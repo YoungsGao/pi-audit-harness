@@ -1,0 +1,14 @@
+node_modules/
+runs/
+
+.env
+.env.*
+!.env.example
+
+__pycache__/
+.venv/
+
+*.log
+
+.pytest_cache/
+*.egg-info/
