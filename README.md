@@ -1,6 +1,6 @@
 ## Pi Audit Harness
 
-基于 Pi 的代码审计与污点分析智能体，在线文档：https://youngsgao.github.io/pi-audit-harness/docs
+基于 Pi 的代码审计与污点分析智能体，[在线文档](https://youngsgao.github.io/pi-audit-harness/docs)
 
 ## 当前进度
 
