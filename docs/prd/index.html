@@ -977,7 +977,7 @@
       "description": "Pi Loop 从 SQLite 领取调用链，取证并进行污点传播分析，通过 /analyze SSE 展示进度，保存过程事件与结构化结果。",
       "acceptance": [
         "至少一条真实调用链完成领取、源码取证、污点判断和事务回写",
-        "data.type 为 thinking / process / result 的 SSE 帧可在前端实时观察，并关联 runId、chainId、sessionId、checkpoint",
+        "data.type 为 thinking / process / result 的 SSE 帧可在前端实时观察，并关联 runId、chainId、sessionId、eventId",
         "分析事件持久化，包含工具输入输出摘要、耗时与错误，可用于调用链详情调试",
         "上限、防重复和错误终态生效；中断/未知不得当成安全或完成"
       ],
@@ -1124,11 +1124,11 @@
           "id": "API-02",
           "module": "M07",
           "title": "POST /analyze：SSE 三段帧与事件驱动",
-          "description": "event / id / data 三段式 SSE；event 表达业务事件，id 对齐会话 checkpoint，data JSON 的 type 区分思考、过程、结果。",
+          "description": "event / id / data 三段式 SSE；event 驱动状态，id 为事件游标，data.type 区分思考、过程、结果。",
           "acceptance": [
             "请求包含 projectId、modelConfigId；链路流绑定 chainId、sessionId；一个流的 id 只在该 session 内递增",
             "响应为 text/event-stream，UTF-8、空行分帧；event 与 id 为文本字段，data 为单个 JSON 对象",
-            "id = checkpoint = 同 session 有序集合 score；每个带 id 的业务帧均有完整有效会话快照，发布前先持久化",
+            "id 为同一会话流内递增事件游标；事件与对应状态持久化后发送，不要求每帧保存完整会话快照",
             "data.type 使用 thinking / process / result；event 可为 queued、analyzing、thoughts_execute、tool_call_info 及终态事件",
             "Harness 根据事件表校验并迁移状态，工具/思考事件不改变 analyze；重复与旧 attempt 事件不覆盖状态",
             "前端通过 fetch POST 解析流；携带 sessionId + afterId 重连，重放沿用原 id，不能把不同 session 的数字 id 混用",
@@ -1150,19 +1150,19 @@
           "design": [
             {
               "title": "帧示例",
-              "code": "event: queued\nid: 1\ndata: {\"sessionId\":\"s1\",\"runId\":\"r1\",\"chainId\":\"c1\",\"attemptId\":1,\"checkpoint\":1,\"type\":\"process\",\"status\":\"queue\",\"message\":\"调用链进入队列\"}\n\nevent: analyzing\nid: 2\ndata: {\"sessionId\":\"s1\",\"runId\":\"r1\",\"chainId\":\"c1\",\"attemptId\":1,\"checkpoint\":2,\"type\":\"process\",\"status\":\"analyze\",\"message\":\"开始分析\"}\n\nevent: thoughts_execute\nid: 3\ndata: {\"sessionId\":\"s1\",\"runId\":\"r1\",\"chainId\":\"c1\",\"attemptId\":1,\"checkpoint\":3,\"type\":\"thinking\",\"status\":\"analyze\",\"message\":\"核查输入到危险参数的传播证据\"}\n\nevent: tool_call_info\nid: 4\ndata: {\"sessionId\":\"s1\",\"runId\":\"r1\",\"chainId\":\"c1\",\"attemptId\":1,\"checkpoint\":4,\"type\":\"process\",\"status\":\"analyze\",\"toolCallId\":\"t1\",\"details\":{\"name\":\"read_source\",\"phase\":\"completed\",\"input\":{\"file\":\"UserService.java\",\"line\":42},\"output\":{\"evidence\":\"参数进入 SQL 拼接\"}}}\n\nevent: completed\nid: 5\ndata: {\"sessionId\":\"s1\",\"runId\":\"r1\",\"chainId\":\"c1\",\"attemptId\":1,\"checkpoint\":5,\"type\":\"result\",\"status\":\"completed\",\"details\":{\"verdict\":\"risk\",\"dangerous\":true}}\n\n"
+              "code": "event: queued\nid: 1\ndata: {\"sessionId\":\"s1\",\"runId\":\"r1\",\"chainId\":\"c1\",\"attemptId\":1,\"type\":\"process\",\"status\":\"queue\",\"message\":\"调用链进入队列\"}\n\nevent: analyzing\nid: 2\ndata: {\"sessionId\":\"s1\",\"runId\":\"r1\",\"chainId\":\"c1\",\"attemptId\":1,\"type\":\"process\",\"status\":\"analyze\",\"message\":\"开始分析\"}\n\nevent: thoughts_execute\nid: 3\ndata: {\"sessionId\":\"s1\",\"runId\":\"r1\",\"chainId\":\"c1\",\"attemptId\":1,\"type\":\"thinking\",\"status\":\"analyze\",\"message\":\"核查输入到危险参数的传播证据\"}\n\nevent: tool_call_info\nid: 4\ndata: {\"sessionId\":\"s1\",\"runId\":\"r1\",\"chainId\":\"c1\",\"attemptId\":1,\"type\":\"process\",\"status\":\"analyze\",\"toolCallId\":\"t1\",\"details\":{\"name\":\"read_source\",\"phase\":\"completed\",\"input\":{\"file\":\"UserService.java\",\"line\":42},\"output\":{\"evidence\":\"参数进入 SQL 拼接\"}}}\n\nevent: completed\nid: 5\ndata: {\"sessionId\":\"s1\",\"runId\":\"r1\",\"chainId\":\"c1\",\"attemptId\":1,\"type\":\"result\",\"status\":\"completed\",\"details\":{\"verdict\":\"risk\",\"dangerous\":true}}\n\n"
             },
             {
-              "title": "分类与事件",
-              "text": "三类展示由 data.type 决定，不再固定 event=thinking/process/result。queued→queue；analyzing→analyze；completed/stopped/cancelled/failed/timed_out→对应终态。thinking 只展示模型提供的分析摘要。"
+              "title": "事件与游标",
+              "text": "event 驱动 Harness 状态迁移；data.type 区分 thinking/process/result。id 只用于事件排序、去重与补发，不与 Pi 会话检查点或 ZSet score 强绑定。"
             },
             {
-              "title": "游标与恢复",
-              "text": "每个带 id 的业务帧先保存完整可恢复会话快照，并提交事件与状态，再发送。不能只递增 SSE id 而缺少对应快照。重放使用原 id，不生成新 checkpoint。 同一 SSE 流绑定一个 sessionId，id 只在该 session 内递增。仓库分析由 Harness 调度多个链路 session，前端汇总显示。 事件缓存与快照均需保留策略；afterId 是传输游标，恢复使用最大有效快照。"
+              "title": "会话管理待确认",
+              "text": "优先验证 Pi SessionManager 的持久化与恢复能力；不将 LevelDB / ZSet 作为必选实现。"
             },
             {
-              "title": "前端解析",
-              "text": "fetch ReadableStream 增量解码 UTF-8、处理拆包和合包。POST 重连显式携带 afterId；不要求原生 EventSource 发送 JSON 请求体。"
+              "title": "前端接收",
+              "text": "fetch POST 增量解析 SSE；sessionId + afterId 用于事件补发。事件历史过期需重新获取当前任务状态。"
             }
           ]
         },
@@ -1170,12 +1170,12 @@
           "id": "UI-05",
           "module": "M08",
           "title": "三段式分析流前端展示",
-          "description": "按 data.type 展示思考、过程和结果，按 event 更新链路状态；使用 sessionId + checkpoint 去重。",
+          "description": "按 data.type 展示思考、过程和结果，按 event 更新链路状态，按 sessionId + eventId 去重。",
           "acceptance": [
             "思考区域展示当前目标与分析摘要",
             "过程区域展示预处理、取证、状态和已处理链路",
             "结果区域展示结构化结论及数据库统计",
-            "按 sessionId/checkpoint 关联与去重，解析错误或断连有明确状态",
+            "按 sessionId/eventId 关联与去重，解析错误或断连有明确状态",
             "至少一条真实调用链从提交到结果回写可在界面观察",
             "点击调用链详情可查看该链的分析过程；不同链路的事件不串线"
           ],
@@ -1218,7 +1218,7 @@
       "design": [
         {
           "title": "关键设计看板 · 2026-10-18",
-          "text": "调用链状态名称和迁移以关键设计中的 DESIGN-01 为准；短期会话与检查点方案见 DESIGN-02。恢复能力当前仍为 P1，库选型和是否提升优先级待确认。"
+          "text": "状态迁移见 DESIGN-01；SSE 协议见 DESIGN-03；会话管理见末尾 DESIGN-02，优先验证 Pi 原生能力，方案待确认。"
         }
       ]
     },
@@ -1823,7 +1823,7 @@
       "title": "任务控制与恢复",
       "priority": "P1",
       "module": "M03",
-      "description": "提供任务停止、状态保存与恢复；每个 sessionId 使用有序集合保存完整会话快照，以递增 checkpoint 排序，恢复时读取最新有效快照。",
+      "description": "提供任务停止与状态恢复；会话管理方案待确认，优先验证 Pi 原生持久化和继续会话能力。",
       "acceptance": [
         "停止与任务状态持久化：停止请求得到明确确认",
         "风险点边界检查点恢复：已提交风险点不丢失、不重复计数"
@@ -1864,14 +1864,14 @@
           "id": "RUN-02",
           "module": "M10",
           "title": "风险点边界检查点恢复",
-          "description": "支持风险点边界的检查点恢复；会话内部安全边界按 DESIGN-02 设计保存和恢复完整会话快照。",
+          "description": "支持风险点边界的任务恢复；会话上下文恢复优先验证 Pi 原生能力，具体方案待确认。",
           "acceptance": [
             "已提交风险点不丢失、不重复计数",
             "未提交风险点可重跑，并说明用量影响",
             "恢复使用原快照和审计配置",
-            "每个 sessionId 对应一个有序集合；score 为唯一递增 checkpoint，member 直接保存完整会话 JSON",
-            "按 checkpoint 降序取第一个完整有效 member 恢复，恢复后继续递增序号；同 checkpoint 保存重试幂等",
-            "未完整发布的快照不可见；两库写入中断后先协调提交意图，再允许会话恢复"
+            "验证 Pi 会话重新打开后能否继续当前链路，以及中断工具的执行边界",
+            "SQLite 保存调用链与 Pi 会话关联；会话持久化方案以 DESIGN-02 验证结论为准",
+            "SSE 事件补发与 Agent 恢复独立处理；恢复操作不重复提交已落库结果"
           ],
           "dependencies": [
             "RUN-01",
@@ -1886,20 +1886,28 @@
           "ref": "FR-12 / A10",
           "design": [
             {
-              "title": "存储语义",
-              "text": "以关键设计 DESIGN-02 为准：session:{sessionId} → ZSet(checkpoint, 完整会话 JSON)。LevelDB 通过有序键与反向迭代封装实现；不将 member 改成快照 ID，不以时间戳作为 score。"
+              "title": "会话管理（待确认）",
+              "text": "优先验证 Pi SessionManager，LevelDB / ZSet 仅为发现能力缺口后的备选，不作为当前验收必选技术。"
             }
           ]
         }
       ],
       "design": [
         {
-          "title": "关键设计看板 · 2026-10-18",
-          "text": "调用链状态名称和迁移以关键设计中的 DESIGN-01 为准；短期会话与检查点方案见 DESIGN-02。恢复能力当前仍为 P1，库选型和是否提升优先级待确认。"
+          "title": "会话管理（待确认）",
+          "text": "验证 Pi SessionManager 的会话持久化、打开与继续能力；SQLite 记录 chainId 与 Pi sessionId / sessionFile 的关联。"
         },
         {
-          "title": "会话快照有序集合（已对齐）",
-          "text": "Key = session:{sessionId}；score = checkpoint，使用同一 session 内唯一且单调递增的整数；member = 完整会话 JSON，直接存放可恢复上下文，不改成仅保存 sessionId 或 checkpointId。checkpoint 表示保存进度，不使用时间戳充当 score。 从 SQLite 当前调用链取得 sessionId → 对该集合按 score 降序取第一个 member → 反序列化完整会话 JSON → 核对所属链路、源码、规则、模型、schema 与有效期 → Harness 原子领取并生成新 attemptId → queue → analyze，从最近安全步骤继续。新 attempt 沿用该 session 的递增 checkpoint；全新会话使用新的 sessionId。"
+          "title": "会话管理（待确认）",
+          "text": "中断后的上下文恢复、工具执行边界、业务结果幂等，以及源码或配置变更后的处理。恢复会话不保证恢复执行中的精确位置。"
+        },
+        {
+          "title": "会话管理（待确认）",
+          "text": "只有 Pi 原生能力存在明确缺口时，再评估 LevelDB / ZSet 会话快照；具体存储与检查点协议尚未确定。"
+        },
+        {
+          "title": "会话管理（待确认）",
+          "text": "Pi 管理会话上下文，Harness / SQLite 管理调用链任务；SSE id 用作事件游标，不与会话 checkpoint 或 ZSet score 强绑定。"
         }
       ]
     },
@@ -2368,7 +2376,7 @@
   "designBoard": {
     "updated": "2026-10-18",
     "title": "关键设计",
-    "status": "状态机 · LevelDB 会话快照 · SSE 事件协议",
+    "status": "状态机 · SSE 协议 · 会话管理（待确认）",
     "states": [
       [
         "init",
@@ -2433,25 +2441,6 @@
         ]
       },
       {
-        "id": "DESIGN-02",
-        "title": "Agent 断点恢复与短期会话",
-        "label": "方案已对齐 · LevelDB 适配待实现",
-        "related": [
-          "ANALYZE-01",
-          "RECOVERY-01"
-        ],
-        "sections": [
-          {
-            "title": "数据结构",
-            "text": "每个 sessionId 一个逻辑 ZSet；score = 递增 checkpoint；member = 完整会话 JSON。"
-          },
-          {
-            "title": "恢复",
-            "text": "按 score 降序取第一个有效 member；继续分配 checkpoint + 1。LevelDB 适配有序集合，非原生 ZSet。"
-          }
-        ]
-      },
-      {
         "id": "DESIGN-03",
         "title": "SSE 三段帧与事件驱动",
         "label": "event / id / data",
@@ -2463,6 +2452,33 @@
           {
             "title": "协议",
             "text": "event 驱动状态；id = checkpoint = score；data 是一个 JSON 对象，使用 type 区分思考、过程、结果。"
+          }
+        ]
+      },
+      {
+        "id": "DESIGN-02",
+        "title": "会话管理",
+        "label": "待确认 · 优先验证 Pi 原生能力",
+        "related": [
+          "ANALYZE-01",
+          "RECOVERY-01"
+        ],
+        "sections": [
+          {
+            "title": "优先方案",
+            "text": "验证 Pi SessionManager 的会话持久化、打开与继续能力；SQLite 记录 chainId 与 Pi sessionId / sessionFile 的关联。"
+          },
+          {
+            "title": "待验证",
+            "text": "中断后的上下文恢复、工具执行边界、业务结果幂等，以及源码或配置变更后的处理。恢复会话不保证恢复执行中的精确位置。"
+          },
+          {
+            "title": "备选方案",
+            "text": "只有 Pi 原生能力存在明确缺口时，再评估 LevelDB / ZSet 会话快照；具体存储与检查点协议尚未确定。"
+          },
+          {
+            "title": "职责分开",
+            "text": "Pi 管理会话上下文，Harness / SQLite 管理调用链任务；SSE id 用作事件游标，不与会话 checkpoint 或 ZSet score 强绑定。"
           }
         ]
       }
@@ -2479,28 +2495,29 @@
       "status": "completed",
       "verdict": "insufficient_evidence",
       "dangerous": null,
-      "checkpointId": "cp-000012",
-      "sessionId": "s1",
-      "checkpoint": 12
+      "sessionId": "s1"
     },
-    "kvExample": "// 逻辑 ZSet：session:s1\nscore   member（完整会话 JSON）\n1       {\"sessionId\":\"s1\",\"messages\":[...],\"toolResults\":[...]}\n2       {\"sessionId\":\"s1\",\"messages\":[...],\"toolResults\":[...]}\n3       {\"sessionId\":\"s1\",\"messages\":[...],\"toolResults\":[...]}\n\n// LevelDB 物理映射：key → 完整 JSON\nzset!s1!00000001 → {...}\nzset!s1!00000002 → {...}\nzset!s1!00000003 → {...}  // 反向迭代，取第一条\n\nlatest = sessions.latest(\"s1\")   // score: 3, member: {...}\nsessions.add(\"s1\", 4, nextJson) // 适配层伪代码，非 LevelDB 原生 API",
     "sources": [
       {
-        "title": "LevelDB 官方能力与限制",
-        "url": "https://github.com/google/leveldb"
+        "title": "Pi 会话管理 SDK",
+        "url": "https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/sdk.md#session-storage"
+      },
+      {
+        "title": "Pi 会话示例",
+        "url": "https://github.com/earendil-works/pi/blob/main/packages/coding-agent/examples/sdk/11-sessions.ts"
       }
     ],
     "sse": {
       "fields": {
         "event": "事件名称；驱动 Harness 状态流转",
-        "id": "checkpoint；等于该 session 的 ZSet score",
+        "id": "同一会话流内递增的事件游标，用于去重与补发；不等同于会话检查点",
         "data": "单个 JSON 对象；type = thinking / process / result"
       },
-      "example": "event: queued\nid: 1\ndata: {\"sessionId\":\"s1\",\"runId\":\"r1\",\"chainId\":\"c1\",\"attemptId\":1,\"checkpoint\":1,\"type\":\"process\",\"status\":\"queue\",\"message\":\"调用链进入队列\"}\n\nevent: analyzing\nid: 2\ndata: {\"sessionId\":\"s1\",\"runId\":\"r1\",\"chainId\":\"c1\",\"attemptId\":1,\"checkpoint\":2,\"type\":\"process\",\"status\":\"analyze\",\"message\":\"开始分析\"}\n\nevent: thoughts_execute\nid: 3\ndata: {\"sessionId\":\"s1\",\"runId\":\"r1\",\"chainId\":\"c1\",\"attemptId\":1,\"checkpoint\":3,\"type\":\"thinking\",\"status\":\"analyze\",\"message\":\"核查输入到危险参数的传播证据\"}\n\nevent: tool_call_info\nid: 4\ndata: {\"sessionId\":\"s1\",\"runId\":\"r1\",\"chainId\":\"c1\",\"attemptId\":1,\"checkpoint\":4,\"type\":\"process\",\"status\":\"analyze\",\"toolCallId\":\"t1\",\"details\":{\"name\":\"read_source\",\"phase\":\"completed\",\"input\":{\"file\":\"UserService.java\",\"line\":42},\"output\":{\"evidence\":\"参数进入 SQL 拼接\"}}}\n\nevent: completed\nid: 5\ndata: {\"sessionId\":\"s1\",\"runId\":\"r1\",\"chainId\":\"c1\",\"attemptId\":1,\"checkpoint\":5,\"type\":\"result\",\"status\":\"completed\",\"details\":{\"verdict\":\"risk\",\"dangerous\":true}}\n\n",
+      "example": "event: queued\nid: 1\ndata: {\"sessionId\":\"s1\",\"runId\":\"r1\",\"chainId\":\"c1\",\"attemptId\":1,\"type\":\"process\",\"status\":\"queue\",\"message\":\"调用链进入队列\"}\n\nevent: analyzing\nid: 2\ndata: {\"sessionId\":\"s1\",\"runId\":\"r1\",\"chainId\":\"c1\",\"attemptId\":1,\"type\":\"process\",\"status\":\"analyze\",\"message\":\"开始分析\"}\n\nevent: thoughts_execute\nid: 3\ndata: {\"sessionId\":\"s1\",\"runId\":\"r1\",\"chainId\":\"c1\",\"attemptId\":1,\"type\":\"thinking\",\"status\":\"analyze\",\"message\":\"核查输入到危险参数的传播证据\"}\n\nevent: tool_call_info\nid: 4\ndata: {\"sessionId\":\"s1\",\"runId\":\"r1\",\"chainId\":\"c1\",\"attemptId\":1,\"type\":\"process\",\"status\":\"analyze\",\"toolCallId\":\"t1\",\"details\":{\"name\":\"read_source\",\"phase\":\"completed\",\"input\":{\"file\":\"UserService.java\",\"line\":42},\"output\":{\"evidence\":\"参数进入 SQL 拼接\"}}}\n\nevent: completed\nid: 5\ndata: {\"sessionId\":\"s1\",\"runId\":\"r1\",\"chainId\":\"c1\",\"attemptId\":1,\"type\":\"result\",\"status\":\"completed\",\"details\":{\"verdict\":\"risk\",\"dangerous\":true}}\n\n",
       "scope": "同一 SSE 流绑定一个 sessionId，id 只在该 session 内递增。仓库分析由 Harness 调度多个链路 session，前端汇总显示。",
-      "recovery": "每个带 id 的业务帧先保存完整可恢复会话快照，并提交事件与状态，再发送。不能只递增 SSE id 而缺少对应快照。重放使用原 id，不生成新 checkpoint。",
+      "recovery": "业务事件及对应状态持久化后发送；断线按 afterId 重放原事件，重放沿用原 id。Agent 会话恢复单独验证，不要求每个事件保存完整会话快照。",
       "heartbeat": ": ping\n\n",
-      "resume": "POST /analyze\n{\"projectId\":\"p1\",\"modelConfigId\":\"m1\",\"chainId\":\"c1\",\"sessionId\":\"s1\",\"afterId\":3}\n\n// 传输重连：按 afterId 重放已持久化的后续事件（id > 3）\n// Agent 已中断：读取 s1 最大有效 checkpoint 的完整快照恢复\n// 两者独立；重连不自动重启 Agent，恢复需显式操作。",
+      "resume": "POST /analyze\n{\"projectId\":\"p1\",\"modelConfigId\":\"m1\",\"chainId\":\"c1\",\"sessionId\":\"s1\",\"afterId\":3}\n\n// SSE 补发：读取 eventId > 3 的已持久化事件\n// Agent 恢复：优先验证 Pi SessionManager.open(sessionFile)\n// eventId 与会话检查点不强绑定",
       "events": [
         [
           "queued",
@@ -2569,7 +2586,7 @@ function closeDetail(){document.querySelector('#detail').hidden=true;activeReq=n
 function navigate(view,module){state.view=labels[view]?view:'overview';if(module)state.module=module;closeDetail();if(location.hash!=='#'+state.view)location.hash=state.view;render();window.scrollTo(0,0)}
 function overview(){return `<div class="heading"><div><div class="eyebrow">AGENT WORKFLOW / P0 FIRST</div><h1>需求总览</h1><p class="sub">15 个父需求按功能流程组织；实现细节收纳为子需求。P0 跑通主流程，P1 做增强，P2 留后续。</p></div><button class="btn primary" data-action="all">查看需求列表 ${icon('arrow')}</button></div><section class="intro"><div><h2>先跑通审计流程</h2><p class="sub">Electron 客户端连接以 Pi 为基座的本地服务。模型手动配置并 ping 连通；源码先经过风险工具处理，调用链写入 SQLite，再由 Agent Loop 领取分析，经 /analyze SSE 展示过程，最终回写结果并由 Pi /report 生成 HTML。</p><div class="flow-strip"><span>Electron / Pi 服务</span><i>→</i><span>模型 ping</span><i>→</i><span>源码输入</span><i>→</i><span>调用链入库</span><i>→</i><span>/analyze SSE</span><i>→</i><span>/report HTML</span></div><div class="scope"><span class="tag">Windows x64</span><span class="tag">Java / Spring</span><span class="tag">SQLite</span><span class="tag">Git 缺失只提示安装</span><span class="tag">思考 / 过程 / 结果</span></div></div></section><div class="counts">${[['父需求总数',REQS.length],['P0 · 主链路',REQS.filter(r=>r.priority==='P0').length],['P1 · 增强',REQS.filter(r=>r.priority==='P1').length],['P2 · 后续',REQS.filter(r=>r.priority==='P2').length]].map(([t,n])=>`<div class="count"><span>${t}</span><strong>${String(n).padStart(2,'0')}</strong></div>`).join('')}</div><div class="section-head"><h2>按功能范围查看</h2><small>${MODULES.length} 个范围 · 点击进入需求列表</small></div><div class="module-grid">${MODULES.map(m=>{const all=REQS.filter(r=>r.module===m.id);const numbers=['P0','P1','P2'].map(p=>[p,all.filter(r=>r.priority===p).length]).filter(x=>x[1]);return `<button class="module-card" data-module="${m.id}"><div class="module-top"><span class="module-id">${m.id}</span><span class="tag">${all.length} 项需求</span></div><h3>${m.name}</h3><p>${m.summary}</p><div class="module-foot"><span>${numbers.map(([p,n])=>p+' '+n+' 项').join(' · ')}</span>${icon('arrow')}</div></button>`}).join('')}</div>`}
 function requirements(){const list=filtered();return `<div class="heading"><div><div class="eyebrow">REQUIREMENTS</div><h1>需求列表</h1><p class="sub">按完整功能流程组织需求，点击后在右侧查看子需求与验收条件。</p></div></div><div class="toolbar"><div class="filter-left"><select class="select" id="modulefilter" aria-label="按模块筛选"><option value="all">全部模块</option>${MODULES.map(m=>`<option value="${m.id}" ${state.module===m.id?'selected':''}>${m.name}</option>`).join('')}</select><div class="priority-tabs">${[['all','全部'],['P0','P0 主链路'],['P1','P1 增强'],['P2','P2 后续']].map(([k,l])=>`<button data-priority="${k}" class="${state.priority===k?'active':''}">${l}</button>`).join('')}</div>${state.module!=='all'||state.priority!=='all'||state.query?'<button class="clear" data-action="reset">清除筛选</button>':''}</div><span class="result-count">${list.length} 项需求</span></div>${list.length?`<div class="list"><div class="list-header"><span>编号</span><span>需求</span><span class="header-module">模块</span><span>优先级</span><span></span></div>${list.map(r=>`<button class="requirement-row ${activeReq===r.id?'active':''}" data-open="${r.id}" aria-label="查看 ${escapeHtml(r.title)}"><span class="row-id">${r.id}</span><span style="min-width:0"><span class="row-title">${escapeHtml(r.title)}</span><span class="row-desc">${escapeHtml(r.description)}</span><span class="child-count">${(r.children||[]).length} 个子需求</span></span><span class="row-module">${getModule(r.module).name}</span>${priorityHTML(r.priority)}${icon('chevron')}</button>`).join('')}</div>`:'<div class="empty"><p>没有匹配的需求。</p><button class="btn" data-action="reset">清除筛选</button></div>'}`}
-function design(){return "<div class=\"heading\"><div><div class=\"eyebrow\">HARNESS / KEY DESIGNS</div><h1>关键设计</h1><p class=\"sub\">状态机 / 会话快照 / SSE 协议</p></div></div><div class=\"visual-designs\"><article class=\"design-card\"><div class=\"module-top\"><span class=\"module-id\">01 / STATE MACHINE</span><span class=\"tag\">Harness 管状态 · Agent 回调</span></div><h2>调用链状态机</h2><svg class=\"state-diagram\" viewBox=\"0 0 1000 410\" role=\"img\" aria-label=\"调用链状态机：init 到 queue 到 analyze 到 completed；可停止、取消、失败或超时，并受控重试\"><defs><marker id=\"state-arrow\" markerWidth=\"8\" markerHeight=\"8\" refX=\"7\" refY=\"4\" orient=\"auto\"><path d=\"M0 0L8 4L0 8\" fill=\"#6b9cc7\"/></marker></defs><g><rect x=\"35\" y=\"70\" width=\"160\" height=\"66\" rx=\"9\" fill=\"#10283f\" stroke=\"#89afd0\"/><text x=\"115.0\" y=\"97\" fill=\"#89afd0\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"16\">init</text><text x=\"115.0\" y=\"119\" fill=\"#8baece\" text-anchor=\"middle\" font-size=\"12\">调用链入库</text></g><g><rect x=\"285\" y=\"70\" width=\"160\" height=\"66\" rx=\"9\" fill=\"#10283f\" stroke=\"#89c8f7\"/><text x=\"365.0\" y=\"97\" fill=\"#89c8f7\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"16\">queue</text><text x=\"365.0\" y=\"119\" fill=\"#8baece\" text-anchor=\"middle\" font-size=\"12\">等待领取</text></g><g><rect x=\"535\" y=\"70\" width=\"160\" height=\"66\" rx=\"9\" fill=\"#10283f\" stroke=\"#65b9ff\"/><text x=\"615.0\" y=\"97\" fill=\"#65b9ff\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"16\">analyze</text><text x=\"615.0\" y=\"119\" fill=\"#8baece\" text-anchor=\"middle\" font-size=\"12\">Agent 分析</text></g><g><rect x=\"805\" y=\"70\" width=\"160\" height=\"66\" rx=\"9\" fill=\"#10283f\" stroke=\"#72c5b0\"/><text x=\"885.0\" y=\"97\" fill=\"#72c5b0\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"16\">completed</text><text x=\"885.0\" y=\"119\" fill=\"#8baece\" text-anchor=\"middle\" font-size=\"12\">结果落库</text></g><path d=\"M195 103H285\" fill=\"none\" stroke=\"#6b9cc7\" stroke-width=\"1.5\" marker-end=\"url(#state-arrow)\"/><path d=\"M445 103H535\" fill=\"none\" stroke=\"#6b9cc7\" stroke-width=\"1.5\" marker-end=\"url(#state-arrow)\"/><path d=\"M695 103H805\" fill=\"none\" stroke=\"#6b9cc7\" stroke-width=\"1.5\" marker-end=\"url(#state-arrow)\"/><text x=\"235\" y=\"89\" fill=\"#789abc\" text-anchor=\"middle\" font-size=\"11\">启动</text><text x=\"490\" y=\"89\" fill=\"#789abc\" text-anchor=\"middle\" font-size=\"11\">领取</text><text x=\"750\" y=\"89\" fill=\"#789abc\" text-anchor=\"middle\" font-size=\"11\">result 回调</text><g><rect x=\"35\" y=\"265\" width=\"160\" height=\"66\" rx=\"9\" fill=\"#10283f\" stroke=\"#c4b685\"/><text x=\"115.0\" y=\"292\" fill=\"#c4b685\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"16\">stop</text><text x=\"115.0\" y=\"314\" fill=\"#8baece\" text-anchor=\"middle\" font-size=\"12\">停止 · 可恢复</text></g><path d=\"M615 136V214H115V265\" fill=\"none\" stroke=\"#6b9cc7\" stroke-width=\"1.5\" marker-end=\"url(#state-arrow)\"/><g><rect x=\"285\" y=\"265\" width=\"160\" height=\"66\" rx=\"9\" fill=\"#10283f\" stroke=\"#d19c99\"/><text x=\"365.0\" y=\"292\" fill=\"#d19c99\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"16\">error</text><text x=\"365.0\" y=\"314\" fill=\"#8baece\" text-anchor=\"middle\" font-size=\"12\">执行失败</text></g><path d=\"M615 136V214H365V265\" fill=\"none\" stroke=\"#6b9cc7\" stroke-width=\"1.5\" marker-end=\"url(#state-arrow)\"/><g><rect x=\"535\" y=\"265\" width=\"160\" height=\"66\" rx=\"9\" fill=\"#10283f\" stroke=\"#c4b685\"/><text x=\"615.0\" y=\"292\" fill=\"#c4b685\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"16\">timeout</text><text x=\"615.0\" y=\"314\" fill=\"#8baece\" text-anchor=\"middle\" font-size=\"12\">超时</text></g><path d=\"M615 136V214H615V265\" fill=\"none\" stroke=\"#6b9cc7\" stroke-width=\"1.5\" marker-end=\"url(#state-arrow)\"/><g><rect x=\"805\" y=\"265\" width=\"160\" height=\"66\" rx=\"9\" fill=\"#10283f\" stroke=\"#a6a8c4\"/><text x=\"885.0\" y=\"292\" fill=\"#a6a8c4\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"16\">cancel</text><text x=\"885.0\" y=\"314\" fill=\"#8baece\" text-anchor=\"middle\" font-size=\"12\">取消</text></g><path d=\"M615 136V214H885V265\" fill=\"none\" stroke=\"#6b9cc7\" stroke-width=\"1.5\" marker-end=\"url(#state-arrow)\"/><path d=\"M115 331V374H245V30H365V70\" fill=\"none\" stroke=\"#6b9cc7\" stroke-width=\"1.5\" marker-end=\"url(#state-arrow)\" stroke-dasharray=\"5 5\"/><path d=\"M365 331V374H245\" fill=\"none\" stroke=\"#6b9cc7\" stroke-width=\"1.5\" marker-end=\"url(#state-arrow)\" stroke-dasharray=\"5 5\"/><path d=\"M615 331V374H365\" fill=\"none\" stroke=\"#6b9cc7\" stroke-width=\"1.5\" marker-end=\"url(#state-arrow)\" stroke-dasharray=\"5 5\"/><text x=\"485\" y=\"398\" fill=\"#8db9df\" text-anchor=\"middle\" font-size=\"12\">虚线：stop 继续 / error、timeout 受控重试 → queue（新 attemptId）</text></svg><div class=\"mini-notes\"><span>init / queue 也可取消；queue 可停止。</span><span>cancel / completed 结束本次 attempt。</span><span>思考、工具事件不改变 analyze。</span></div><div class=\"related\"><button data-related=\"SOURCE-01\">源码仓库输入</button><button data-related=\"ANALYZE-01\">Agent 分析流程</button></div></article><article class=\"design-card\"><div class=\"module-top\"><span class=\"module-id\">02 / LEVELDB</span><span class=\"tag\">sessionId → ZSet</span></div><h2>断点恢复：checkpoint 排序，JSON 存会话</h2><div class=\"structure-flow\"><div><small>集合 Key</small><code>session:{sessionId}</code></div><i>→</i><div><small>Score</small><code>checkpoint ↑</code></div><i>→</i><div><small>Member</small><code>完整会话 JSON</code></div></div><div class=\"code-caption\">数据结构与操作（伪代码）</div><pre class=\"design-code\">// 逻辑 ZSet：session:s1\nscore   member（完整会话 JSON）\n1       {&quot;sessionId&quot;:&quot;s1&quot;,&quot;messages&quot;:[...],&quot;toolResults&quot;:[...]}\n2       {&quot;sessionId&quot;:&quot;s1&quot;,&quot;messages&quot;:[...],&quot;toolResults&quot;:[...]}\n3       {&quot;sessionId&quot;:&quot;s1&quot;,&quot;messages&quot;:[...],&quot;toolResults&quot;:[...]}\n\n// LevelDB 物理映射：key → 完整 JSON\nzset!s1!00000001 → {...}\nzset!s1!00000002 → {...}\nzset!s1!00000003 → {...}  // 反向迭代，取第一条\n\nlatest = sessions.latest(&quot;s1&quot;)   // score: 3, member: {...}\nsessions.add(&quot;s1&quot;, 4, nextJson) // 适配层伪代码，非 LevelDB 原生 API</pre><div class=\"mini-notes\"><span>降序第一条 = 最新有效快照。</span><span>新快照序号继续递增，完整落盘后可见。</span><span>LevelDB 需封装 ZSet；恢复仍为 P1。</span></div><div class=\"related\"><button data-related=\"RECOVERY-01\">任务控制与恢复</button></div></article><article class=\"design-card\"><div class=\"module-top\"><span class=\"module-id\">03 / SSE</span><span class=\"tag\">event + id + data</span></div><h2>事件驱动与三段帧</h2><div class=\"structure-flow\"><div><small>event</small><code>驱动状态流转</code></div><div><small>id</small><code>checkpoint = score</code></div><div><small>data（JSON）</small><code>type + 上下文 + 内容</code></div></div><div class=\"code-caption\">text/event-stream · 空行分帧 · data 是 JSON</div><pre class=\"design-code\">event: queued\nid: 1\ndata: {&quot;sessionId&quot;:&quot;s1&quot;,&quot;runId&quot;:&quot;r1&quot;,&quot;chainId&quot;:&quot;c1&quot;,&quot;attemptId&quot;:1,&quot;checkpoint&quot;:1,&quot;type&quot;:&quot;process&quot;,&quot;status&quot;:&quot;queue&quot;,&quot;message&quot;:&quot;调用链进入队列&quot;}\n\nevent: analyzing\nid: 2\ndata: {&quot;sessionId&quot;:&quot;s1&quot;,&quot;runId&quot;:&quot;r1&quot;,&quot;chainId&quot;:&quot;c1&quot;,&quot;attemptId&quot;:1,&quot;checkpoint&quot;:2,&quot;type&quot;:&quot;process&quot;,&quot;status&quot;:&quot;analyze&quot;,&quot;message&quot;:&quot;开始分析&quot;}\n\nevent: thoughts_execute\nid: 3\ndata: {&quot;sessionId&quot;:&quot;s1&quot;,&quot;runId&quot;:&quot;r1&quot;,&quot;chainId&quot;:&quot;c1&quot;,&quot;attemptId&quot;:1,&quot;checkpoint&quot;:3,&quot;type&quot;:&quot;thinking&quot;,&quot;status&quot;:&quot;analyze&quot;,&quot;message&quot;:&quot;核查输入到危险参数的传播证据&quot;}\n\nevent: tool_call_info\nid: 4\ndata: {&quot;sessionId&quot;:&quot;s1&quot;,&quot;runId&quot;:&quot;r1&quot;,&quot;chainId&quot;:&quot;c1&quot;,&quot;attemptId&quot;:1,&quot;checkpoint&quot;:4,&quot;type&quot;:&quot;process&quot;,&quot;status&quot;:&quot;analyze&quot;,&quot;toolCallId&quot;:&quot;t1&quot;,&quot;details&quot;:{&quot;name&quot;:&quot;read_source&quot;,&quot;phase&quot;:&quot;completed&quot;,&quot;input&quot;:{&quot;file&quot;:&quot;UserService.java&quot;,&quot;line&quot;:42},&quot;output&quot;:{&quot;evidence&quot;:&quot;参数进入 SQL 拼接&quot;}}}\n\nevent: completed\nid: 5\ndata: {&quot;sessionId&quot;:&quot;s1&quot;,&quot;runId&quot;:&quot;r1&quot;,&quot;chainId&quot;:&quot;c1&quot;,&quot;attemptId&quot;:1,&quot;checkpoint&quot;:5,&quot;type&quot;:&quot;result&quot;,&quot;status&quot;:&quot;completed&quot;,&quot;details&quot;:{&quot;verdict&quot;:&quot;risk&quot;,&quot;dangerous&quot;:true}}\n\n</pre><details class=\"design-payload\"><summary>事件映射与恢复请求</summary><div class=\"code-caption\">event → status / type</div><pre class=\"design-code\">queued               → queue        | data.type = process\nanalyzing            → analyze      | data.type = process\nthoughts_execute     → 不变           | data.type = thinking\ntool_call_info       → 不变           | data.type = process\ncompleted            → completed    | data.type = result\nstopped              → stop         | data.type = result\ncancelled            → cancel       | data.type = result\nfailed               → error        | data.type = result\ntimed_out            → timeout      | data.type = result</pre><div class=\"code-caption\">重连与恢复</div><pre class=\"design-code\">POST /analyze\n{&quot;projectId&quot;:&quot;p1&quot;,&quot;modelConfigId&quot;:&quot;m1&quot;,&quot;chainId&quot;:&quot;c1&quot;,&quot;sessionId&quot;:&quot;s1&quot;,&quot;afterId&quot;:3}\n\n// 传输重连：按 afterId 重放已持久化的后续事件（id &gt; 3）\n// Agent 已中断：读取 s1 最大有效 checkpoint 的完整快照恢复\n// 两者独立；重连不自动重启 Agent，恢复需显式操作。</pre></details><div class=\"mini-notes\"><span>一个流绑定一个 session；不同 session 的 id 不混用。</span><span>业务帧：保存快照 / 事件 / 状态 → 发布 SSE。</span><span>心跳用 : ping，不占 id。</span><span>思考 = 模型提供的分析摘要。</span></div><div class=\"related\"><button data-related=\"ANALYZE-01\">Agent 分析流程</button><button data-related=\"RESULT-01\">调用链详情与审计结果</button></div></article></div>"}
+function design(){return "<div class=\"heading\"><div><div class=\"eyebrow\">HARNESS / KEY DESIGNS</div><h1>关键设计</h1><p class=\"sub\">状态机 / SSE 协议 / 会话管理（待确认）</p></div></div><div class=\"visual-designs\"><article class=\"design-card\"><div class=\"module-top\"><span class=\"module-id\">01 / STATE MACHINE</span><span class=\"tag\">Harness 管状态 · Agent 回调</span></div><h2>调用链状态机</h2><svg class=\"state-diagram\" viewBox=\"0 0 1000 410\" role=\"img\" aria-label=\"调用链状态机：init 到 queue 到 analyze 到 completed；可停止、取消、失败或超时，并受控重试\"><defs><marker id=\"state-arrow\" markerWidth=\"8\" markerHeight=\"8\" refX=\"7\" refY=\"4\" orient=\"auto\"><path d=\"M0 0L8 4L0 8\" fill=\"#6b9cc7\"/></marker></defs><g><rect x=\"35\" y=\"70\" width=\"160\" height=\"66\" rx=\"9\" fill=\"#10283f\" stroke=\"#89afd0\"/><text x=\"115.0\" y=\"97\" fill=\"#89afd0\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"16\">init</text><text x=\"115.0\" y=\"119\" fill=\"#8baece\" text-anchor=\"middle\" font-size=\"12\">调用链入库</text></g><g><rect x=\"285\" y=\"70\" width=\"160\" height=\"66\" rx=\"9\" fill=\"#10283f\" stroke=\"#89c8f7\"/><text x=\"365.0\" y=\"97\" fill=\"#89c8f7\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"16\">queue</text><text x=\"365.0\" y=\"119\" fill=\"#8baece\" text-anchor=\"middle\" font-size=\"12\">等待领取</text></g><g><rect x=\"535\" y=\"70\" width=\"160\" height=\"66\" rx=\"9\" fill=\"#10283f\" stroke=\"#65b9ff\"/><text x=\"615.0\" y=\"97\" fill=\"#65b9ff\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"16\">analyze</text><text x=\"615.0\" y=\"119\" fill=\"#8baece\" text-anchor=\"middle\" font-size=\"12\">Agent 分析</text></g><g><rect x=\"805\" y=\"70\" width=\"160\" height=\"66\" rx=\"9\" fill=\"#10283f\" stroke=\"#72c5b0\"/><text x=\"885.0\" y=\"97\" fill=\"#72c5b0\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"16\">completed</text><text x=\"885.0\" y=\"119\" fill=\"#8baece\" text-anchor=\"middle\" font-size=\"12\">结果落库</text></g><path d=\"M195 103H285\" fill=\"none\" stroke=\"#6b9cc7\" stroke-width=\"1.5\" marker-end=\"url(#state-arrow)\"/><path d=\"M445 103H535\" fill=\"none\" stroke=\"#6b9cc7\" stroke-width=\"1.5\" marker-end=\"url(#state-arrow)\"/><path d=\"M695 103H805\" fill=\"none\" stroke=\"#6b9cc7\" stroke-width=\"1.5\" marker-end=\"url(#state-arrow)\"/><text x=\"235\" y=\"89\" fill=\"#789abc\" text-anchor=\"middle\" font-size=\"11\">启动</text><text x=\"490\" y=\"89\" fill=\"#789abc\" text-anchor=\"middle\" font-size=\"11\">领取</text><text x=\"750\" y=\"89\" fill=\"#789abc\" text-anchor=\"middle\" font-size=\"11\">result 回调</text><g><rect x=\"35\" y=\"265\" width=\"160\" height=\"66\" rx=\"9\" fill=\"#10283f\" stroke=\"#c4b685\"/><text x=\"115.0\" y=\"292\" fill=\"#c4b685\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"16\">stop</text><text x=\"115.0\" y=\"314\" fill=\"#8baece\" text-anchor=\"middle\" font-size=\"12\">停止 · 可恢复</text></g><path d=\"M615 136V214H115V265\" fill=\"none\" stroke=\"#6b9cc7\" stroke-width=\"1.5\" marker-end=\"url(#state-arrow)\"/><g><rect x=\"285\" y=\"265\" width=\"160\" height=\"66\" rx=\"9\" fill=\"#10283f\" stroke=\"#d19c99\"/><text x=\"365.0\" y=\"292\" fill=\"#d19c99\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"16\">error</text><text x=\"365.0\" y=\"314\" fill=\"#8baece\" text-anchor=\"middle\" font-size=\"12\">执行失败</text></g><path d=\"M615 136V214H365V265\" fill=\"none\" stroke=\"#6b9cc7\" stroke-width=\"1.5\" marker-end=\"url(#state-arrow)\"/><g><rect x=\"535\" y=\"265\" width=\"160\" height=\"66\" rx=\"9\" fill=\"#10283f\" stroke=\"#c4b685\"/><text x=\"615.0\" y=\"292\" fill=\"#c4b685\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"16\">timeout</text><text x=\"615.0\" y=\"314\" fill=\"#8baece\" text-anchor=\"middle\" font-size=\"12\">超时</text></g><path d=\"M615 136V214H615V265\" fill=\"none\" stroke=\"#6b9cc7\" stroke-width=\"1.5\" marker-end=\"url(#state-arrow)\"/><g><rect x=\"805\" y=\"265\" width=\"160\" height=\"66\" rx=\"9\" fill=\"#10283f\" stroke=\"#a6a8c4\"/><text x=\"885.0\" y=\"292\" fill=\"#a6a8c4\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"16\">cancel</text><text x=\"885.0\" y=\"314\" fill=\"#8baece\" text-anchor=\"middle\" font-size=\"12\">取消</text></g><path d=\"M615 136V214H885V265\" fill=\"none\" stroke=\"#6b9cc7\" stroke-width=\"1.5\" marker-end=\"url(#state-arrow)\"/><path d=\"M115 331V374H245V30H365V70\" fill=\"none\" stroke=\"#6b9cc7\" stroke-width=\"1.5\" marker-end=\"url(#state-arrow)\" stroke-dasharray=\"5 5\"/><path d=\"M365 331V374H245\" fill=\"none\" stroke=\"#6b9cc7\" stroke-width=\"1.5\" marker-end=\"url(#state-arrow)\" stroke-dasharray=\"5 5\"/><path d=\"M615 331V374H365\" fill=\"none\" stroke=\"#6b9cc7\" stroke-width=\"1.5\" marker-end=\"url(#state-arrow)\" stroke-dasharray=\"5 5\"/><text x=\"485\" y=\"398\" fill=\"#8db9df\" text-anchor=\"middle\" font-size=\"12\">虚线：stop 继续 / error、timeout 受控重试 → queue（新 attemptId）</text></svg><div class=\"mini-notes\"><span>init / queue 也可取消；queue 可停止。</span><span>cancel / completed 结束本次 attempt。</span><span>思考、工具事件不改变 analyze。</span></div><div class=\"related\"><button data-related=\"SOURCE-01\">源码仓库输入</button><button data-related=\"ANALYZE-01\">Agent 分析流程</button></div></article><article class=\"design-card\"><div class=\"module-top\"><span class=\"module-id\">02 / SSE</span><span class=\"tag\">event + id + data</span></div><h2>事件驱动与三段帧</h2><div class=\"structure-flow\"><div><small>event</small><code>驱动状态流转</code></div><div><small>id</small><code>事件游标 eventId</code></div><div><small>data（JSON）</small><code>type + 上下文 + 内容</code></div></div><div class=\"code-caption\">text/event-stream · 空行分帧 · data 是 JSON</div><pre class=\"design-code\">event: queued\nid: 1\ndata: {&quot;sessionId&quot;:&quot;s1&quot;,&quot;runId&quot;:&quot;r1&quot;,&quot;chainId&quot;:&quot;c1&quot;,&quot;attemptId&quot;:1,&quot;type&quot;:&quot;process&quot;,&quot;status&quot;:&quot;queue&quot;,&quot;message&quot;:&quot;调用链进入队列&quot;}\n\nevent: analyzing\nid: 2\ndata: {&quot;sessionId&quot;:&quot;s1&quot;,&quot;runId&quot;:&quot;r1&quot;,&quot;chainId&quot;:&quot;c1&quot;,&quot;attemptId&quot;:1,&quot;type&quot;:&quot;process&quot;,&quot;status&quot;:&quot;analyze&quot;,&quot;message&quot;:&quot;开始分析&quot;}\n\nevent: thoughts_execute\nid: 3\ndata: {&quot;sessionId&quot;:&quot;s1&quot;,&quot;runId&quot;:&quot;r1&quot;,&quot;chainId&quot;:&quot;c1&quot;,&quot;attemptId&quot;:1,&quot;type&quot;:&quot;thinking&quot;,&quot;status&quot;:&quot;analyze&quot;,&quot;message&quot;:&quot;核查输入到危险参数的传播证据&quot;}\n\nevent: tool_call_info\nid: 4\ndata: {&quot;sessionId&quot;:&quot;s1&quot;,&quot;runId&quot;:&quot;r1&quot;,&quot;chainId&quot;:&quot;c1&quot;,&quot;attemptId&quot;:1,&quot;type&quot;:&quot;process&quot;,&quot;status&quot;:&quot;analyze&quot;,&quot;toolCallId&quot;:&quot;t1&quot;,&quot;details&quot;:{&quot;name&quot;:&quot;read_source&quot;,&quot;phase&quot;:&quot;completed&quot;,&quot;input&quot;:{&quot;file&quot;:&quot;UserService.java&quot;,&quot;line&quot;:42},&quot;output&quot;:{&quot;evidence&quot;:&quot;参数进入 SQL 拼接&quot;}}}\n\nevent: completed\nid: 5\ndata: {&quot;sessionId&quot;:&quot;s1&quot;,&quot;runId&quot;:&quot;r1&quot;,&quot;chainId&quot;:&quot;c1&quot;,&quot;attemptId&quot;:1,&quot;type&quot;:&quot;result&quot;,&quot;status&quot;:&quot;completed&quot;,&quot;details&quot;:{&quot;verdict&quot;:&quot;risk&quot;,&quot;dangerous&quot;:true}}\n\n</pre><details class=\"design-payload\"><summary>事件映射与恢复请求</summary><div class=\"code-caption\">event → status / type</div><pre class=\"design-code\">queued               → queue        | data.type = process\nanalyzing            → analyze      | data.type = process\nthoughts_execute     → 不变           | data.type = thinking\ntool_call_info       → 不变           | data.type = process\ncompleted            → completed    | data.type = result\nstopped              → stop         | data.type = result\ncancelled            → cancel       | data.type = result\nfailed               → error        | data.type = result\ntimed_out            → timeout      | data.type = result</pre><div class=\"code-caption\">重连与恢复</div><pre class=\"design-code\">POST /analyze\n{&quot;projectId&quot;:&quot;p1&quot;,&quot;modelConfigId&quot;:&quot;m1&quot;,&quot;chainId&quot;:&quot;c1&quot;,&quot;sessionId&quot;:&quot;s1&quot;,&quot;afterId&quot;:3}\n\n// SSE 补发：读取 eventId &gt; 3 的已持久化事件\n// Agent 恢复：优先验证 Pi SessionManager.open(sessionFile)\n// eventId 与会话检查点不强绑定</pre></details><div class=\"mini-notes\"><span>一个流绑定一个 session；不同 session 的 id 不混用。</span><span>业务帧：保存事件 / 状态 → 发布 SSE。</span><span>心跳用 : ping，不占 id。</span><span>思考 = 模型提供的分析摘要。</span></div><div class=\"related\"><button data-related=\"ANALYZE-01\">Agent 分析流程</button><button data-related=\"RESULT-01\">调用链详情与审计结果</button></div></article><article class=\"design-card\"><div class=\"module-top\"><span class=\"module-id\">03 / SESSION MANAGEMENT</span><span class=\"tag\">待确认</span></div><h2>会话管理</h2><div class=\"structure-flow\"><div><small>Pi SessionManager · 优先验证</small><code>会话持久化 / 打开 / 继续</code></div><i>↔</i><div><small>Harness + SQLite</small><code>调用链状态 / 会话关联</code></div></div><div class=\"code-caption\">待验证的集成方式</div><pre class=\"design-code\">// 优先验证 Pi 原生会话恢复\nconst { session } = await createAgentSession({\n  cwd: projectPath,\n  sessionManager: SessionManager.open(sessionFile),\n});\nawait session.prompt(&quot;继续分析当前调用链&quot;);\n\n// Harness 保存关联，不重复保存整份模型上下文\n{ chainId, piSessionId, sessionFile, status }\n\n// SSE id：事件补发游标 ≠ 会话检查点</pre><div class=\"mini-notes\"><span>验证：中断恢复、工具边界、结果幂等。</span><span>LevelDB / ZSet 仅为备选，暂不确定采用。</span><span>会话管理恢复仍为 P1。</span></div><div class=\"related\"><button data-related=\"RECOVERY-01\">任务控制与恢复</button><button data-related=\"ANALYZE-01\">Agent 分析流程</button></div><p class=\"sub\"><a href=\"https://github.com/earendil-works/pi/blob/main/packages/coding-agent/examples/sdk/11-sessions.ts\" target=\"_blank\" rel=\"noopener noreferrer\" style=\"color:#8ac9fb\">Pi 官方会话示例 ↗</a></p></article></div>"}
 function render(){navigation();document.querySelector('#content').innerHTML=({overview,requirements,design}[state.view])()+`<footer class="foot"><span>pi-audit-harness · 产品需求</span><span>P0 主链路 / P1 增强 / P2 后续 · 不代表研发进度</span></footer>`}
 function renderChildren(r){return `<section class="detail-section"><h3>子需求 · ${(r.children||[]).length} 项</h3><div class="subrequirements">${(r.children||[]).map((c,i)=>`<details class="subrequirement"><summary><span class="child-no">${String(i+1).padStart(2,'0')}</span><span>${escapeHtml(c.title)}</span></summary><div class="child-body"><p>${escapeHtml(c.description)}</p><h4>验收条件</h4><ul class="acceptance">${c.acceptance.map(a=>`<li>${icon('check')}<span>${escapeHtml(a)}</span></li>`).join('')}</ul>${(c.design||[]).length?`<details class="child-notes"><summary>实现备注</summary>${c.design.map(n=>`<section class="design-note"><h4>${escapeHtml(n.title)}</h4>${n.text?`<p>${escapeHtml(n.text)}</p>`:''}${n.code?`<pre>${escapeHtml(n.code)}</pre>`:''}</section>`).join('')}</details>`:''}<small class="child-source">原条目 ${escapeHtml(c.id)} · ${escapeHtml(c.owner)}</small></div></details>`).join('')}</div></section>`}
 function openDetail(id){const r=getReq(id);if(!r)return;activeReq=id;const m=getModule(r.module),s=DATA.source.sections.find(x=>x.id===r.section),phase=DATA.phases.find(x=>x.id===r.phase);const d=document.querySelector('#detail');d.innerHTML=`<div class="detail-head"><div class="detail-top"><span class="detail-id">${r.id}</span><button class="close" data-action="close" aria-label="关闭需求详情">${icon('close')}</button></div><h2 id="detail-title">${escapeHtml(r.title)}</h2><div class="detail-tags">${priorityHTML(r.priority)}<span class="tag">${m.name}</span></div></div><div class="detail-body"><section class="detail-section"><h3>需求说明</h3><p>${escapeHtml(r.description)}</p></section>${renderChildren(r)}<section class="detail-section"><h3>验收条件</h3><ul class="acceptance">${r.acceptance.map(a=>`<li>${icon('check')}<span>${escapeHtml(a)}</span></li>`).join('')}</ul></section><div class="detail-facts"><div class="fact"><small>参考职责</small><strong>${r.owner}</strong></div><div class="fact"><small>需求类型</small><strong>${r.kind}</strong></div></div><details class="technical"><summary>实现备注与原文出处</summary><p>参考阶段：${phase?phase.title+'（时间可协商）':'后续迭代'}<br>文档映射：${escapeHtml(r.ref||'§'+r.section)}</p>${(r.design||[]).map(n=>`<section class="design-note"><h4>${escapeHtml(n.title)}</h4>${n.text?`<p>${escapeHtml(n.text)}</p>`:""}${n.code?`<pre>${escapeHtml(n.code)}</pre>`:""}</section>`).join('')}${r.dependencies.length?`<h3 style="font-size:10px;color:#789ec6;margin-bottom:9px">前置需求</h3><div class="related">${r.dependencies.map(id=>`<button data-related="${id}" title="${escapeHtml(getReq(id).title)}">${id} · ${escapeHtml(getReq(id).title)}</button>`).join('')}</div>`:''}${r.origin==='补充需求'?`<p class="source-note">本项依据 2026-10-17 的 Agent 主流程调整。以下原文仅供背景参考，当前优先级和验收以本项为准。</p>`:''}<h3 style="font-size:10px;color:#789ec6">§${s.id} ${escapeHtml(s.title)} · L${s.line}–L${s.end}</h3><pre class="source-code">${escapeHtml(s.text)}</pre></details></div><div class="detail-bottom">需求定义已调整；这不代表后端或 Agent 功能已经实现。</div>`;d.hidden=false;document.querySelectorAll('[data-open]').forEach(el=>el.classList.toggle('active',el.dataset.open===id));d.querySelector('.detail-body').scrollTop=0}

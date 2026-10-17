@@ -946,7 +946,7 @@
       "description": "Pi Loop 从 SQLite 领取调用链，取证并进行污点传播分析，通过 /analyze SSE 展示进度，保存过程事件与结构化结果。",
       "acceptance": [
         "至少一条真实调用链完成领取、源码取证、污点判断和事务回写",
-        "data.type 为 thinking / process / result 的 SSE 帧可在前端实时观察，并关联 runId、chainId、sessionId、checkpoint",
+        "data.type 为 thinking / process / result 的 SSE 帧可在前端实时观察，并关联 runId、chainId、sessionId、eventId",
         "分析事件持久化，包含工具输入输出摘要、耗时与错误，可用于调用链详情调试",
         "上限、防重复和错误终态生效；中断/未知不得当成安全或完成"
       ],
@@ -1093,11 +1093,11 @@
           "id": "API-02",
           "module": "M07",
           "title": "POST /analyze：SSE 三段帧与事件驱动",
-          "description": "event / id / data 三段式 SSE；event 表达业务事件，id 对齐会话 checkpoint，data JSON 的 type 区分思考、过程、结果。",
+          "description": "event / id / data 三段式 SSE；event 驱动状态，id 为事件游标，data.type 区分思考、过程、结果。",
           "acceptance": [
             "请求包含 projectId、modelConfigId；链路流绑定 chainId、sessionId；一个流的 id 只在该 session 内递增",
             "响应为 text/event-stream，UTF-8、空行分帧；event 与 id 为文本字段，data 为单个 JSON 对象",
-            "id = checkpoint = 同 session 有序集合 score；每个带 id 的业务帧均有完整有效会话快照，发布前先持久化",
+            "id 为同一会话流内递增事件游标；事件与对应状态持久化后发送，不要求每帧保存完整会话快照",
             "data.type 使用 thinking / process / result；event 可为 queued、analyzing、thoughts_execute、tool_call_info 及终态事件",
             "Harness 根据事件表校验并迁移状态，工具/思考事件不改变 analyze；重复与旧 attempt 事件不覆盖状态",
             "前端通过 fetch POST 解析流；携带 sessionId + afterId 重连，重放沿用原 id，不能把不同 session 的数字 id 混用",
@@ -1119,19 +1119,19 @@
           "design": [
             {
               "title": "帧示例",
-              "code": "event: queued\nid: 1\ndata: {\"sessionId\":\"s1\",\"runId\":\"r1\",\"chainId\":\"c1\",\"attemptId\":1,\"checkpoint\":1,\"type\":\"process\",\"status\":\"queue\",\"message\":\"调用链进入队列\"}\n\nevent: analyzing\nid: 2\ndata: {\"sessionId\":\"s1\",\"runId\":\"r1\",\"chainId\":\"c1\",\"attemptId\":1,\"checkpoint\":2,\"type\":\"process\",\"status\":\"analyze\",\"message\":\"开始分析\"}\n\nevent: thoughts_execute\nid: 3\ndata: {\"sessionId\":\"s1\",\"runId\":\"r1\",\"chainId\":\"c1\",\"attemptId\":1,\"checkpoint\":3,\"type\":\"thinking\",\"status\":\"analyze\",\"message\":\"核查输入到危险参数的传播证据\"}\n\nevent: tool_call_info\nid: 4\ndata: {\"sessionId\":\"s1\",\"runId\":\"r1\",\"chainId\":\"c1\",\"attemptId\":1,\"checkpoint\":4,\"type\":\"process\",\"status\":\"analyze\",\"toolCallId\":\"t1\",\"details\":{\"name\":\"read_source\",\"phase\":\"completed\",\"input\":{\"file\":\"UserService.java\",\"line\":42},\"output\":{\"evidence\":\"参数进入 SQL 拼接\"}}}\n\nevent: completed\nid: 5\ndata: {\"sessionId\":\"s1\",\"runId\":\"r1\",\"chainId\":\"c1\",\"attemptId\":1,\"checkpoint\":5,\"type\":\"result\",\"status\":\"completed\",\"details\":{\"verdict\":\"risk\",\"dangerous\":true}}\n\n"
+              "code": "event: queued\nid: 1\ndata: {\"sessionId\":\"s1\",\"runId\":\"r1\",\"chainId\":\"c1\",\"attemptId\":1,\"type\":\"process\",\"status\":\"queue\",\"message\":\"调用链进入队列\"}\n\nevent: analyzing\nid: 2\ndata: {\"sessionId\":\"s1\",\"runId\":\"r1\",\"chainId\":\"c1\",\"attemptId\":1,\"type\":\"process\",\"status\":\"analyze\",\"message\":\"开始分析\"}\n\nevent: thoughts_execute\nid: 3\ndata: {\"sessionId\":\"s1\",\"runId\":\"r1\",\"chainId\":\"c1\",\"attemptId\":1,\"type\":\"thinking\",\"status\":\"analyze\",\"message\":\"核查输入到危险参数的传播证据\"}\n\nevent: tool_call_info\nid: 4\ndata: {\"sessionId\":\"s1\",\"runId\":\"r1\",\"chainId\":\"c1\",\"attemptId\":1,\"type\":\"process\",\"status\":\"analyze\",\"toolCallId\":\"t1\",\"details\":{\"name\":\"read_source\",\"phase\":\"completed\",\"input\":{\"file\":\"UserService.java\",\"line\":42},\"output\":{\"evidence\":\"参数进入 SQL 拼接\"}}}\n\nevent: completed\nid: 5\ndata: {\"sessionId\":\"s1\",\"runId\":\"r1\",\"chainId\":\"c1\",\"attemptId\":1,\"type\":\"result\",\"status\":\"completed\",\"details\":{\"verdict\":\"risk\",\"dangerous\":true}}\n\n"
             },
             {
-              "title": "分类与事件",
-              "text": "三类展示由 data.type 决定，不再固定 event=thinking/process/result。queued→queue；analyzing→analyze；completed/stopped/cancelled/failed/timed_out→对应终态。thinking 只展示模型提供的分析摘要。"
+              "title": "事件与游标",
+              "text": "event 驱动 Harness 状态迁移；data.type 区分 thinking/process/result。id 只用于事件排序、去重与补发，不与 Pi 会话检查点或 ZSet score 强绑定。"
             },
             {
-              "title": "游标与恢复",
-              "text": "每个带 id 的业务帧先保存完整可恢复会话快照，并提交事件与状态，再发送。不能只递增 SSE id 而缺少对应快照。重放使用原 id，不生成新 checkpoint。 同一 SSE 流绑定一个 sessionId，id 只在该 session 内递增。仓库分析由 Harness 调度多个链路 session，前端汇总显示。 事件缓存与快照均需保留策略；afterId 是传输游标，恢复使用最大有效快照。"
+              "title": "会话管理待确认",
+              "text": "优先验证 Pi SessionManager 的持久化与恢复能力；不将 LevelDB / ZSet 作为必选实现。"
             },
             {
-              "title": "前端解析",
-              "text": "fetch ReadableStream 增量解码 UTF-8、处理拆包和合包。POST 重连显式携带 afterId；不要求原生 EventSource 发送 JSON 请求体。"
+              "title": "前端接收",
+              "text": "fetch POST 增量解析 SSE；sessionId + afterId 用于事件补发。事件历史过期需重新获取当前任务状态。"
             }
           ]
         },
@@ -1139,12 +1139,12 @@
           "id": "UI-05",
           "module": "M08",
           "title": "三段式分析流前端展示",
-          "description": "按 data.type 展示思考、过程和结果，按 event 更新链路状态；使用 sessionId + checkpoint 去重。",
+          "description": "按 data.type 展示思考、过程和结果，按 event 更新链路状态，按 sessionId + eventId 去重。",
           "acceptance": [
             "思考区域展示当前目标与分析摘要",
             "过程区域展示预处理、取证、状态和已处理链路",
             "结果区域展示结构化结论及数据库统计",
-            "按 sessionId/checkpoint 关联与去重，解析错误或断连有明确状态",
+            "按 sessionId/eventId 关联与去重，解析错误或断连有明确状态",
             "至少一条真实调用链从提交到结果回写可在界面观察",
             "点击调用链详情可查看该链的分析过程；不同链路的事件不串线"
           ],
@@ -1187,7 +1187,7 @@
       "design": [
         {
           "title": "关键设计看板 · 2026-10-18",
-          "text": "调用链状态名称和迁移以关键设计中的 DESIGN-01 为准；短期会话与检查点方案见 DESIGN-02。恢复能力当前仍为 P1，库选型和是否提升优先级待确认。"
+          "text": "状态迁移见 DESIGN-01；SSE 协议见 DESIGN-03；会话管理见末尾 DESIGN-02，优先验证 Pi 原生能力，方案待确认。"
         }
       ]
     },
@@ -1792,7 +1792,7 @@
       "title": "任务控制与恢复",
       "priority": "P1",
       "module": "M03",
-      "description": "提供任务停止、状态保存与恢复；每个 sessionId 使用有序集合保存完整会话快照，以递增 checkpoint 排序，恢复时读取最新有效快照。",
+      "description": "提供任务停止与状态恢复；会话管理方案待确认，优先验证 Pi 原生持久化和继续会话能力。",
       "acceptance": [
         "停止与任务状态持久化：停止请求得到明确确认",
         "风险点边界检查点恢复：已提交风险点不丢失、不重复计数"
@@ -1833,14 +1833,14 @@
           "id": "RUN-02",
           "module": "M10",
           "title": "风险点边界检查点恢复",
-          "description": "支持风险点边界的检查点恢复；会话内部安全边界按 DESIGN-02 设计保存和恢复完整会话快照。",
+          "description": "支持风险点边界的任务恢复；会话上下文恢复优先验证 Pi 原生能力，具体方案待确认。",
           "acceptance": [
             "已提交风险点不丢失、不重复计数",
             "未提交风险点可重跑，并说明用量影响",
             "恢复使用原快照和审计配置",
-            "每个 sessionId 对应一个有序集合；score 为唯一递增 checkpoint，member 直接保存完整会话 JSON",
-            "按 checkpoint 降序取第一个完整有效 member 恢复，恢复后继续递增序号；同 checkpoint 保存重试幂等",
-            "未完整发布的快照不可见；两库写入中断后先协调提交意图，再允许会话恢复"
+            "验证 Pi 会话重新打开后能否继续当前链路，以及中断工具的执行边界",
+            "SQLite 保存调用链与 Pi 会话关联；会话持久化方案以 DESIGN-02 验证结论为准",
+            "SSE 事件补发与 Agent 恢复独立处理；恢复操作不重复提交已落库结果"
           ],
           "dependencies": [
             "RUN-01",
@@ -1855,20 +1855,28 @@
           "ref": "FR-12 / A10",
           "design": [
             {
-              "title": "存储语义",
-              "text": "以关键设计 DESIGN-02 为准：session:{sessionId} → ZSet(checkpoint, 完整会话 JSON)。LevelDB 通过有序键与反向迭代封装实现；不将 member 改成快照 ID，不以时间戳作为 score。"
+              "title": "会话管理（待确认）",
+              "text": "优先验证 Pi SessionManager，LevelDB / ZSet 仅为发现能力缺口后的备选，不作为当前验收必选技术。"
             }
           ]
         }
       ],
       "design": [
         {
-          "title": "关键设计看板 · 2026-10-18",
-          "text": "调用链状态名称和迁移以关键设计中的 DESIGN-01 为准；短期会话与检查点方案见 DESIGN-02。恢复能力当前仍为 P1，库选型和是否提升优先级待确认。"
+          "title": "会话管理（待确认）",
+          "text": "验证 Pi SessionManager 的会话持久化、打开与继续能力；SQLite 记录 chainId 与 Pi sessionId / sessionFile 的关联。"
         },
         {
-          "title": "会话快照有序集合（已对齐）",
-          "text": "Key = session:{sessionId}；score = checkpoint，使用同一 session 内唯一且单调递增的整数；member = 完整会话 JSON，直接存放可恢复上下文，不改成仅保存 sessionId 或 checkpointId。checkpoint 表示保存进度，不使用时间戳充当 score。 从 SQLite 当前调用链取得 sessionId → 对该集合按 score 降序取第一个 member → 反序列化完整会话 JSON → 核对所属链路、源码、规则、模型、schema 与有效期 → Harness 原子领取并生成新 attemptId → queue → analyze，从最近安全步骤继续。新 attempt 沿用该 session 的递增 checkpoint；全新会话使用新的 sessionId。"
+          "title": "会话管理（待确认）",
+          "text": "中断后的上下文恢复、工具执行边界、业务结果幂等，以及源码或配置变更后的处理。恢复会话不保证恢复执行中的精确位置。"
+        },
+        {
+          "title": "会话管理（待确认）",
+          "text": "只有 Pi 原生能力存在明确缺口时，再评估 LevelDB / ZSet 会话快照；具体存储与检查点协议尚未确定。"
+        },
+        {
+          "title": "会话管理（待确认）",
+          "text": "Pi 管理会话上下文，Harness / SQLite 管理调用链任务；SSE id 用作事件游标，不与会话 checkpoint 或 ZSet score 强绑定。"
         }
       ]
     },
@@ -2337,7 +2345,7 @@
   "designBoard": {
     "updated": "2026-10-18",
     "title": "关键设计",
-    "status": "状态机 · LevelDB 会话快照 · SSE 事件协议",
+    "status": "状态机 · SSE 协议 · 会话管理（待确认）",
     "states": [
       [
         "init",
@@ -2402,25 +2410,6 @@
         ]
       },
       {
-        "id": "DESIGN-02",
-        "title": "Agent 断点恢复与短期会话",
-        "label": "方案已对齐 · LevelDB 适配待实现",
-        "related": [
-          "ANALYZE-01",
-          "RECOVERY-01"
-        ],
-        "sections": [
-          {
-            "title": "数据结构",
-            "text": "每个 sessionId 一个逻辑 ZSet；score = 递增 checkpoint；member = 完整会话 JSON。"
-          },
-          {
-            "title": "恢复",
-            "text": "按 score 降序取第一个有效 member；继续分配 checkpoint + 1。LevelDB 适配有序集合，非原生 ZSet。"
-          }
-        ]
-      },
-      {
         "id": "DESIGN-03",
         "title": "SSE 三段帧与事件驱动",
         "label": "event / id / data",
@@ -2432,6 +2421,33 @@
           {
             "title": "协议",
             "text": "event 驱动状态；id = checkpoint = score；data 是一个 JSON 对象，使用 type 区分思考、过程、结果。"
+          }
+        ]
+      },
+      {
+        "id": "DESIGN-02",
+        "title": "会话管理",
+        "label": "待确认 · 优先验证 Pi 原生能力",
+        "related": [
+          "ANALYZE-01",
+          "RECOVERY-01"
+        ],
+        "sections": [
+          {
+            "title": "优先方案",
+            "text": "验证 Pi SessionManager 的会话持久化、打开与继续能力；SQLite 记录 chainId 与 Pi sessionId / sessionFile 的关联。"
+          },
+          {
+            "title": "待验证",
+            "text": "中断后的上下文恢复、工具执行边界、业务结果幂等，以及源码或配置变更后的处理。恢复会话不保证恢复执行中的精确位置。"
+          },
+          {
+            "title": "备选方案",
+            "text": "只有 Pi 原生能力存在明确缺口时，再评估 LevelDB / ZSet 会话快照；具体存储与检查点协议尚未确定。"
+          },
+          {
+            "title": "职责分开",
+            "text": "Pi 管理会话上下文，Harness / SQLite 管理调用链任务；SSE id 用作事件游标，不与会话 checkpoint 或 ZSet score 强绑定。"
           }
         ]
       }
@@ -2448,28 +2464,29 @@
       "status": "completed",
       "verdict": "insufficient_evidence",
       "dangerous": null,
-      "checkpointId": "cp-000012",
-      "sessionId": "s1",
-      "checkpoint": 12
+      "sessionId": "s1"
     },
-    "kvExample": "// 逻辑 ZSet：session:s1\nscore   member（完整会话 JSON）\n1       {\"sessionId\":\"s1\",\"messages\":[...],\"toolResults\":[...]}\n2       {\"sessionId\":\"s1\",\"messages\":[...],\"toolResults\":[...]}\n3       {\"sessionId\":\"s1\",\"messages\":[...],\"toolResults\":[...]}\n\n// LevelDB 物理映射：key → 完整 JSON\nzset!s1!00000001 → {...}\nzset!s1!00000002 → {...}\nzset!s1!00000003 → {...}  // 反向迭代，取第一条\n\nlatest = sessions.latest(\"s1\")   // score: 3, member: {...}\nsessions.add(\"s1\", 4, nextJson) // 适配层伪代码，非 LevelDB 原生 API",
     "sources": [
       {
-        "title": "LevelDB 官方能力与限制",
-        "url": "https://github.com/google/leveldb"
+        "title": "Pi 会话管理 SDK",
+        "url": "https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/sdk.md#session-storage"
+      },
+      {
+        "title": "Pi 会话示例",
+        "url": "https://github.com/earendil-works/pi/blob/main/packages/coding-agent/examples/sdk/11-sessions.ts"
       }
     ],
     "sse": {
       "fields": {
         "event": "事件名称；驱动 Harness 状态流转",
-        "id": "checkpoint；等于该 session 的 ZSet score",
+        "id": "同一会话流内递增的事件游标，用于去重与补发；不等同于会话检查点",
         "data": "单个 JSON 对象；type = thinking / process / result"
       },
-      "example": "event: queued\nid: 1\ndata: {\"sessionId\":\"s1\",\"runId\":\"r1\",\"chainId\":\"c1\",\"attemptId\":1,\"checkpoint\":1,\"type\":\"process\",\"status\":\"queue\",\"message\":\"调用链进入队列\"}\n\nevent: analyzing\nid: 2\ndata: {\"sessionId\":\"s1\",\"runId\":\"r1\",\"chainId\":\"c1\",\"attemptId\":1,\"checkpoint\":2,\"type\":\"process\",\"status\":\"analyze\",\"message\":\"开始分析\"}\n\nevent: thoughts_execute\nid: 3\ndata: {\"sessionId\":\"s1\",\"runId\":\"r1\",\"chainId\":\"c1\",\"attemptId\":1,\"checkpoint\":3,\"type\":\"thinking\",\"status\":\"analyze\",\"message\":\"核查输入到危险参数的传播证据\"}\n\nevent: tool_call_info\nid: 4\ndata: {\"sessionId\":\"s1\",\"runId\":\"r1\",\"chainId\":\"c1\",\"attemptId\":1,\"checkpoint\":4,\"type\":\"process\",\"status\":\"analyze\",\"toolCallId\":\"t1\",\"details\":{\"name\":\"read_source\",\"phase\":\"completed\",\"input\":{\"file\":\"UserService.java\",\"line\":42},\"output\":{\"evidence\":\"参数进入 SQL 拼接\"}}}\n\nevent: completed\nid: 5\ndata: {\"sessionId\":\"s1\",\"runId\":\"r1\",\"chainId\":\"c1\",\"attemptId\":1,\"checkpoint\":5,\"type\":\"result\",\"status\":\"completed\",\"details\":{\"verdict\":\"risk\",\"dangerous\":true}}\n\n",
+      "example": "event: queued\nid: 1\ndata: {\"sessionId\":\"s1\",\"runId\":\"r1\",\"chainId\":\"c1\",\"attemptId\":1,\"type\":\"process\",\"status\":\"queue\",\"message\":\"调用链进入队列\"}\n\nevent: analyzing\nid: 2\ndata: {\"sessionId\":\"s1\",\"runId\":\"r1\",\"chainId\":\"c1\",\"attemptId\":1,\"type\":\"process\",\"status\":\"analyze\",\"message\":\"开始分析\"}\n\nevent: thoughts_execute\nid: 3\ndata: {\"sessionId\":\"s1\",\"runId\":\"r1\",\"chainId\":\"c1\",\"attemptId\":1,\"type\":\"thinking\",\"status\":\"analyze\",\"message\":\"核查输入到危险参数的传播证据\"}\n\nevent: tool_call_info\nid: 4\ndata: {\"sessionId\":\"s1\",\"runId\":\"r1\",\"chainId\":\"c1\",\"attemptId\":1,\"type\":\"process\",\"status\":\"analyze\",\"toolCallId\":\"t1\",\"details\":{\"name\":\"read_source\",\"phase\":\"completed\",\"input\":{\"file\":\"UserService.java\",\"line\":42},\"output\":{\"evidence\":\"参数进入 SQL 拼接\"}}}\n\nevent: completed\nid: 5\ndata: {\"sessionId\":\"s1\",\"runId\":\"r1\",\"chainId\":\"c1\",\"attemptId\":1,\"type\":\"result\",\"status\":\"completed\",\"details\":{\"verdict\":\"risk\",\"dangerous\":true}}\n\n",
       "scope": "同一 SSE 流绑定一个 sessionId，id 只在该 session 内递增。仓库分析由 Harness 调度多个链路 session，前端汇总显示。",
-      "recovery": "每个带 id 的业务帧先保存完整可恢复会话快照，并提交事件与状态，再发送。不能只递增 SSE id 而缺少对应快照。重放使用原 id，不生成新 checkpoint。",
+      "recovery": "业务事件及对应状态持久化后发送；断线按 afterId 重放原事件，重放沿用原 id。Agent 会话恢复单独验证，不要求每个事件保存完整会话快照。",
       "heartbeat": ": ping\n\n",
-      "resume": "POST /analyze\n{\"projectId\":\"p1\",\"modelConfigId\":\"m1\",\"chainId\":\"c1\",\"sessionId\":\"s1\",\"afterId\":3}\n\n// 传输重连：按 afterId 重放已持久化的后续事件（id > 3）\n// Agent 已中断：读取 s1 最大有效 checkpoint 的完整快照恢复\n// 两者独立；重连不自动重启 Agent，恢复需显式操作。",
+      "resume": "POST /analyze\n{\"projectId\":\"p1\",\"modelConfigId\":\"m1\",\"chainId\":\"c1\",\"sessionId\":\"s1\",\"afterId\":3}\n\n// SSE 补发：读取 eventId > 3 的已持久化事件\n// Agent 恢复：优先验证 Pi SessionManager.open(sessionFile)\n// eventId 与会话检查点不强绑定",
       "events": [
         [
           "queued",
