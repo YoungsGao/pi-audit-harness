@@ -1,6 +1,6 @@
 {
   "product": "pi-audit-harness",
-  "date": "2026-10-16",
+  "date": "2026-10-17",
   "source": {
     "path": "PRD 原文快照（已内嵌于需求页面）",
     "lineCount": 485,
@@ -435,1221 +435,1872 @@
   "modules": [
     {
       "id": "M01",
-      "name": "客户端与环境",
-      "goal": "先建立可承载后续功能的客户端",
-      "summary": "Electron 骨架、Pi 与本地工具",
-      "label": "桌面 / 环境"
+      "name": "基础与输入",
+      "goal": "基础与输入",
+      "summary": "项目构建、模型连通、源码预处理与入库",
+      "label": "基础与输入"
     },
     {
       "id": "M02",
-      "name": "项目与源码",
-      "goal": "让每次分析绑定稳定的源码",
-      "summary": "公开仓库、本地目录与快照",
-      "label": "导入 / 快照"
+      "name": "分析与结果",
+      "goal": "分析与结果",
+      "summary": "Agent 分析、调用链详情、HTML 报告",
+      "label": "分析与结果"
     },
     {
       "id": "M03",
-      "name": "模型连接",
-      "goal": "由用户配置和决定模型",
-      "summary": "手动填写、教程、连接测试",
-      "label": "设置 / 引导"
+      "name": "增强能力",
+      "goal": "增强能力",
+      "summary": "模板、LSP、交互、恢复、安全与发布",
+      "label": "增强能力"
     },
     {
       "id": "M04",
-      "name": "模板与知识",
-      "goal": "把审计方法写成可复用文档",
-      "summary": "三类模板、Markdown、Skill",
-      "label": "模板 / 编辑器"
-    },
-    {
-      "id": "M05",
-      "name": "风险点发现",
-      "goal": "从候选 Sink 建立调查目标",
-      "summary": "规则命中、参数位置与手动定位",
-      "label": "扫描 / 线索"
-    },
-    {
-      "id": "M06",
-      "name": "代码查询",
-      "goal": "默认可用，语义能力按需增强",
-      "summary": "rg、Java LSP、多语言接口",
-      "label": "CLI / Skill"
-    },
-    {
-      "id": "M07",
-      "name": "Agent 调度",
-      "goal": "持续查证，并有依据地结束",
-      "summary": "Goal、Loop、预算与证据",
-      "label": "Pi / 扩展"
-    },
-    {
-      "id": "M08",
-      "name": "审计工作台",
-      "goal": "让风险与证据能够一起阅读",
-      "summary": "列表、路径图、源码与状态",
-      "label": "交互 / 图形"
-    },
-    {
-      "id": "M09",
-      "name": "复核与报告",
-      "goal": "将分析结果变为交付成果",
-      "summary": "人工结论、HTML、JSON",
-      "label": "复核 / 导出"
-    },
-    {
-      "id": "M10",
-      "name": "控制与恢复",
-      "goal": "中断之后仍保留有效工作",
-      "summary": "停止、检查点、异常与续跑",
-      "label": "状态 / 可靠性"
-    },
-    {
-      "id": "M11",
-      "name": "安全与数据",
-      "goal": "守住源码、凭据和执行边界",
-      "summary": "受控工具、可信内容与脱敏",
-      "label": "边界 / 存储"
-    },
-    {
-      "id": "M12",
-      "name": "验证与发布",
-      "goal": "以真实流程验证首版",
-      "summary": "样例、实测、安装包与开源",
-      "label": "测试 / 发布"
+      "name": "后续规划",
+      "goal": "后续规划",
+      "summary": "平台、分析引擎、协作与输出扩展",
+      "label": "后续规划"
     }
   ],
   "requirements": [
     {
-      "id": "ENV-01",
+      "id": "BUILD-01",
+      "title": "项目构建",
+      "priority": "P0",
       "module": "M01",
-      "title": "构建 Electron 客户端骨架",
-      "description": "作为首个开发任务，搭建 Electron + TypeScript + React 客户端，先跑通窗口、页面导航和受控 IPC，再在其上接入 Pi、代码查询与审计功能。Windows x64 沿用既定平台约束。",
+      "description": "启动 Electron 客户端与 Pi 本地服务，完成运行时、SQLite 初始化，以及用户 API 配置和真实 ping 测试。",
       "acceptance": [
-        "通过统一开发命令启动主窗口，工程可正常运行",
-        "项目、模型、模板、审计工作台与报告具备基础路由和占位页面",
-        "主进程、预加载与渲染进程职责分离，受控 IPC 示例可往返通信",
-        "页面使用占位数据，后续功能可按模块接入；安装包交付在发布阶段验收"
+        "客户端可启动并连接本地 Pi 服务，退出时正确处理服务生命周期",
+        "用户手动填写 API 配置，可发送 ping 并看到真实回复或明确错误",
+        "SQLite 可初始化并保留用户配置，密钥不以明文落库"
       ],
       "dependencies": [],
       "section": "6",
       "phase": 1,
-      "owner": "前端实现",
-      "kind": "功能",
-      "priority": "P0",
+      "owner": "前后端协作",
+      "kind": "功能流程",
       "origin": "补充需求",
-      "ref": "首个开发任务 / Electron 客户端工程"
+      "ref": "2026-10-17 · 按功能流程归并",
+      "children": [
+        {
+          "id": "ENV-01",
+          "module": "M01",
+          "title": "构建 Electron 客户端骨架",
+          "description": "先建立 Electron + TypeScript 客户端，跑通主窗口、页面导航和受控桥接，再逐步接入本地服务。Windows x64 是既定平台条件。",
+          "acceptance": [
+            "开发命令可启动客户端主窗口",
+            "模型、项目、分析和报告具有基础页面及导航",
+            "主进程、预加载和渲染进程边界明确",
+            "本地服务启动状态与失败原因可呈现"
+          ],
+          "dependencies": [],
+          "section": "6",
+          "phase": 1,
+          "owner": "前端",
+          "kind": "功能",
+          "priority": "P0",
+          "origin": "补充需求",
+          "ref": "2026-10-17 · Agent 主流程范围"
+        },
+        {
+          "id": "API-01",
+          "module": "M01",
+          "title": "建立基于 Pi 的本地后端服务",
+          "description": "由 Electron 启动并管理本地 HTTP/SSE 服务，服务封装 Pi 基座，对前端暴露模型测试、项目数据与分析能力。",
+          "acceptance": [
+            "本地服务与 Electron 同步启动、检查健康状态和退出",
+            "约定本地地址、端口及受控连接方式，不对公网监听",
+            "Pi SDK 或 RPC 由适配层封装，前端不直接操作 Pi 内部会话",
+            "明确前后端错误格式和 runId/projectId 传递"
+          ],
+          "dependencies": [
+            "ENV-01"
+          ],
+          "section": "6",
+          "phase": 1,
+          "owner": "后端",
+          "kind": "功能",
+          "priority": "P0",
+          "origin": "补充需求",
+          "ref": "2026-10-17 · Agent 主流程范围",
+          "design": [
+            {
+              "title": "实现边界",
+              "text": "推荐使用 Node.js/TypeScript 本地工作进程承载服务并接入 Pi。SQLite 是本地嵌入数据库，不另起远程数据库服务。HTTP/SSE 服务与数据库分别承担通信和持久化职责。"
+            },
+            {
+              "title": "本地接口约定",
+              "code": "GET  /health                 # 本地服务就绪状态\nPOST /test                   # 模型 ping 测试\nPOST /projects               # 登记/导入源码项目\nPOST /analyze                # SSE 分析主入口\n报告请求 → Pi /report 扩展   # 由后端适配器触发"
+            }
+          ]
+        },
+        {
+          "id": "ENV-02",
+          "module": "M01",
+          "title": "Pi 运行时接入与扩展加载",
+          "description": "将 Pi 接入本地服务，准备模型调用、审计 Loop 和 /report 扩展的共用运行环境。",
+          "acceptance": [
+            "本地服务能创建真实 Pi 会话或等价受控调用",
+            "模型测试与正式审计使用同一套已配置供应商信息",
+            "审计与报告扩展可由服务调用，输出可被捕获",
+            "运行时版本固定，错误回传前端"
+          ],
+          "dependencies": [
+            "API-01"
+          ],
+          "section": "4.2",
+          "phase": 1,
+          "owner": "后端",
+          "kind": "功能",
+          "priority": "P0",
+          "origin": "补充需求",
+          "ref": "2026-10-17 · Agent 主流程范围"
+        },
+        {
+          "id": "DB-01",
+          "module": "M10",
+          "title": "初始化 SQLite 本地存储",
+          "description": "由本地服务管理 SQLite 文件、建表、外键与必要索引，用于项目、调用链、分析任务和报告持久化。",
+          "acceptance": [
+            "首次运行可创建数据库与基础表",
+            "服务重启后可以读取已保存项目与分析结果",
+            "数据库访问集中在后端，前端通过 API/桥接读取",
+            "批量写入使用事务，保留基本 schema 版本"
+          ],
+          "dependencies": [
+            "API-01"
+          ],
+          "section": "10.1",
+          "phase": 1,
+          "owner": "后端",
+          "kind": "功能",
+          "priority": "P0",
+          "origin": "补充需求",
+          "ref": "2026-10-17 · Agent 主流程范围",
+          "design": [
+            {
+              "title": "不需要单独部署数据库服务",
+              "text": "SQLite 是嵌入式数据库，随本地后端使用即可。首版采用单任务串行写入，先不建设远程数据库服务或复杂并发队列。"
+            },
+            {
+              "title": "建议的最小表集合",
+              "code": "projects       项目元数据\nmodel_configs  模型非敏感配置 + secret_ref\naudit_runs     本次分析任务及状态\ncall_edges     一次真实调用位置一行\ncall_paths     待分析路径 / 工作队列\npath_steps     路径中的有序调用步骤与结论\nreports        报告文件、状态与统计快照"
+            }
+          ]
+        },
+        {
+          "id": "DB-02",
+          "module": "M10",
+          "title": "项目与模型配置数据表",
+          "description": "保存用户项目元数据及模型非敏感配置，统一项目和配置的可复用标识。",
+          "acceptance": [
+            "projects 至少保存 projectId、gitUrl、projectName、path 与 sourceType",
+            "local 来源允许 gitUrl 为空，Git 来源记录 commit",
+            "模型配置保存配置 ID、名称、地址和模型 ID",
+            "API Key 仅保存系统凭据引用，数据库不保存明文密钥"
+          ],
+          "dependencies": [
+            "DB-01"
+          ],
+          "section": "10.1",
+          "phase": 1,
+          "owner": "后端",
+          "kind": "功能",
+          "priority": "P0",
+          "origin": "补充需求",
+          "ref": "2026-10-17 · Agent 主流程范围",
+          "design": [
+            {
+              "title": "字段建议",
+              "code": "projects(\n  project_id PK, project_name, source_type,\n  git_url NULL, path, branch NULL, commit_hash NULL,\n  source_stamp, created_at, updated_at\n)\n\nmodel_configs(\n  config_id PK, name, base_url, model_id,\n  secret_ref, created_at, updated_at\n)"
+            },
+            {
+              "title": "版本关联",
+              "text": "每次 audit_run 记录本次源码 commit 或本地文件版本标记。完整不可变源码快照列为 P1；P0 至少避免重用旧版本结果而不标明来源。"
+            }
+          ]
+        },
+        {
+          "id": "MOD-01",
+          "module": "M03",
+          "title": "手动模型配置与前端展示",
+          "description": "前端填写并展示名称、Base URL、API Key 和模型 ID，交给本地服务保存非敏感配置并供 Pi 使用。",
+          "acceptance": [
+            "可填写、保存、修改和选择模型配置",
+            "前后端使用相同配置标识，实际调用使用保存的配置",
+            "保存不触发模型调用，不发现或替换模型",
+            "密钥在界面掩码显示，不作为明文写入 SQLite 或普通日志"
+          ],
+          "dependencies": [
+            "API-01",
+            "DB-02"
+          ],
+          "section": "9.1",
+          "phase": 1,
+          "owner": "前端",
+          "kind": "功能",
+          "priority": "P0",
+          "origin": "补充需求",
+          "ref": "2026-10-17 · Agent 主流程范围"
+        },
+        {
+          "id": "MOD-03",
+          "module": "M03",
+          "title": "模型 test：发送 ping 并收到回复",
+          "description": "提供前端测试按钮和本地 test 函数，通过 Pi 配置的模型发送 ping，展示真实响应或明确失败。",
+          "acceptance": [
+            "点击测试才发送一条 ping，不带项目源码",
+            "收到模型的非空回复才判连通成功，展示响应内容与耗时",
+            "不强求供应商必须逐字返回 pong，避免误判",
+            "鉴权、模型错误、额度、超时或网络失败有明确提示"
+          ],
+          "dependencies": [
+            "MOD-01",
+            "ENV-02"
+          ],
+          "section": "9.3",
+          "phase": 1,
+          "owner": "前后端协作",
+          "kind": "功能",
+          "priority": "P0",
+          "origin": "补充需求",
+          "ref": "2026-10-17 · Agent 主流程范围",
+          "design": [
+            {
+              "title": "接口示例",
+              "code": "POST /test\n{ \"modelConfigId\": \"model-01\", \"message\": \"ping\" }\n\n成功：{ \"ok\": true, \"reply\": \"pong\", \"latencyMs\": 420 }\n失败：{ \"ok\": false, \"code\": \"MODEL_TIMEOUT\", \"message\": \"...\" }"
+            },
+            {
+              "title": "测试范围",
+              "text": "P0 验证一次真实请求和回复，不将 ping 成功等同于已验证复杂工具调用、污点分析准确率或完整 Agent 能力。"
+            }
+          ]
+        }
+      ]
     },
     {
-      "id": "ENV-02",
-      "module": "M01",
-      "title": "Pi 基座自动准备",
-      "description": "在应用管理目录准备固定版本 Pi，并加载产品提供的审计扩展和 Skills。",
-      "acceptance": [
-        "显示检查、下载、准备和启动阶段",
-        "失败可诊断与重试",
-        "不覆盖用户已有 Pi 配置"
-      ],
-      "dependencies": [
-        "ENV-01"
-      ],
-      "section": "4.2",
-      "phase": 1,
-      "owner": "核心适配",
-      "kind": "功能",
+      "id": "SOURCE-01",
+      "title": "源码仓库输入",
       "priority": "P0",
-      "origin": "PRD",
-      "ref": "FR-01 / A01"
-    },
-    {
-      "id": "ENV-03",
       "module": "M01",
-      "title": "基础工具环境准备",
-      "description": "基础查询随产品可用，仓库导入不能依赖未说明的 Git 前提。",
+      "description": "用户提交本地目录或公开 GitHub 仓库，完成 Git 检测、项目登记、风险预处理、调用链入库，并在前端看到可分析的调用链。",
       "acceptance": [
-        "rg 能力在标准安装路径可用",
-        "无预装 Git 时有明确的准备流程",
-        "环境准备失败给出原因和可操作下一步"
+        "本地目录和公开 GitHub 仓库均能登记项目；缺少 Git 时只提示安装",
+        "按 SQL 注入、命令注入、路径遍历基础规则生成候选调用链并持久化",
+        "前端展示项目、预处理状态、候选链路与基础统计；失败和未解析信息明确可见",
+        "调用边、路径与有序步骤支持分支/共享/环；危险 API 命中不等同于漏洞成立"
       ],
       "dependencies": [
-        "ENV-01"
-      ],
-      "section": "4.3",
-      "phase": 1,
-      "owner": "协同实现",
-      "kind": "功能",
-      "priority": "P0",
-      "origin": "PRD",
-      "ref": "FR-01 / A01"
-    },
-    {
-      "id": "SRC-01",
-      "module": "M02",
-      "title": "公开 GitHub 仓库导入",
-      "description": "输入公开仓库 URL，解析分支或提交并下载到应用目录。",
-      "acceptance": [
-        "公开仓库可完成导入",
-        "记录解析后的 commit",
-        "仓库不存在、网络与权限错误分别提示"
-      ],
-      "dependencies": [
-        "ENV-03"
+        "BUILD-01"
       ],
       "section": "4.3",
       "phase": 2,
-      "owner": "前端实现",
-      "kind": "功能",
-      "priority": "P0",
-      "origin": "PRD",
-      "ref": "FR-02 / A02"
+      "owner": "前后端协作",
+      "kind": "功能流程",
+      "origin": "补充需求",
+      "ref": "2026-10-17 · 按功能流程归并",
+      "children": [
+        {
+          "id": "ENV-03",
+          "module": "M01",
+          "title": "Git 与基础工具检测",
+          "description": "检测源码下载与基础搜索所需工具。没有 Git 时提示用户安装，不自动安装 Git。",
+          "acceptance": [
+            "Git 可用时允许公开仓库下载",
+            "缺少 Git 时显示安装引导与重新检测入口",
+            "没有 Git 时仍可使用本地目录",
+            "产品不静默下载、安装或配置 Git"
+          ],
+          "dependencies": [
+            "ENV-01"
+          ],
+          "section": "4.3",
+          "phase": 2,
+          "owner": "前后端协作",
+          "kind": "功能",
+          "priority": "P0",
+          "origin": "补充需求",
+          "ref": "2026-10-17 · Agent 主流程范围"
+        },
+        {
+          "id": "SRC-02",
+          "module": "M02",
+          "title": "本地源码目录输入与项目登记",
+          "description": "用户选择已有目录，本地服务校验可读性并创建项目数据，后续预处理和 Agent 均通过 projectId 定位源码。",
+          "acceptance": [
+            "本地输入不依赖 Git",
+            "保存项目名称、源码路径、来源类型及基本版本标识",
+            "路径不可读或不是有效源码目录时提示原因",
+            "前端项目列表可从 SQLite 查询并再次打开"
+          ],
+          "dependencies": [
+            "API-01",
+            "DB-02"
+          ],
+          "section": "4.3",
+          "phase": 2,
+          "owner": "前后端协作",
+          "kind": "功能",
+          "priority": "P0",
+          "origin": "补充需求",
+          "ref": "2026-10-17 · Agent 主流程范围"
+        },
+        {
+          "id": "SRC-01",
+          "module": "M02",
+          "title": "公开 GitHub 仓库下载与项目登记",
+          "description": "用户提交公开仓库链接，后端通过现有 Git 下载，解析项目名称和目录并保存项目记录。",
+          "acceptance": [
+            "Git 存在时可下载公开仓库到应用管理目录",
+            "保存 gitUrl、projectName、path、sourceType 与解析到的 commit",
+            "缺少 Git 时提示安装，下载失败明确反馈",
+            "同一项目重复导入有明确选择，不默默覆盖已有目录"
+          ],
+          "dependencies": [
+            "API-01",
+            "ENV-03",
+            "DB-02"
+          ],
+          "section": "4.3",
+          "phase": 2,
+          "owner": "前后端协作",
+          "kind": "功能",
+          "priority": "P0",
+          "origin": "补充需求",
+          "ref": "2026-10-17 · Agent 主流程范围"
+        },
+        {
+          "id": "TPL-01",
+          "module": "M04",
+          "title": "内置基础风险规则",
+          "description": "为 SQL 注入、命令注入、路径遍历提供首批风险点与传播审查规则，先服务预处理和 Loop。",
+          "acceptance": [
+            "规则能定位声明支持的危险 API 与参数位置",
+            "同一规则用于候选点标识和后续分析解释",
+            "规则版本随分析任务记录",
+            "P0 不依赖新增模板编辑器、文档导入或高级配置界面"
+          ],
+          "dependencies": [],
+          "section": "5.1",
+          "phase": 2,
+          "owner": "后端",
+          "kind": "功能",
+          "priority": "P0",
+          "origin": "补充需求",
+          "ref": "2026-10-17 · Agent 主流程范围"
+        },
+        {
+          "id": "QRY-01",
+          "module": "M06",
+          "title": "预处理与取证的基础代码查询",
+          "description": "提供默认 rg/grep 与源码读取能力，为风险点工具和 Pi Loop 取得函数、引用候选及源码片段。",
+          "acceptance": [
+            "基础流程不依赖 LSP 或 CodeGraph",
+            "查询返回文件位置和原文范围",
+            "同名文本只算调用候选，无法确认时保留未知",
+            "有基本查询范围和输出限制，不无限读取"
+          ],
+          "dependencies": [
+            "ENV-03"
+          ],
+          "section": "6.2",
+          "phase": 2,
+          "owner": "后端",
+          "kind": "功能",
+          "priority": "P0",
+          "origin": "补充需求",
+          "ref": "2026-10-17 · Agent 主流程范围"
+        },
+        {
+          "id": "DB-03",
+          "module": "M10",
+          "title": "调用边 + 路径 + 有序步骤存储",
+          "description": "调用关系实际是有向图，允许分支、递归与共享函数；用调用边表保存基础事实，用路径表与步骤表组织 Agent 的工作单元。",
+          "acceptance": [
+            "call_edges 每条调用位置一行，保存调用方、被调用方和源码位置",
+            "call_paths 一条待分析路径一行，具有状态和去重标识",
+            "path_steps 用 pathId + stepIndex 还原顺序，可复用同一条调用边",
+            "能表示分支与重复函数，展开递归时有深度/节点限制并标记截断"
+          ],
+          "dependencies": [
+            "DB-01",
+            "DB-02"
+          ],
+          "section": "10.1",
+          "phase": 2,
+          "owner": "后端",
+          "kind": "功能",
+          "priority": "P0",
+          "origin": "补充需求",
+          "ref": "2026-10-17 · Agent 主流程范围",
+          "design": [
+            {
+              "title": "边表保留你提出的一调用一行结构",
+              "code": "call_edges(\n  uid PK, project_id, run_id,\n  file_name, file_path, function_name, caller_key,\n  called_function_name, called_function_file_name,\n  called_function_file_path, callee_key,\n  call_line, call_column, is_sink, rule_id,\n  resolution_status\n)"
+            },
+            {
+              "title": "路径作为 Agent Loop 的工作项",
+              "code": "call_paths(\n  path_id PK, run_id, project_id, path_hash,\n  source_ref, sink_edge_id, rule_id,\n  status, verdict, dangerous NULL, truncated,\n  result_summary, created_at, updated_at\n)\n\npath_steps(\n  path_id FK, step_index, edge_uid FK,\n  dangerous NULL, taint_in_json, taint_out_json,\n  evidence_json, defense_summary,\n  PRIMARY KEY(path_id, step_index)\n)"
+            },
+            {
+              "title": "为什么不只用 parentId 存一棵树",
+              "text": "同一个函数可以被多个调用方使用，一条调用边也能出现在多条路径中；递归还会形成环。若只用 parentId，需要大量复制且容易把结论覆盖。边表表达调用图，路径与步骤表达一次有上下文的调查。函数表可在 P1 进一步规范化，首版可先用完整签名与位置组成稳定符号标识。"
+            },
+            {
+              "title": "dangerous 的取值",
+              "text": "is_sink 只表示危险 API；dangerous 表示当前路径或该路径步骤是否有已确认风险。推荐 NULL=未确定、0=已阻断、1=证据支持风险。无法解析、尚未分析或错误调用链不能直接写 0。"
+            }
+          ]
+        },
+        {
+          "id": "SCAN-01",
+          "module": "M05",
+          "title": "风险点工具预处理并生成调用链",
+          "description": "源码导入后先运行风险点分析工具，识别候选 Sink 和调用关系，形成一条条有序候选路径并写入 SQLite，供后续 Loop 领取。",
+          "acceptance": [
+            "工具输入 projectId 对应源码目录，输出调用边和候选路径",
+            "预处理完成或明确标记部分完成后，路径进入 pending 队列",
+            "规则、位置、危险参数与路径来源可追溯",
+            "零命中、工具失败、截断或调用未解析分别标记，不把未知当安全"
+          ],
+          "dependencies": [
+            "SRC-01",
+            "SRC-02",
+            "TPL-01",
+            "QRY-01",
+            "DB-03",
+            "DB-04"
+          ],
+          "section": "3.2",
+          "phase": 2,
+          "owner": "后端",
+          "kind": "功能",
+          "priority": "P0",
+          "origin": "补充需求",
+          "ref": "2026-10-17 · Agent 主流程范围",
+          "design": [
+            {
+              "title": "预处理和漏洞确认分工",
+              "text": "工具阶段发现危险 API 并尽量补全候选调用路径，SQLite 保存调用图与待调查路径。工具命中不等于漏洞成立，后续 Pi Loop 核实输入影响、传播与防护。首版使用基础查询，Java LSP 与图后端作为 P1/P2 增强。"
+            },
+            {
+              "title": "扫描边界",
+              "text": "不要求先枚举整个仓库所有可能调用链。以风险点为起点有界展开，按完整签名、调用位置和路径哈希去重；分支/深度达到上限时保留截断标记。"
+            }
+          ]
+        },
+        {
+          "id": "SCAN-03",
+          "module": "M05",
+          "title": "候选调用与上下文风险分离",
+          "description": "同一调用边可被多条路径共享，但每条路径中的污染和防护结论单独保存，避免全局覆盖。",
+          "acceptance": [
+            "边表保存源码调用事实，不把 API 危险性直接当漏洞",
+            "同一 edgeUid 在不同 pathId 下允许不同危险判断",
+            "路径无效、未解析、部分分析和已阻断有不同状态",
+            "统计按风险路径或去重后的 Sink 计算，不按所有步骤相加"
+          ],
+          "dependencies": [
+            "SCAN-01",
+            "DB-03"
+          ],
+          "section": "4.6",
+          "phase": 2,
+          "owner": "后端",
+          "kind": "功能",
+          "priority": "P0",
+          "origin": "补充需求",
+          "ref": "2026-10-17 · Agent 主流程范围"
+        },
+        {
+          "id": "UI-01",
+          "module": "M08",
+          "title": "项目调用链列表与基础统计",
+          "description": "前端从本地服务读取 SQLite 中的项目、候选调用链与状态，作为分析工作的基础界面。",
+          "acceptance": [
+            "可选择项目，查看其调用链和危险/未知状态",
+            "基本统计来源于数据库查询而非只累加 SSE 消息",
+            "可以启动分析并显示 pending/analyzing/completed 等状态",
+            "P0 以列表与简要链路详情完成闭环，交互式图列为 P1"
+          ],
+          "dependencies": [
+            "DB-03",
+            "API-02",
+            "UI-05"
+          ],
+          "section": "4.5",
+          "phase": 3,
+          "owner": "前端",
+          "kind": "功能",
+          "priority": "P0",
+          "origin": "补充需求",
+          "ref": "2026-10-17 · Agent 主流程范围"
+        }
+      ]
     },
     {
-      "id": "SRC-02",
-      "module": "M02",
-      "title": "本地目录导入与预检",
-      "description": "选择已有源码，预检可读性、语言、规模、忽略范围和构建信息。",
-      "acceptance": [
-        "本地未提交修改可纳入分析",
-        "混合语言项目显示支持与跳过部分",
-        "目录无权限或语言不支持时说明原因"
-      ],
-      "dependencies": [
-        "ENV-01"
-      ],
-      "section": "4.3",
-      "phase": 2,
-      "owner": "前端实现",
-      "kind": "功能",
+      "id": "ANALYZE-01",
+      "title": "Agent 分析流程",
       "priority": "P0",
-      "origin": "PRD",
-      "ref": "FR-02 / A02"
-    },
-    {
-      "id": "SRC-03",
       "module": "M02",
-      "title": "固定只读源码快照",
-      "description": "为一次任务保存稳定源码视图，使代码位置与报告可复现。",
+      "description": "Pi Loop 从 SQLite 领取调用链，取证并进行污点传播分析，通过 /analyze SSE 展示进度，保存过程事件与结构化结果。",
       "acceptance": [
-        "保存快照 ID、文件摘要和忽略范围",
-        "源码后续变化不使旧证据漂移",
-        "恢复沿用原快照，新源码创建新任务"
+        "至少一条真实调用链完成领取、源码取证、污点判断和事务回写",
+        "thinking / process / result 三类 SSE 帧可在前端实时观察，并关联 runId、chainId、seq",
+        "分析事件持久化，包含工具输入输出摘要、耗时与错误，可用于调用链详情调试",
+        "上限、防重复和错误终态生效；中断/未知不得当成安全或完成"
       ],
       "dependencies": [
-        "SRC-01",
-        "SRC-02"
+        "SOURCE-01"
       ],
       "section": "10.1",
-      "phase": 2,
-      "owner": "核心适配",
-      "kind": "功能",
-      "priority": "P0",
-      "origin": "PRD",
-      "ref": "FR-02 / A02"
+      "phase": 3,
+      "owner": "前后端协作",
+      "kind": "功能流程",
+      "origin": "补充需求",
+      "ref": "2026-10-17 · 按功能流程归并",
+      "children": [
+        {
+          "id": "DB-04",
+          "module": "M10",
+          "title": "分析任务、路径状态与报告记录",
+          "description": "建立任务状态与结果写入接口，使预处理、Agent Loop、前端展示和报告使用同一批数据库事实。",
+          "acceptance": [
+            "audit_runs 记录 projectId、模型配置、规则版本、源码版本与阶段状态",
+            "路径包含 pending/analyzing/completed/failed/unresolved 等明确状态",
+            "结果与统计在事务中提交，写入后再发布对应最终结果",
+            "reports 保存 runId、文件路径、生成状态与统计快照",
+            "持久化 analysis_events：event_id、run_id、chain_id、seq、time、type、summary、tool_call_id、tool_name、status、duration_ms、payload_json；run_id + seq 唯一，按链路可查询，索引(run_id, chain_id, seq)",
+            "分析日志与业务结果关联保存；工具输入输出先脱敏并限制大小，超限用截断标志；不存在的模型摘要明确记录为缺失"
+          ],
+          "dependencies": [
+            "DB-01",
+            "DB-03"
+          ],
+          "section": "10.1",
+          "phase": 2,
+          "owner": "后端",
+          "kind": "功能",
+          "priority": "P0",
+          "origin": "补充需求",
+          "ref": "2026-10-17 · Agent 主流程范围",
+          "design": [
+            {
+              "title": "任务与报告字段",
+              "code": "audit_runs(\n  run_id PK, project_id FK, model_config_id,\n  source_stamp, rules_version, status, stage,\n  started_at, finished_at, error_code\n)\n\nreports(\n  report_id PK, run_id FK, file_path, status,\n  summary_json, generated_at, error_message\n)"
+            },
+            {
+              "title": "P0 状态一致性",
+              "text": "重复点击不应重复领取同一路径或产生两次相同结论；完成/失败需落库。服务异常结束时，遗留 analyzing 记录应明确标记为中断或待处理。自动断点续跑和 SSE 事件重放列为 P1。"
+            }
+          ]
+        },
+        {
+          "id": "AGT-01",
+          "module": "M07",
+          "title": "Pi 基座上的核心 Agent Loop",
+          "description": "在本地后端接入 Pi，按项目任务逐条分析 SQLite 中的待办调用链。",
+          "acceptance": [
+            "Pi 会话真实运行，使用选定模型配置",
+            "Loop 读取数据库工作项而非依赖前端传完整源码",
+            "完成一轮需形成结构化结果和下一步/终止判断",
+            "工具访问范围绑定当前项目，循环有可执行结束条件"
+          ],
+          "dependencies": [
+            "ENV-02",
+            "DB-04"
+          ],
+          "section": "8.1",
+          "phase": 3,
+          "owner": "后端",
+          "kind": "功能",
+          "priority": "P0",
+          "origin": "补充需求",
+          "ref": "2026-10-17 · Agent 主流程范围"
+        },
+        {
+          "id": "AGT-02",
+          "module": "M07",
+          "title": "领取 SQLite 中的调用链工作项",
+          "description": "从 call_paths 读取 pending 路径，按 path_steps 顺序组装调用信息和证据。",
+          "acceptance": [
+            "首版串行领取路径并原子更新为 analyzing",
+            "链路顺序由 stepIndex 决定，不依赖查询返回的偶然排序",
+            "按需读取对应源码补证，SQLite 不是源码内容的替代品",
+            "每条路径分析结束后更新状态，失败不静默丢失"
+          ],
+          "dependencies": [
+            "AGT-01",
+            "SCAN-01",
+            "DB-03"
+          ],
+          "section": "8.1",
+          "phase": 3,
+          "owner": "后端",
+          "kind": "功能",
+          "priority": "P0",
+          "origin": "补充需求",
+          "ref": "2026-10-17 · Agent 主流程范围"
+        },
+        {
+          "id": "AGT-04",
+          "module": "M07",
+          "title": "Loop 基础上限与防重复",
+          "description": "为首版循环设置基本次数、展开深度和无进展限制，确保一次分析能够收敛。",
+          "acceptance": [
+            "有后端执行的迭代和路径展开上限",
+            "重复查询无新增证据时结束该工作项并记录原因",
+            "达到上限的路径标记未完成/未知而非安全",
+            "高级预算设置界面和精细 Token 策略可在 P1 完善"
+          ],
+          "dependencies": [
+            "AGT-01"
+          ],
+          "section": "8.2",
+          "phase": 3,
+          "owner": "后端",
+          "kind": "功能",
+          "priority": "P0",
+          "origin": "补充需求",
+          "ref": "2026-10-17 · Agent 主流程范围"
+        },
+        {
+          "id": "AGT-03",
+          "module": "M07",
+          "title": "污点传播判断与结果回写",
+          "description": "Pi 根据路径、源码和防护信息判断是否存在风险，将每条路径及步骤的危险状态、证据和摘要写回 SQLite。",
+          "acceptance": [
+            "核对来源、实参与形参、赋值/返回值/字段传播和有效防护",
+            "以结构化模式校验结果再写入路径与步骤",
+            "dangerous 的未知/阻断/风险值与 verdict 一致",
+            "失败或证据不足保存原因，不自动标记无风险"
+          ],
+          "dependencies": [
+            "AGT-02",
+            "QRY-01",
+            "TPL-01",
+            "DB-04"
+          ],
+          "section": "8.1",
+          "phase": 3,
+          "owner": "后端",
+          "kind": "功能",
+          "priority": "P0",
+          "origin": "补充需求",
+          "ref": "2026-10-17 · Agent 主流程范围"
+        },
+        {
+          "id": "API-02",
+          "module": "M07",
+          "title": "POST /analyze：三类 SSE 业务帧",
+          "description": "由本地后端提供 /analyze 事件流，统一承载预处理、Pi Loop 和最终结果通知。思考、过程、结果是三类帧，不是全程只发三条消息。",
+          "acceptance": [
+            "请求明确 projectId、modelConfigId，可选指定 chainIds",
+            "响应 Content-Type 为 text/event-stream，UTF-8、空行分帧",
+            "thinking/process 可多次出现，result 标识完成、部分完成或失败",
+            "每帧带 runId、seq 和时间；结果完成帧在对应状态落库后发送",
+            "中断/失败不能显示为完成；首版不自动恢复或切换模型",
+            "单链分析帧携带 chainId；工具事件携带 toolCallId、工具名、状态、输入输出摘要、耗时/错误，供分析过程标签实时展示与持久化"
+          ],
+          "dependencies": [
+            "API-01",
+            "AGT-03",
+            "DB-04"
+          ],
+          "section": "8.1",
+          "phase": 3,
+          "owner": "后端",
+          "kind": "功能",
+          "priority": "P0",
+          "origin": "补充需求",
+          "ref": "2026-10-17 · Agent 主流程范围",
+          "design": [
+            {
+              "title": "请求与帧示例",
+              "code": "POST /analyze\n{ \"projectId\": \"p1\", \"modelConfigId\": \"m1\" }\n\nid: run-01:1\nevent: thinking\ndata: {\"runId\":\"run-01\",\"seq\":1,\"time\":\"...\",\"chainId\":\"c1\",\"summary\":\"核查输入是否传入 SQL 执行参数\"}\n\nid: run-01:2\nevent: process\ndata: {\"runId\":\"run-01\",\"seq\":2,\"time\":\"...\",\"stage\":\"analyzing\",\"operation\":\"read_source\",\"status\":\"completed\"}\n\nid: run-01:3\nevent: result\ndata: {\"runId\":\"run-01\",\"seq\":3,\"time\":\"...\",\"scope\":\"run\",\"status\":\"completed\",\"riskPaths\":2,\"unknownPaths\":1}\n\n"
+            },
+            {
+              "title": "前端接收与思考内容",
+              "text": "前端通过 fetch 的可读流发起 POST 并解析 SSE；不能直接把原生 EventSource 当作能发送 JSON POST 的客户端。thinking 展示可公开的分析计划、依据摘要与当前目标，不要求暴露模型的内部思维链。网络 chunk 不等于完整帧，需处理拆包、合包与 UTF-8 增量解码。"
+            },
+            {
+              "title": "三类帧与传输控制",
+              "text": "业务事件名固定为 thinking / process / result。心跳可使用 SSE 注释，不新增业务类型。result 带 scope=chain 或 run 区分单链结果和任务终态；失败可用 result.status=failed 表达，避免挂起。事件重放和断线自动续接列为 P1。"
+            }
+          ]
+        },
+        {
+          "id": "UI-05",
+          "module": "M08",
+          "title": "三段式分析流前端展示",
+          "description": "在 Electron 中发起 /analyze，并按思考、过程、结果展示真实后端事件。",
+          "acceptance": [
+            "思考区域展示当前目标与分析摘要",
+            "过程区域展示预处理、取证、状态和已处理链路",
+            "结果区域展示结构化结论及数据库统计",
+            "按 runId/seq 关联与去重，解析错误或断连有明确状态",
+            "至少一条真实调用链从提交到结果回写可在界面观察",
+            "点击调用链详情可查看该链的分析过程；不同链路的事件不串线"
+          ],
+          "dependencies": [
+            "API-02"
+          ],
+          "section": "4.5",
+          "phase": 3,
+          "owner": "前端",
+          "kind": "功能",
+          "priority": "P0",
+          "origin": "补充需求",
+          "ref": "2026-10-17 · Agent 主流程范围"
+        },
+        {
+          "id": "RUN-03",
+          "module": "M10",
+          "title": "主链路错误反馈与状态收敛",
+          "description": "处理模型不可达、Git 下载失败、扫描失败、SSE 中断和写库失败，避免界面停留在虚假的运行或完成状态。",
+          "acceptance": [
+            "失败原因关联到 projectId/runId/chainId",
+            "可有限重试短暂错误；持续失败明确结束或待处理",
+            "SSE 无最终结果时不判成功，数据库保存已提交结果",
+            "重新发起分析不悄悄重写旧报告或混用不同源码版本"
+          ],
+          "dependencies": [
+            "API-02",
+            "DB-04",
+            "MOD-03"
+          ],
+          "section": "9.4",
+          "phase": 4,
+          "owner": "前后端协作",
+          "kind": "功能",
+          "priority": "P0",
+          "origin": "补充需求",
+          "ref": "2026-10-17 · Agent 主流程范围"
+        }
+      ]
     },
     {
-      "id": "MOD-01",
-      "module": "M03",
-      "title": "手动配置模型连接",
-      "description": "由用户填写名称、Base URL、API Key 与准确模型 ID，不替用户选择模型。",
+      "id": "RESULT-01",
+      "title": "调用链详情与审计结果",
+      "priority": "P0",
+      "module": "M02",
+      "description": "按调用链查看路径、传播证据、防护分析和模型分析过程，定位源码并核对风险判断。",
       "acceptance": [
-        "可保存、编辑和删除配置",
-        "不自动拉取模型目录、推荐或切换模型",
-        "保存操作不触发模型调用"
+        "调用路径、传播证据、防护分析、分析过程四个标签可切换且保持当前链路",
+        "分析过程显示该链的模型分析摘要、工具记录、证据和未决项；记录缺失明确提示",
+        "结果关联文件、函数、行号；刷新后恢复已保存数据",
+        "dangerous 区分未知、已阻断和危险；模型未公开的内部思维链不作为展示前提"
       ],
       "dependencies": [
-        "ENV-01"
+        "ANALYZE-01"
       ],
-      "section": "9.1",
-      "phase": 1,
-      "owner": "前端实现",
-      "kind": "功能",
-      "priority": "P0",
-      "origin": "PRD",
-      "ref": "FR-03 / A09"
+      "section": "4.6",
+      "phase": 3,
+      "owner": "前端",
+      "kind": "功能流程",
+      "origin": "补充需求",
+      "ref": "2026-10-17 · 按功能流程归并",
+      "children": [
+        {
+          "id": "UI-03",
+          "module": "M08",
+          "title": "调用链详情与源码证据展示",
+          "description": "查看调用链路径、传播证据、防护分析，以及按链路留存的模型分析过程，支持审计调试。",
+          "acceptance": [
+            "点击列表能查看路径及步骤顺序",
+            "区分未分析、风险、阻断和证据不足",
+            "能对应到文件、函数与行号",
+            "刷新或重新打开后从已落库结果恢复展示",
+            "详情含调用路径、传播证据、防护分析、分析过程四个标签；切换时保持当前调用链",
+            "分析过程按时间/序号展示模型提供的分析摘要、工具调用输入输出、错误与最终判断依据，并关联 runId、chainId",
+            "进行中可实时追加记录；刷新后可从 SQLite 恢复；未知或缺失记录明确提示，不补造模型过程",
+            "仅展示模型实际提供的可公开分析摘要与调试事件，不依赖模型内部隐藏思维链；密钥等敏感字段脱敏"
+          ],
+          "dependencies": [
+            "AGT-03",
+            "UI-01"
+          ],
+          "section": "4.6",
+          "phase": 3,
+          "owner": "前端",
+          "kind": "功能",
+          "priority": "P0",
+          "origin": "补充需求",
+          "ref": "2026-10-17 · Agent 主流程范围",
+          "design": [
+            {
+              "title": "按调用链调试",
+              "text": "分析过程由 /analyze 的 thinking/process/result 事件投影形成。界面按 seq 排序并关联 toolCallId；工具输入输出可展开，显示耗时和错误。记录当前判断及证据变化，避免只显示最终结论。原型中的过程为明确标注的模拟记录。"
+            }
+          ]
+        }
+      ]
     },
     {
-      "id": "MOD-02",
-      "module": "M03",
-      "title": "OpenRouter 配置教程",
-      "description": "提供手动操作步骤、填写示例与官方链接。",
+      "id": "REPORT-01",
+      "title": "报告输出与主流程验收",
+      "priority": "P0",
+      "module": "M02",
+      "description": "通过 Pi /report 汇总落库结果，生成可独立打开的 HTML 报告，保存报告记录与统计，并完成主流程端到端验收。",
       "acceptance": [
-        "覆盖账号、Key、模型 ID、服务地址和额度说明",
-        "模型 ID 使用占位示例",
-        "教程在首次配置及设置页均可打开"
+        "从项目输入到分析完成、结果回写、生成 HTML 报告的真实闭环可验收",
+        "报告包含调用路径、风险证据、未知项与修复建议；统计与数据库一致",
+        "报告可登记、重新打开，未完成任务输出明确的阶段状态"
       ],
       "dependencies": [
-        "MOD-01"
+        "RESULT-01"
+      ],
+      "section": "4.7",
+      "phase": 4,
+      "owner": "前后端协作",
+      "kind": "功能流程",
+      "origin": "补充需求",
+      "ref": "2026-10-17 · 按功能流程归并",
+      "children": [
+        {
+          "id": "REP-02",
+          "module": "M09",
+          "title": "Pi /report 扩展生成 HTML 报告",
+          "description": "实现由 Pi 驱动的 /report 扩展，读取指定 runId 的数据库结果，生成分析摘要与可独立打开的 HTML 报告。",
+          "acceptance": [
+            "报告输入使用 projectId/runId，不依赖前端临时状态",
+            "由 Pi 扩展完成汇总与 HTML 产物生成",
+            "报告含项目、调用路径、风险判断、源码证据、未知项和建议",
+            "只含已保存结果，未完成任务明确标为阶段报告",
+            "报告文本安全转义，不包含 Key，生成失败有明确状态"
+          ],
+          "dependencies": [
+            "ENV-02",
+            "DB-04",
+            "AGT-03"
+          ],
+          "section": "4.7",
+          "phase": 4,
+          "owner": "后端",
+          "kind": "功能",
+          "priority": "P0",
+          "origin": "补充需求",
+          "ref": "2026-10-17 · Agent 主流程范围",
+          "design": [
+            {
+              "title": "/report 是 Pi 扩展入口",
+              "text": "这里首先指 Pi 的报告扩展命令或等价扩展函数，不天然等同于同名 HTTP 路由。Electron 向本地服务请求生成报告，再由服务适配器触发 Pi /report。HTTP 是否使用 /report 可在实现接口契约时统一。"
+            },
+            {
+              "title": "生成方式建议",
+              "text": "Pi 负责读取结果、总结与组织报告；扩展可采用固定 HTML 模板渲染经过校验的数据，保证文件结构、统计与证据一致。P0 不要求任意自由布局、多格式报告或交互式大图。"
+            }
+          ]
+        },
+        {
+          "id": "REP-04",
+          "module": "M09",
+          "title": "报告登记、打开与危险统计",
+          "description": "将报告生成状态、HTML 文件位置与统计快照登记到 SQLite，前端提供查看与打开入口。",
+          "acceptance": [
+            "报告生成成功后记录 reportId/runId/filePath 与时间",
+            "前端能再次查询并打开报告文件",
+            "危险路径以 pathId 去重，风险点以 Sink/规则去重",
+            "未知、阻断、未分析分别统计，不把危险 API 或每个危险步骤当独立漏洞"
+          ],
+          "dependencies": [
+            "REP-02",
+            "DB-04"
+          ],
+          "section": "4.7",
+          "phase": 4,
+          "owner": "前后端协作",
+          "kind": "功能",
+          "priority": "P0",
+          "origin": "补充需求",
+          "ref": "2026-10-17 · Agent 主流程范围",
+          "design": [
+            {
+              "title": "统计口径",
+              "text": "危险路径：当前 run 中 call_paths.dangerous=1 的不同 pathId 数。风险点：在已成立路径中按 sink_edge_id 与 rule_id 去重。步骤危险数可作为过程指标单独显示，但不可直接当作漏洞数量。"
+            },
+            {
+              "title": "dangerous 与结论",
+              "code": "dangerous = NULL → 未分析 / 证据不足 / 无效链待处理\ndangerous = 0    → 当前路径已确认被阻断\ndangerous = 1    → 当前路径证据支持风险\n\nverdict、status 和 evidence 必须同时保存；\n原始 call_edges.is_sink 不能用于替代漏洞统计。"
+            }
+          ]
+        },
+        {
+          "id": "QA-04",
+          "module": "M12",
+          "title": "Agent 主链路端到端验收",
+          "description": "用一个真实 Java/Spring 样例，完成客户端、模型 ping、源码输入、预处理入库、SSE 分析与报告生成的真实闭环。",
+          "acceptance": [
+            "ping 请求确实经过配置模型并收到回复",
+            "本地目录与公开 GitHub 输入分别可用；缺 Git 时提示安装",
+            "预处理产生调用边/路径/步骤，Loop 从 SQLite 领取并更新",
+            "前端收到三类 SSE 帧，结论、dangerous 和统计一致",
+            "/report 生成可打开 HTML，重启后项目与结果仍可读取"
+          ],
+          "dependencies": [
+            "UI-03",
+            "REP-04",
+            "RUN-03",
+            "MOD-03"
+          ],
+          "section": "12.3",
+          "phase": 5,
+          "owner": "前后端协作",
+          "kind": "功能",
+          "priority": "P0",
+          "origin": "补充需求",
+          "ref": "2026-10-17 · Agent 主流程范围"
+        }
+      ]
+    },
+    {
+      "id": "CONFIG-01",
+      "title": "模型与源码输入增强",
+      "priority": "P1",
+      "module": "M03",
+      "description": "补充模型配置教程、源码发送确认、固定只读快照与手工风险点输入。",
+      "acceptance": [
+        "OpenRouter 配置教程：覆盖账号、Key、模型 ID、服务地址和额度说明",
+        "源码发送范围确认：确认前不发送项目源码",
+        "固定只读源码快照：保存快照 ID、文件摘要和忽略范围",
+        "手工指定风险点：保存快照、文件及函数或位置"
+      ],
+      "dependencies": [
+        "BUILD-01",
+        "SOURCE-01"
       ],
       "section": "9.2",
-      "phase": 1,
-      "owner": "前端实现",
-      "kind": "功能",
-      "priority": "P0",
-      "origin": "PRD",
-      "ref": "FR-03 / A09"
-    },
-    {
-      "id": "MOD-03",
-      "module": "M03",
-      "title": "主动连接测试与反馈",
-      "description": "仅在点击测试时使用不含项目源码的固定样例检查接口和工具调用。",
-      "acceptance": [
-        "区分网络、鉴权、模型不存在、额度、限流与能力不兼容",
-        "提示测试可能产生少量用量",
-        "连接失败不自动更换模型"
-      ],
-      "dependencies": [
-        "MOD-01"
-      ],
-      "section": "9.3",
-      "phase": 1,
-      "owner": "协同实现",
-      "kind": "功能",
-      "priority": "P0",
-      "origin": "PRD",
-      "ref": "FR-03 / A09"
-    },
-    {
-      "id": "MOD-04",
-      "module": "M03",
-      "title": "源码发送范围确认",
-      "description": "首次向指定服务发送项目源码前，展示目标、模型和内容类别。",
-      "acceptance": [
-        "确认前不发送项目源码",
-        "同一项目及发送范围可复用授权",
-        "超出既有范围时重新确认并记录实际模型"
-      ],
-      "dependencies": [
-        "MOD-01",
-        "SRC-03"
-      ],
-      "section": "9.4",
-      "phase": 2,
-      "owner": "协同实现",
-      "kind": "功能",
-      "priority": "P0",
-      "origin": "PRD",
-      "ref": "A09 / A11"
-    },
-    {
-      "id": "TPL-01",
-      "module": "M04",
-      "title": "三类内置漏洞模板",
-      "description": "内置 SQL 注入、命令注入和路径遍历，按需选择启用。",
-      "acceptance": [
-        "每类包含审查步骤及相应 Source/Sink/防护模型",
-        "每类具有风险成立与有效阻断样例",
-        "任务记录使用的模板及版本"
-      ],
-      "dependencies": [],
-      "section": "5.1",
-      "phase": 2,
-      "owner": "核心适配",
-      "kind": "功能",
-      "priority": "P0",
-      "origin": "PRD",
-      "ref": "FR-04 / A06"
-    },
-    {
-      "id": "TPL-02",
-      "module": "M04",
-      "title": "可视化新增与编辑模板",
-      "description": "使用文档编辑界面配置名称、语言、漏洞分类、简介及 Markdown 审计说明。",
-      "acceptance": [
-        "新建和编辑入口清晰可见",
-        "支持正文预览并校验必填字段",
-        "保存后可在创建审计时选择，不要求用户填写 JSON"
-      ],
-      "dependencies": [
-        "TPL-01"
-      ],
-      "section": "4.4",
-      "phase": 3,
-      "owner": "前端实现",
-      "kind": "功能",
-      "priority": "P0",
+      "phase": 5,
+      "owner": "前后端协作",
+      "kind": "功能流程",
       "origin": "补充需求",
-      "ref": "最新模板界面要求"
+      "ref": "2026-10-17 · 按功能流程归并",
+      "children": [
+        {
+          "id": "MOD-02",
+          "module": "M03",
+          "title": "OpenRouter 配置教程",
+          "description": "提供 OpenRouter 手动配置教程和官方链接，不增加自动发现、选择或切换模型逻辑。",
+          "acceptance": [
+            "覆盖账号、Key、模型 ID、服务地址和额度说明",
+            "模型 ID 使用占位示例",
+            "教程在首次配置及设置页均可打开"
+          ],
+          "dependencies": [
+            "MOD-01"
+          ],
+          "section": "9.2",
+          "phase": 0,
+          "owner": "前端",
+          "kind": "功能",
+          "priority": "P1",
+          "origin": "补充需求",
+          "ref": "FR-03 / A09"
+        },
+        {
+          "id": "MOD-04",
+          "module": "M03",
+          "title": "源码发送范围确认",
+          "description": "首次向指定服务发送项目源码前，展示目标、模型和内容类别。",
+          "acceptance": [
+            "确认前不发送项目源码",
+            "同一项目及发送范围可复用授权",
+            "超出既有范围时重新确认并记录实际模型"
+          ],
+          "dependencies": [
+            "MOD-01",
+            "SRC-01",
+            "SRC-02"
+          ],
+          "section": "9.4",
+          "phase": 0,
+          "owner": "前后端协作",
+          "kind": "功能",
+          "priority": "P1",
+          "origin": "补充需求",
+          "ref": "A09 / A11"
+        },
+        {
+          "id": "SRC-03",
+          "module": "M02",
+          "title": "固定只读源码快照",
+          "description": "完整不可变源码快照作为增强能力；P0 在任务内至少记录 commit 或本地版本标记，避免结果来源不明。",
+          "acceptance": [
+            "保存快照 ID、文件摘要和忽略范围",
+            "源码后续变化不使旧证据漂移",
+            "恢复沿用原快照，新源码创建新任务"
+          ],
+          "dependencies": [
+            "SRC-01",
+            "SRC-02",
+            "DB-02"
+          ],
+          "section": "10.1",
+          "phase": 0,
+          "owner": "后端",
+          "kind": "功能",
+          "priority": "P1",
+          "origin": "补充需求",
+          "ref": "FR-02 / A02"
+        },
+        {
+          "id": "SCAN-02",
+          "module": "M05",
+          "title": "手工指定风险点",
+          "description": "允许审计人员补充需要调查的具体源码位置。",
+          "acceptance": [
+            "保存快照、文件及函数或位置",
+            "纳入统一调查与证据流程",
+            "位置无效时给出明确反馈"
+          ],
+          "dependencies": [
+            "DB-03",
+            "SCAN-01"
+          ],
+          "section": "4.4",
+          "phase": 0,
+          "owner": "前后端协作",
+          "kind": "功能",
+          "priority": "P1",
+          "origin": "补充需求",
+          "ref": "FR-05 / A06"
+        }
+      ]
     },
     {
-      "id": "TPL-03",
-      "module": "M04",
-      "title": "Markdown / Skill 文档导入",
-      "description": "导入 .md、SKILL.md 或 Skill 目录，预览编辑后保存为审计知识模板。",
+      "id": "TEMPLATE-01",
+      "title": "漏洞模板管理",
+      "priority": "P1",
+      "module": "M03",
+      "description": "提供模板新增、编辑、Markdown / Skill 文档导入，以及项目级审查要求。",
       "acceptance": [
-        "可提取识别到的标题与描述并允许修改",
-        "不执行关联脚本、安装指令或外部链接",
-        "标识自定义模板的未验证范围"
+        "可视化新增与编辑模板：新建和编辑入口清晰可见",
+        "Markdown / Skill 文档导入：可提取识别到的标题与描述并允许修改",
+        "项目级补充审查要求：输入随审计配置保存"
       ],
       "dependencies": [
-        "TPL-02"
+        "SOURCE-01"
       ],
       "section": "4.4",
-      "phase": 3,
-      "owner": "前端实现",
-      "kind": "功能",
-      "priority": "P0",
+      "phase": 5,
+      "owner": "前后端协作",
+      "kind": "功能流程",
       "origin": "补充需求",
-      "ref": "以文档入口替换旧规则配置导入"
+      "ref": "2026-10-17 · 按功能流程归并",
+      "children": [
+        {
+          "id": "TPL-02",
+          "module": "M04",
+          "title": "可视化新增与编辑模板",
+          "description": "使用文档编辑界面配置名称、语言、漏洞分类、简介及 Markdown 审计说明。",
+          "acceptance": [
+            "新建和编辑入口清晰可见",
+            "支持正文预览并校验必填字段",
+            "保存后可在创建审计时选择，不要求用户填写 JSON"
+          ],
+          "dependencies": [
+            "TPL-01"
+          ],
+          "section": "4.4",
+          "phase": 0,
+          "owner": "前后端协作",
+          "kind": "功能",
+          "priority": "P1",
+          "origin": "补充需求",
+          "ref": "最新模板界面要求"
+        },
+        {
+          "id": "TPL-03",
+          "module": "M04",
+          "title": "Markdown / Skill 文档导入",
+          "description": "导入 .md、SKILL.md 或 Skill 目录，预览编辑后保存为审计知识模板。",
+          "acceptance": [
+            "可提取识别到的标题与描述并允许修改",
+            "不执行关联脚本、安装指令或外部链接",
+            "标识自定义模板的未验证范围"
+          ],
+          "dependencies": [
+            "TPL-02"
+          ],
+          "section": "4.4",
+          "phase": 0,
+          "owner": "前后端协作",
+          "kind": "功能",
+          "priority": "P1",
+          "origin": "补充需求",
+          "ref": "以文档入口替换旧规则配置导入"
+        },
+        {
+          "id": "TPL-04",
+          "module": "M04",
+          "title": "项目级补充审查要求",
+          "description": "为某个项目补充业务封装、输入来源、防护约定和重点。",
+          "acceptance": [
+            "输入随审计配置保存",
+            "实际进入对应 Agent 分析上下文",
+            "增加提示词不被表述为已增加全部漏洞发现能力"
+          ],
+          "dependencies": [
+            "TPL-01",
+            "DB-02"
+          ],
+          "section": "5.1",
+          "phase": 0,
+          "owner": "前后端协作",
+          "kind": "功能",
+          "priority": "P1",
+          "origin": "补充需求",
+          "ref": "FR-04 / A06"
+        }
+      ]
     },
     {
-      "id": "TPL-04",
-      "module": "M04",
-      "title": "项目级补充审查要求",
-      "description": "为某个项目补充业务封装、输入来源、防护约定和重点。",
+      "id": "QUERY-01",
+      "title": "代码查询工具增强",
+      "priority": "P1",
+      "module": "M03",
+      "description": "统一 CLI + Skill 查询入口，接入 Java LSP，并管理语言服务器和查询降级。",
       "acceptance": [
-        "输入随审计配置保存",
-        "实际进入对应 Agent 分析上下文",
-        "增加提示词不被表述为已增加全部漏洞发现能力"
+        "统一 CLI + Skill 查询接口：支持能力查询、读取、符号、定义、引用与调用适配",
+        "Java LSP 语义查询：至少一个跨文件真实样例参与风险路径分析",
+        "语言服务器生命周期与降级：显示准备与索引状态，避免每条 CLI 请求重复启动",
+        "多语言查询扩展边界：业务不依赖唯一全局 Java 服务器"
       ],
       "dependencies": [
-        "TPL-01",
-        "SRC-03"
-      ],
-      "section": "5.1",
-      "phase": 3,
-      "owner": "协同实现",
-      "kind": "功能",
-      "priority": "P0",
-      "origin": "PRD",
-      "ref": "FR-04 / A06"
-    },
-    {
-      "id": "SCAN-01",
-      "module": "M05",
-      "title": "候选危险函数发现",
-      "description": "通过版本化内置规则定位 Sink，为 Agent 产生调查线索。",
-      "acceptance": [
-        "命中结果包含规则 ID、位置及危险参数",
-        "仅称候选风险点，不直接称已验证漏洞",
-        "覆盖三类内置模板声明支持的样例"
-      ],
-      "dependencies": [
-        "SRC-03",
-        "TPL-01"
-      ],
-      "section": "3.2",
-      "phase": 2,
-      "owner": "核心适配",
-      "kind": "功能",
-      "priority": "P0",
-      "origin": "PRD",
-      "ref": "FR-05 / 分析质量"
-    },
-    {
-      "id": "SCAN-02",
-      "module": "M05",
-      "title": "手工指定风险点",
-      "description": "允许审计人员补充需要调查的具体源码位置。",
-      "acceptance": [
-        "保存快照、文件及函数或位置",
-        "纳入统一调查与证据流程",
-        "位置无效时给出明确反馈"
-      ],
-      "dependencies": [
-        "SRC-03"
-      ],
-      "section": "4.4",
-      "phase": 2,
-      "owner": "协同实现",
-      "kind": "功能",
-      "priority": "P0",
-      "origin": "PRD",
-      "ref": "FR-05 / A06"
-    },
-    {
-      "id": "SCAN-03",
-      "module": "M05",
-      "title": "候选点与路径独立建模",
-      "description": "同一 Sink 可有多条路径，调用边和污染传播分别记录。",
-      "acceptance": [
-        "候选点、调用位置、路径状态可区分",
-        "证据记录参数映射及查询来源",
-        "单一路径已阻断不能汇总整个风险点安全"
-      ],
-      "dependencies": [
-        "SCAN-01"
-      ],
-      "section": "4.6",
-      "phase": 2,
-      "owner": "核心适配",
-      "kind": "功能",
-      "priority": "P0",
-      "origin": "PRD",
-      "ref": "FR-05 / FR-09"
-    },
-    {
-      "id": "QRY-01",
-      "module": "M06",
-      "title": "基础文本搜索独立运行",
-      "description": "默认使用 rg/grep 提供文本、文件及源码读取能力。",
-      "acceptance": [
-        "没有 LSP 时仍完成分析、图和报告全流程",
-        "同名文本匹配只形成待核对候选关系",
-        "保留搜索截断与错误信息"
-      ],
-      "dependencies": [
-        "ENV-03"
+        "SOURCE-01"
       ],
       "section": "6.2",
-      "phase": 1,
-      "owner": "核心适配",
-      "kind": "功能",
-      "priority": "P0",
-      "origin": "PRD",
-      "ref": "FR-06 / A03"
-    },
-    {
-      "id": "QRY-02",
-      "module": "M06",
-      "title": "统一 CLI + Skill 查询接口",
-      "description": "用统一契约暴露代码能力，Skill 说明使用方式与边界。",
-      "acceptance": [
-        "支持能力查询、读取、符号、定义、引用与调用适配",
-        "区分无命中、结果不全、未就绪、超时及不支持",
-        "返回语言、后端、快照、完整符号与位置"
-      ],
-      "dependencies": [
-        "QRY-01"
-      ],
-      "section": "6.2",
-      "phase": 1,
-      "owner": "核心适配",
-      "kind": "功能",
-      "priority": "P0",
-      "origin": "PRD",
-      "ref": "FR-06 / FR-07"
-    },
-    {
-      "id": "QRY-03",
-      "module": "M06",
-      "title": "Java LSP 语义查询",
-      "description": "接入 JDT-LS 定义和引用，在实际支持的项目上补全调用定位。",
-      "acceptance": [
-        "至少一个跨文件真实样例参与风险路径分析",
-        "调用层次按服务器实际能力适配",
-        "不能用一次诊断通知证明全工作区索引完成"
-      ],
-      "dependencies": [
-        "QRY-02",
-        "ENV-02"
-      ],
-      "section": "7.2",
-      "phase": 1,
-      "owner": "核心适配",
-      "kind": "功能",
-      "priority": "P0",
-      "origin": "PRD",
-      "ref": "FR-07 / A04"
-    },
-    {
-      "id": "QRY-04",
-      "module": "M06",
-      "title": "语言服务器生命周期与降级",
-      "description": "按项目根和语言管理运行时、导入、索引、复用、超时与退出。",
-      "acceptance": [
-        "显示准备与索引状态，避免每条 CLI 请求重复启动",
-        "失败可回退基础搜索并保留覆盖缺口",
-        "降级或超时不能推导出安全"
-      ],
-      "dependencies": [
-        "QRY-03"
-      ],
-      "section": "7.2",
-      "phase": 4,
-      "owner": "核心适配",
-      "kind": "功能",
-      "priority": "P0",
-      "origin": "PRD",
-      "ref": "FR-07 / A12"
-    },
-    {
-      "id": "QRY-05",
-      "module": "M06",
-      "title": "多语言查询扩展边界",
-      "description": "建立语言注册、能力协商、位置编码和返回值适配接口。",
-      "acceptance": [
-        "业务不依赖唯一全局 Java 服务器",
-        "首版只交付 Java，其余明确未支持",
-        "多服务器注册不被宣称为已解决跨语言传播"
-      ],
-      "dependencies": [
-        "QRY-02"
-      ],
-      "section": "7.1",
-      "phase": 1,
-      "owner": "核心适配",
-      "kind": "功能",
-      "priority": "P0",
-      "origin": "PRD",
-      "ref": "FR-08 / A05"
-    },
-    {
-      "id": "AGT-01",
-      "module": "M07",
-      "title": "Pi 扩展式 Goal / Loop",
-      "description": "通过产品扩展定义项目目标和逐风险点调查循环。",
-      "acceptance": [
-        "项目范围、模板、预算及结束条件固定",
-        "循环包含取证、分析、结构校验和提交",
-        "Pi 一次会话结束不自动等于项目 Goal 完成"
-      ],
-      "dependencies": [
-        "ENV-02",
-        "QRY-02",
-        "MOD-03"
-      ],
-      "section": "8.1",
-      "phase": 1,
-      "owner": "核心适配",
-      "kind": "功能",
-      "priority": "P0",
-      "origin": "PRD",
-      "ref": "FR-09 / A07"
-    },
-    {
-      "id": "AGT-02",
-      "module": "M07",
-      "title": "风险点串行工作队列",
-      "description": "首版单任务按风险点依次处理，必要时增加查入口或防护的子项。",
-      "acceptance": [
-        "待办和已结束工作项可追踪",
-        "不要求首版使用多 Agent",
-        "一个风险点错误可明确记录并继续其他独立项"
-      ],
-      "dependencies": [
-        "AGT-01",
-        "SCAN-01"
-      ],
-      "section": "8.1",
-      "phase": 2,
-      "owner": "核心适配",
-      "kind": "功能",
-      "priority": "P0",
-      "origin": "PRD",
-      "ref": "FR-09 / A07"
-    },
-    {
-      "id": "AGT-03",
-      "module": "M07",
-      "title": "函数间污染传播与防护分析",
-      "description": "核对参数、赋值、返回值、基础字段和危险操作前的有效防护。",
-      "acceptance": [
-        "记录来源、映射、传播类型和源码位置",
-        "判断防护是否对该漏洞及路径有效",
-        "缺源码或目标歧义时允许证据不足"
-      ],
-      "dependencies": [
-        "AGT-02",
-        "QRY-03",
-        "SCAN-03",
-        "MOD-04"
-      ],
-      "section": "8.1",
-      "phase": 2,
-      "owner": "核心适配",
-      "kind": "功能",
-      "priority": "P0",
-      "origin": "PRD",
-      "ref": "FR-09 / 分析质量"
-    },
-    {
-      "id": "AGT-04",
-      "module": "M07",
-      "title": "循环预算与无进展终止",
-      "description": "通过代码控制时间、调用数、Token、深度、分支和重复查询。",
-      "acceptance": [
-        "达到预算后不继续扩展相关范围",
-        "重复查询无新增证据时终止该分支",
-        "保存未完成项，不能让模型自称完成替代校验"
-      ],
-      "dependencies": [
-        "AGT-01"
-      ],
-      "section": "8.2",
-      "phase": 2,
-      "owner": "核心适配",
-      "kind": "功能",
-      "priority": "P0",
-      "origin": "PRD",
-      "ref": "FR-09 / A07"
-    },
-    {
-      "id": "UI-01",
-      "module": "M08",
-      "title": "审计工作台与风险列表",
-      "description": "将项目版本、当前阶段、风险状态、模型和查询后端组织为工作台。",
-      "acceptance": [
-        "支持搜索、筛选与风险排序",
-        "显示发现、待分析、分析中及已结束数量",
-        "候选集变化时不展示虚假的全局完成比例"
-      ],
-      "dependencies": [
-        "SCAN-01",
-        "AGT-02"
-      ],
-      "section": "4.5",
-      "phase": 2,
-      "owner": "前端实现",
-      "kind": "功能",
-      "priority": "P0",
-      "origin": "PRD",
-      "ref": "FR-10 / A08"
-    },
-    {
-      "id": "UI-02",
-      "module": "M08",
-      "title": "可交互调用路径图",
-      "description": "按路径显示 Source、函数、Sink、防护和必要分支。",
-      "acceptance": [
-        "点击节点或边可定位对应源码与参数映射",
-        "区分确认与待确认关系",
-        "首版不建设全仓库自由编辑画布"
-      ],
-      "dependencies": [
-        "UI-01",
-        "SCAN-03"
-      ],
-      "section": "4.5",
-      "phase": 3,
-      "owner": "前端实现",
-      "kind": "功能",
-      "priority": "P0",
-      "origin": "PRD",
-      "ref": "FR-10 / A08"
-    },
-    {
-      "id": "UI-03",
-      "module": "M08",
-      "title": "源码证据与风险状态联动",
-      "description": "在只读快照中呈现函数、行号、调用位置和分析摘要。",
-      "acceptance": [
-        "风险成立、阻断、证据不足和无效调用链可区分",
-        "人工结论不覆盖机器证据",
-        "严重程度与证据充分度分开表达"
-      ],
-      "dependencies": [
-        "UI-01",
-        "AGT-03"
-      ],
-      "section": "4.6",
-      "phase": 3,
-      "owner": "前端实现",
-      "kind": "功能",
-      "priority": "P0",
-      "origin": "PRD",
-      "ref": "FR-10 / A08"
-    },
-    {
-      "id": "UI-04",
-      "module": "M08",
-      "title": "冷色主题与配置页布局",
-      "description": "产品统一命名 pi-audit-harness，使用深蓝/青蓝界面及完整宽度配置布局。",
-      "acceptance": [
-        "模型与工具页利用右侧空间",
-        "按钮 hover 保持浅色文字对比",
-        "下拉箭头内缩并为文字留白"
-      ],
-      "dependencies": [
-        "UI-01"
-      ],
-      "section": "4.5",
-      "phase": 3,
-      "owner": "前端实现",
-      "kind": "功能",
-      "priority": "P0",
+      "phase": 5,
+      "owner": "后端",
+      "kind": "功能流程",
       "origin": "补充需求",
-      "ref": "最新原型视觉要求"
+      "ref": "2026-10-17 · 按功能流程归并",
+      "children": [
+        {
+          "id": "QRY-02",
+          "module": "M06",
+          "title": "统一 CLI + Skill 查询接口",
+          "description": "用统一契约暴露代码能力，Skill 说明使用方式与边界。",
+          "acceptance": [
+            "支持能力查询、读取、符号、定义、引用与调用适配",
+            "区分无命中、结果不全、未就绪、超时及不支持",
+            "返回语言、后端、快照、完整符号与位置"
+          ],
+          "dependencies": [
+            "QRY-01"
+          ],
+          "section": "6.2",
+          "phase": 0,
+          "owner": "后端",
+          "kind": "功能",
+          "priority": "P1",
+          "origin": "补充需求",
+          "ref": "FR-06 / FR-07"
+        },
+        {
+          "id": "QRY-03",
+          "module": "M06",
+          "title": "Java LSP 语义查询",
+          "description": "在基础调用链工具与 Pi/SSE 主链路跑通后，以 Java JDT-LS 提升语义定位精度。",
+          "acceptance": [
+            "至少一个跨文件真实样例参与风险路径分析",
+            "调用层次按服务器实际能力适配",
+            "不能用一次诊断通知证明全工作区索引完成"
+          ],
+          "dependencies": [
+            "QRY-02",
+            "ENV-02"
+          ],
+          "section": "7.2",
+          "phase": 0,
+          "owner": "后端",
+          "kind": "功能",
+          "priority": "P1",
+          "origin": "补充需求",
+          "ref": "FR-07 / A04"
+        },
+        {
+          "id": "QRY-04",
+          "module": "M06",
+          "title": "语言服务器生命周期与降级",
+          "description": "按项目根和语言管理运行时、导入、索引、复用、超时与退出。",
+          "acceptance": [
+            "显示准备与索引状态，避免每条 CLI 请求重复启动",
+            "失败可回退基础搜索并保留覆盖缺口",
+            "降级或超时不能推导出安全"
+          ],
+          "dependencies": [
+            "QRY-03"
+          ],
+          "section": "7.2",
+          "phase": 0,
+          "owner": "后端",
+          "kind": "功能",
+          "priority": "P1",
+          "origin": "补充需求",
+          "ref": "FR-07 / A12"
+        },
+        {
+          "id": "QRY-05",
+          "module": "M06",
+          "title": "多语言查询扩展边界",
+          "description": "建立语言注册、能力协商、位置编码和返回值适配接口。",
+          "acceptance": [
+            "业务不依赖唯一全局 Java 服务器",
+            "首版只交付 Java，其余明确未支持",
+            "多服务器注册不被宣称为已解决跨语言传播"
+          ],
+          "dependencies": [
+            "QRY-02"
+          ],
+          "section": "7.1",
+          "phase": 0,
+          "owner": "后端",
+          "kind": "功能",
+          "priority": "P1",
+          "origin": "补充需求",
+          "ref": "FR-08 / A05"
+        }
+      ]
     },
     {
-      "id": "REP-01",
-      "module": "M09",
-      "title": "人工复核与审计备注",
-      "description": "保存未复核、确认、误报、待补充状态，保留独立人工结论。",
+      "id": "EXPERIENCE-01",
+      "title": "审计交互与结果增强",
+      "priority": "P1",
+      "module": "M03",
+      "description": "完善交互式调用图、页面布局、人工复核和 JSON / 阶段结果导出。",
       "acceptance": [
-        "备注和状态可修改并保存",
-        "报告同时保留机器与人工结论",
-        "复核不静默改写已保存源码证据"
+        "可交互调用路径图：点击节点或边可定位对应源码与参数映射",
+        "冷色主题与配置页布局：模型与工具页利用右侧空间",
+        "人工复核与审计备注：备注和状态可修改并保存",
+        "JSON 与阶段结果导出：JSON 与界面结论一致"
       ],
       "dependencies": [
-        "UI-03"
+        "RESULT-01",
+        "REPORT-01"
       ],
-      "section": "4.6",
-      "phase": 3,
-      "owner": "前端实现",
-      "kind": "功能",
-      "priority": "P0",
-      "origin": "PRD",
-      "ref": "FR-11 / A08"
+      "section": "4.5",
+      "phase": 5,
+      "owner": "前后端协作",
+      "kind": "功能流程",
+      "origin": "补充需求",
+      "ref": "2026-10-17 · 按功能流程归并",
+      "children": [
+        {
+          "id": "UI-02",
+          "module": "M08",
+          "title": "可交互调用路径图",
+          "description": "按路径显示 Source、函数、Sink、防护和必要分支。",
+          "acceptance": [
+            "点击节点或边可定位对应源码与参数映射",
+            "区分确认与待确认关系",
+            "首版不建设全仓库自由编辑画布"
+          ],
+          "dependencies": [
+            "UI-01",
+            "SCAN-03"
+          ],
+          "section": "4.5",
+          "phase": 0,
+          "owner": "前端",
+          "kind": "功能",
+          "priority": "P1",
+          "origin": "补充需求",
+          "ref": "FR-10 / A08"
+        },
+        {
+          "id": "UI-04",
+          "module": "M08",
+          "title": "冷色主题与配置页布局",
+          "description": "产品统一命名 pi-audit-harness，使用深蓝/青蓝界面及完整宽度配置布局。",
+          "acceptance": [
+            "模型与工具页利用右侧空间",
+            "按钮 hover 保持浅色文字对比",
+            "下拉箭头内缩并为文字留白"
+          ],
+          "dependencies": [
+            "ENV-01",
+            "UI-01"
+          ],
+          "section": "4.5",
+          "phase": 0,
+          "owner": "前端",
+          "kind": "功能",
+          "priority": "P1",
+          "origin": "补充需求",
+          "ref": "最新原型视觉要求"
+        },
+        {
+          "id": "REP-01",
+          "module": "M09",
+          "title": "人工复核与审计备注",
+          "description": "保存未复核、确认、误报、待补充状态，保留独立人工结论。",
+          "acceptance": [
+            "备注和状态可修改并保存",
+            "报告同时保留机器与人工结论",
+            "复核不静默改写已保存源码证据"
+          ],
+          "dependencies": [
+            "UI-03"
+          ],
+          "section": "4.6",
+          "phase": 0,
+          "owner": "前后端协作",
+          "kind": "功能",
+          "priority": "P1",
+          "origin": "补充需求",
+          "ref": "FR-11 / A08"
+        },
+        {
+          "id": "REP-03",
+          "module": "M09",
+          "title": "JSON 与阶段结果导出",
+          "description": "P0 保证 SQLite 结果与 HTML 报告；结构化 JSON 下载、筛选导出及更丰富阶段报告在 P1 完善。",
+          "acceptance": [
+            "JSON 与界面结论一致",
+            "阶段报告明确标识未完成与结束原因",
+            "文件不包含 API Key，文本安全转义"
+          ],
+          "dependencies": [
+            "REP-02",
+            "REP-04"
+          ],
+          "section": "4.7",
+          "phase": 0,
+          "owner": "前后端协作",
+          "kind": "功能",
+          "priority": "P1",
+          "origin": "补充需求",
+          "ref": "FR-11 / A08"
+        }
+      ]
     },
     {
-      "id": "REP-02",
-      "module": "M09",
-      "title": "离线 HTML 图文报告",
-      "description": "从同一结构化结果生成页面和可独立打开的带图报告。",
+      "id": "RECOVERY-01",
+      "title": "任务控制与恢复",
+      "priority": "P1",
+      "module": "M03",
+      "description": "提供任务停止、状态保存和风险点边界的检查点恢复。",
       "acceptance": [
-        "保留路径图、源码位置、防护与修复建议",
-        "内嵌所需样式和图形，不依赖运行中的客户端",
-        "绑定源码、规则、工具与模型版本"
+        "停止与任务状态持久化：停止请求得到明确确认",
+        "风险点边界检查点恢复：已提交风险点不丢失、不重复计数"
       ],
       "dependencies": [
-        "UI-02",
-        "UI-03",
-        "REP-01"
-      ],
-      "section": "4.7",
-      "phase": 3,
-      "owner": "前端实现",
-      "kind": "功能",
-      "priority": "P0",
-      "origin": "PRD",
-      "ref": "FR-11 / A08"
-    },
-    {
-      "id": "REP-03",
-      "module": "M09",
-      "title": "JSON 与阶段结果导出",
-      "description": "提供机器可读结果，停止或预算耗尽时也能导出部分报告。",
-      "acceptance": [
-        "JSON 与界面结论一致",
-        "阶段报告明确标识未完成与结束原因",
-        "文件不包含 API Key，文本安全转义"
-      ],
-      "dependencies": [
-        "REP-02",
-        "AGT-04"
-      ],
-      "section": "4.7",
-      "phase": 3,
-      "owner": "协同实现",
-      "kind": "功能",
-      "priority": "P0",
-      "origin": "PRD",
-      "ref": "FR-11 / A08"
-    },
-    {
-      "id": "RUN-01",
-      "module": "M10",
-      "title": "停止与任务状态持久化",
-      "description": "停止派发新工作并保留已提交结果，当前行为可观察。",
-      "acceptance": [
-        "停止请求得到明确确认",
-        "无法取消的外部请求显示等待状态",
-        "任务和已完成风险点可持久保存"
-      ],
-      "dependencies": [
-        "AGT-02"
+        "ANALYZE-01"
       ],
       "section": "8.2",
-      "phase": 4,
-      "owner": "协同实现",
-      "kind": "功能",
-      "priority": "P0",
-      "origin": "PRD",
-      "ref": "FR-12 / A10"
+      "phase": 5,
+      "owner": "前后端协作",
+      "kind": "功能流程",
+      "origin": "补充需求",
+      "ref": "2026-10-17 · 按功能流程归并",
+      "children": [
+        {
+          "id": "RUN-01",
+          "module": "M10",
+          "title": "停止与任务状态持久化",
+          "description": "在基本任务状态落库基础上，增加用户主动停止、取消在途工作和阶段报告控制。",
+          "acceptance": [
+            "停止请求得到明确确认",
+            "无法取消的外部请求显示等待状态",
+            "任务和已完成风险点可持久保存"
+          ],
+          "dependencies": [
+            "API-02",
+            "DB-04"
+          ],
+          "section": "8.2",
+          "phase": 0,
+          "owner": "前后端协作",
+          "kind": "功能",
+          "priority": "P1",
+          "origin": "补充需求",
+          "ref": "FR-12 / A10"
+        },
+        {
+          "id": "RUN-02",
+          "module": "M10",
+          "title": "风险点边界检查点恢复",
+          "description": "首版以风险点为提交边界，重启后续跑而非无损恢复每次模型调用。",
+          "acceptance": [
+            "已提交风险点不丢失、不重复计数",
+            "未提交风险点可重跑，并说明用量影响",
+            "恢复使用原快照和审计配置"
+          ],
+          "dependencies": [
+            "RUN-01",
+            "SRC-03"
+          ],
+          "section": "8.3",
+          "phase": 0,
+          "owner": "前后端协作",
+          "kind": "功能",
+          "priority": "P1",
+          "origin": "补充需求",
+          "ref": "FR-12 / A10"
+        }
+      ]
     },
     {
-      "id": "RUN-02",
-      "module": "M10",
-      "title": "风险点边界检查点恢复",
-      "description": "首版以风险点为提交边界，重启后续跑而非无损恢复每次模型调用。",
+      "id": "SECURITY-01",
+      "title": "安全边界加固",
+      "priority": "P1",
+      "module": "M03",
+      "description": "完善源码与指令隔离、工具执行控制，以及凭据、日志和不可信内容的处理。",
       "acceptance": [
-        "已提交风险点不丢失、不重复计数",
-        "未提交风险点可重跑，并说明用量影响",
-        "恢复使用原快照和审计配置"
+        "目标源码与运行指令隔离：仅加载产品管理的运行扩展与 Skills",
+        "受控工具与代码执行边界：默认不改用户源码、不启动目标业务",
+        "凭据、日志与不可信渲染：API Key 不进入普通日志与报告"
       ],
       "dependencies": [
-        "RUN-01",
-        "SRC-03"
-      ],
-      "section": "8.3",
-      "phase": 4,
-      "owner": "核心适配",
-      "kind": "功能",
-      "priority": "P0",
-      "origin": "PRD",
-      "ref": "FR-12 / A10"
-    },
-    {
-      "id": "RUN-03",
-      "module": "M10",
-      "title": "模型与工具异常处理",
-      "description": "针对断网、额度、限流、索引失败等给出原因和下一步。",
-      "acceptance": [
-        "短暂错误有限重试，429 尊重等待提示",
-        "持续失败保存状态等待处理",
-        "用户决定调整模型，不自动切换"
-      ],
-      "dependencies": [
-        "MOD-03",
-        "QRY-04",
-        "RUN-01"
-      ],
-      "section": "9.4",
-      "phase": 4,
-      "owner": "协同实现",
-      "kind": "功能",
-      "priority": "P0",
-      "origin": "PRD",
-      "ref": "FR-12 / A12"
-    },
-    {
-      "id": "SEC-01",
-      "module": "M11",
-      "title": "目标源码与运行指令隔离",
-      "description": "仓库说明、注释及仓库内 Skills 作为分析材料，不自动成为可信指令。",
-      "acceptance": [
-        "仅加载产品管理的运行扩展与 Skills",
-        "用户主动导入的 Skill 作为审计文档，不执行脚本",
-        "通过指定提示词注入样例"
-      ],
-      "dependencies": [
-        "ENV-02",
-        "TPL-03"
+        "ANALYZE-01"
       ],
       "section": "10.2",
-      "phase": 4,
-      "owner": "核心适配",
-      "kind": "非功能",
-      "priority": "P0",
-      "origin": "PRD",
-      "ref": "A11"
+      "phase": 5,
+      "owner": "前后端协作",
+      "kind": "功能流程",
+      "origin": "补充需求",
+      "ref": "2026-10-17 · 按功能流程归并",
+      "children": [
+        {
+          "id": "SEC-01",
+          "module": "M11",
+          "title": "目标源码与运行指令隔离",
+          "description": "仓库说明、注释及仓库内 Skills 作为分析材料，不自动成为可信指令。",
+          "acceptance": [
+            "仅加载产品管理的运行扩展与 Skills",
+            "用户主动导入的 Skill 作为审计文档，不执行脚本",
+            "通过指定提示词注入样例"
+          ],
+          "dependencies": [
+            "ENV-02",
+            "TPL-03"
+          ],
+          "section": "10.2",
+          "phase": 0,
+          "owner": "后端",
+          "kind": "非功能",
+          "priority": "P1",
+          "origin": "补充需求",
+          "ref": "A11"
+        },
+        {
+          "id": "SEC-02",
+          "module": "M11",
+          "title": "受控工具与代码执行边界",
+          "description": "限定快照和缓存访问，约束通用写入、编辑与任意命令执行。",
+          "acceptance": [
+            "默认不改用户源码、不启动目标业务",
+            "校验路径与参数，并核实 JDT-LS 的构建执行行为",
+            "不将应用级限制宣传为 OS 沙箱"
+          ],
+          "dependencies": [
+            "API-01",
+            "QRY-01"
+          ],
+          "section": "10.2",
+          "phase": 0,
+          "owner": "后端",
+          "kind": "非功能",
+          "priority": "P1",
+          "origin": "补充需求",
+          "ref": "A11"
+        },
+        {
+          "id": "SEC-03",
+          "module": "M11",
+          "title": "凭据、日志与不可信渲染",
+          "description": "使用系统凭据存储和脱敏记录，保护源码与模型输出的显示路径。",
+          "acceptance": [
+            "API Key 不进入普通日志与报告",
+            "使用受控 IPC 和上下文隔离",
+            "源码、备注、模型文本按数据转义"
+          ],
+          "dependencies": [
+            "MOD-01",
+            "REP-02"
+          ],
+          "section": "10.2",
+          "phase": 0,
+          "owner": "前后端协作",
+          "kind": "非功能",
+          "priority": "P1",
+          "origin": "补充需求",
+          "ref": "A11"
+        }
+      ]
     },
     {
-      "id": "SEC-02",
-      "module": "M11",
-      "title": "受控工具与代码执行边界",
-      "description": "限定快照和缓存访问，约束通用写入、编辑与任意命令执行。",
+      "id": "RELEASE-01",
+      "title": "质量验证与开源交付",
+      "priority": "P1",
+      "module": "M03",
+      "description": "扩展样例回归、真实项目验证、性能稳定性检查，交付 Windows x64 安装包和开源说明。",
       "acceptance": [
-        "默认不改用户源码、不启动目标业务",
-        "校验路径与参数，并核实 JDT-LS 的构建执行行为",
-        "不将应用级限制宣传为 OS 沙箱"
+        "18 个样例与真实项目验证：每类至少 2 个成立、2 个阻断，另补 6 个未知场景",
+        "界面性能与长任务稳定性：参考 1–5 万行、100 候选与 50 节点路径",
+        "开源安装包与文档交付：包含锁定依赖、模板、Skills、教程和样例报告"
       ],
       "dependencies": [
-        "QRY-02",
-        "SRC-03"
-      ],
-      "section": "10.2",
-      "phase": 4,
-      "owner": "核心适配",
-      "kind": "非功能",
-      "priority": "P0",
-      "origin": "PRD",
-      "ref": "A11"
-    },
-    {
-      "id": "SEC-03",
-      "module": "M11",
-      "title": "凭据、日志与不可信渲染",
-      "description": "使用系统凭据存储和脱敏记录，保护源码与模型输出的显示路径。",
-      "acceptance": [
-        "API Key 不进入普通日志与报告",
-        "使用受控 IPC 和上下文隔离",
-        "源码、备注、模型文本按数据转义"
-      ],
-      "dependencies": [
-        "MOD-01",
-        "REP-02"
-      ],
-      "section": "10.2",
-      "phase": 4,
-      "owner": "协同实现",
-      "kind": "非功能",
-      "priority": "P0",
-      "origin": "PRD",
-      "ref": "A11"
-    },
-    {
-      "id": "QA-01",
-      "module": "M12",
-      "title": "18 个样例与真实项目验证",
-      "description": "建立三类漏洞正反例及歧义、缺依赖等场景，分开评估发现和判断。",
-      "acceptance": [
-        "每类至少 2 个成立、2 个阻断，另补 6 个未知场景",
-        "开发与验收样例分离，固定参考模型与源码版本",
-        "记录三次运行结果与一个真实项目复核"
-      ],
-      "dependencies": [
-        "TPL-01",
-        "AGT-03"
+        "REPORT-01"
       ],
       "section": "12.1",
       "phase": 5,
-      "owner": "协同实现",
-      "kind": "验收",
-      "priority": "P0",
-      "origin": "PRD",
-      "ref": "分析质量验收"
+      "owner": "前后端协作",
+      "kind": "功能流程",
+      "origin": "补充需求",
+      "ref": "2026-10-17 · 按功能流程归并",
+      "children": [
+        {
+          "id": "QA-01",
+          "module": "M12",
+          "title": "18 个样例与真实项目验证",
+          "description": "建立三类漏洞正反例及歧义、缺依赖等场景，分开评估发现和判断。",
+          "acceptance": [
+            "每类至少 2 个成立、2 个阻断，另补 6 个未知场景",
+            "开发与验收样例分离，固定参考模型与源码版本",
+            "记录三次运行结果与一个真实项目复核"
+          ],
+          "dependencies": [
+            "TPL-01",
+            "AGT-03"
+          ],
+          "section": "12.1",
+          "phase": 0,
+          "owner": "前后端协作",
+          "kind": "验收",
+          "priority": "P1",
+          "origin": "补充需求",
+          "ref": "分析质量验收"
+        },
+        {
+          "id": "QA-02",
+          "module": "M12",
+          "title": "界面性能与长任务稳定性",
+          "description": "在明确样例规模下记录响应、查询、索引、用量和恢复表现。",
+          "acceptance": [
+            "参考 1–5 万行、100 候选与 50 节点路径",
+            "停止确认目标 2 秒，新工作停派目标 5 秒",
+            "至少 1 小时运行与一次中断恢复测试"
+          ],
+          "dependencies": [
+            "RUN-02",
+            "UI-02"
+          ],
+          "section": "12.4",
+          "phase": 0,
+          "owner": "前后端协作",
+          "kind": "验收",
+          "priority": "P1",
+          "origin": "补充需求",
+          "ref": "稳定性验收"
+        },
+        {
+          "id": "QA-03",
+          "module": "M12",
+          "title": "开源安装包与文档交付",
+          "description": "P0 先验证可运行客户端与真实 Agent 主链路；安装包、开源发布材料与完整兼容矩阵在 P1 完善。",
+          "acceptance": [
+            "包含锁定依赖、模板、Skills、教程和样例报告",
+            "README、许可证与第三方依赖说明齐备",
+            "记录环境兼容矩阵和已知限制"
+          ],
+          "dependencies": [
+            "ENV-01",
+            "REP-04",
+            "QA-04"
+          ],
+          "section": "14",
+          "phase": 0,
+          "owner": "前后端协作",
+          "kind": "验收",
+          "priority": "P1",
+          "origin": "补充需求",
+          "ref": "发布门槛"
+        }
+      ]
     },
     {
-      "id": "QA-02",
-      "module": "M12",
-      "title": "界面性能与长任务稳定性",
-      "description": "在明确样例规模下记录响应、查询、索引、用量和恢复表现。",
-      "acceptance": [
-        "参考 1–5 万行、100 候选与 50 节点路径",
-        "停止确认目标 2 秒，新工作停派目标 5 秒",
-        "至少 1 小时运行与一次中断恢复测试"
-      ],
-      "dependencies": [
-        "RUN-02",
-        "UI-02"
-      ],
-      "section": "12.4",
-      "phase": 5,
-      "owner": "协同实现",
-      "kind": "验收",
-      "priority": "P0",
-      "origin": "PRD",
-      "ref": "稳定性验收"
-    },
-    {
-      "id": "QA-03",
-      "module": "M12",
-      "title": "开源安装包与文档交付",
-      "description": "交付未签名 Windows x64 安装包及可构建源码。",
-      "acceptance": [
-        "包含锁定依赖、模板、Skills、教程和样例报告",
-        "README、许可证与第三方依赖说明齐备",
-        "记录环境兼容矩阵和已知限制"
-      ],
-      "dependencies": [
-        "ENV-01",
-        "REP-03",
-        "QA-01",
-        "QA-02"
-      ],
-      "section": "14",
-      "phase": 5,
-      "owner": "协同实现",
-      "kind": "验收",
-      "priority": "P0",
-      "origin": "PRD",
-      "ref": "发布门槛"
-    },
-    {
-      "id": "NEXT-01",
-      "module": "M01",
-      "title": "其他系统与架构",
-      "description": "macOS、Linux 与更多 CPU 架构单独适配。",
-      "acceptance": [
-        "不作为首版发布门槛",
-        "进入后续版本前单独评估范围与验收"
-      ],
-      "dependencies": [
-        "ENV-01"
-      ],
-      "section": "3.2",
-      "phase": 0,
-      "owner": "后续规划",
-      "kind": "功能",
-      "priority": "P1",
-      "origin": "PRD",
-      "ref": ""
-    },
-    {
-      "id": "NEXT-02",
-      "module": "M02",
-      "title": "私有仓库鉴权与增量审计",
-      "description": "后续增加凭据接入、变更范围分析和历史关联。",
-      "acceptance": [
-        "不作为首版发布门槛",
-        "进入后续版本前单独评估范围与验收"
-      ],
-      "dependencies": [
-        "SRC-01",
-        "SRC-03"
-      ],
-      "section": "3.2",
-      "phase": 0,
-      "owner": "后续规划",
-      "kind": "功能",
-      "priority": "P1",
-      "origin": "PRD",
-      "ref": ""
-    },
-    {
-      "id": "NEXT-03",
-      "module": "M06",
-      "title": "更多语言与 CodeGraph",
-      "description": "接入其他语言服务器或图查询后端，分别验证能力。",
-      "acceptance": [
-        "不作为首版发布门槛",
-        "进入后续版本前单独评估范围与验收"
-      ],
-      "dependencies": [
-        "QRY-05"
-      ],
-      "section": "3.2",
-      "phase": 0,
-      "owner": "后续规划",
-      "kind": "功能",
-      "priority": "P1",
-      "origin": "PRD",
-      "ref": ""
-    },
-    {
-      "id": "NEXT-04",
-      "module": "M07",
-      "title": "并行任务与多 Agent",
-      "description": "在稳定串行工作流基础上再评估并发。",
-      "acceptance": [
-        "不作为首版发布门槛",
-        "进入后续版本前单独评估范围与验收"
-      ],
-      "dependencies": [
-        "AGT-02"
-      ],
-      "section": "3.2",
-      "phase": 0,
-      "owner": "后续规划",
-      "kind": "功能",
-      "priority": "P1",
-      "origin": "PRD",
-      "ref": ""
-    },
-    {
-      "id": "NEXT-05",
-      "module": "M08",
-      "title": "大图探索与自由图编辑",
-      "description": "面向复杂仓库提供更多布局与全图能力。",
-      "acceptance": [
-        "不作为首版发布门槛",
-        "进入后续版本前单独评估范围与验收"
-      ],
-      "dependencies": [
-        "UI-02"
-      ],
-      "section": "3.2",
-      "phase": 0,
-      "owner": "后续规划",
-      "kind": "功能",
-      "priority": "P1",
-      "origin": "PRD",
-      "ref": ""
-    },
-    {
-      "id": "NEXT-06",
-      "module": "M09",
-      "title": "更多报告格式与企业模板",
-      "description": "按需求增加 Markdown、PDF、SARIF 等。",
-      "acceptance": [
-        "不作为首版发布门槛",
-        "进入后续版本前单独评估范围与验收"
-      ],
-      "dependencies": [
-        "REP-02"
-      ],
-      "section": "3.2",
-      "phase": 0,
-      "owner": "后续规划",
-      "kind": "功能",
-      "priority": "P1",
-      "origin": "PRD",
-      "ref": ""
-    },
-    {
-      "id": "NEXT-07",
-      "module": "M10",
-      "title": "函数级恢复与精细暂停",
-      "description": "提高检查点粒度及跨版本结果对比能力。",
-      "acceptance": [
-        "不作为首版发布门槛",
-        "进入后续版本前单独评估范围与验收"
-      ],
-      "dependencies": [
-        "RUN-02"
-      ],
-      "section": "3.2",
-      "phase": 0,
-      "owner": "后续规划",
-      "kind": "功能",
-      "priority": "P1",
-      "origin": "PRD",
-      "ref": ""
-    },
-    {
-      "id": "NEXT-08",
+      "id": "PLATFORM-01",
+      "title": "平台与仓库扩展",
+      "priority": "P2",
       "module": "M04",
-      "title": "团队模板与协作",
-      "description": "模板共享、团队审阅与集中策略后续独立规划。",
+      "description": "扩展其他操作系统和架构，支持私有仓库与增量审计。",
       "acceptance": [
-        "不作为首版发布门槛",
-        "进入后续版本前单独评估范围与验收"
+        "其他系统与架构：不作为首版发布门槛",
+        "私有仓库鉴权与增量审计：不作为首版发布门槛"
       ],
       "dependencies": [
-        "TPL-03",
-        "REP-01"
+        "SOURCE-01"
       ],
       "section": "3.2",
-      "phase": 0,
-      "owner": "后续规划",
-      "kind": "功能",
-      "priority": "P1",
-      "origin": "PRD",
-      "ref": ""
+      "phase": 5,
+      "owner": "前后端协作",
+      "kind": "功能流程",
+      "origin": "补充需求",
+      "ref": "2026-10-17 · 按功能流程归并",
+      "children": [
+        {
+          "id": "NEXT-01",
+          "module": "M01",
+          "title": "其他系统与架构",
+          "description": "macOS、Linux 与更多 CPU 架构单独适配。",
+          "acceptance": [
+            "不作为首版发布门槛",
+            "进入后续版本前单独评估范围与验收"
+          ],
+          "dependencies": [
+            "ENV-01"
+          ],
+          "section": "3.2",
+          "phase": 0,
+          "owner": "前后端协作",
+          "kind": "功能",
+          "priority": "P2",
+          "origin": "补充需求",
+          "ref": ""
+        },
+        {
+          "id": "NEXT-02",
+          "module": "M02",
+          "title": "私有仓库鉴权与增量审计",
+          "description": "后续增加凭据接入、变更范围分析和历史关联。",
+          "acceptance": [
+            "不作为首版发布门槛",
+            "进入后续版本前单独评估范围与验收"
+          ],
+          "dependencies": [
+            "SRC-01",
+            "SRC-03"
+          ],
+          "section": "3.2",
+          "phase": 0,
+          "owner": "前后端协作",
+          "kind": "功能",
+          "priority": "P2",
+          "origin": "补充需求",
+          "ref": ""
+        }
+      ]
+    },
+    {
+      "id": "ENGINE-01",
+      "title": "分析引擎扩展",
+      "priority": "P2",
+      "module": "M04",
+      "description": "扩展多语言、CodeGraph、并行 Agent、大图探索和更细粒度恢复。",
+      "acceptance": [
+        "更多语言与 CodeGraph：不作为首版发布门槛",
+        "并行任务与多 Agent：不作为首版发布门槛",
+        "大图探索与自由图编辑：不作为首版发布门槛",
+        "函数级恢复与精细暂停：不作为首版发布门槛"
+      ],
+      "dependencies": [
+        "ANALYZE-01",
+        "QUERY-01"
+      ],
+      "section": "3.2",
+      "phase": 5,
+      "owner": "前后端协作",
+      "kind": "功能流程",
+      "origin": "补充需求",
+      "ref": "2026-10-17 · 按功能流程归并",
+      "children": [
+        {
+          "id": "NEXT-03",
+          "module": "M06",
+          "title": "更多语言与 CodeGraph",
+          "description": "接入其他语言服务器或图查询后端，分别验证能力。",
+          "acceptance": [
+            "不作为首版发布门槛",
+            "进入后续版本前单独评估范围与验收"
+          ],
+          "dependencies": [
+            "QRY-05"
+          ],
+          "section": "3.2",
+          "phase": 0,
+          "owner": "后端",
+          "kind": "功能",
+          "priority": "P2",
+          "origin": "补充需求",
+          "ref": ""
+        },
+        {
+          "id": "NEXT-04",
+          "module": "M07",
+          "title": "并行任务与多 Agent",
+          "description": "在稳定串行工作流基础上再评估并发。",
+          "acceptance": [
+            "不作为首版发布门槛",
+            "进入后续版本前单独评估范围与验收"
+          ],
+          "dependencies": [
+            "AGT-02"
+          ],
+          "section": "3.2",
+          "phase": 0,
+          "owner": "后端",
+          "kind": "功能",
+          "priority": "P2",
+          "origin": "补充需求",
+          "ref": ""
+        },
+        {
+          "id": "NEXT-05",
+          "module": "M08",
+          "title": "大图探索与自由图编辑",
+          "description": "面向复杂仓库提供更多布局与全图能力。",
+          "acceptance": [
+            "不作为首版发布门槛",
+            "进入后续版本前单独评估范围与验收"
+          ],
+          "dependencies": [
+            "UI-02"
+          ],
+          "section": "3.2",
+          "phase": 0,
+          "owner": "前后端协作",
+          "kind": "功能",
+          "priority": "P2",
+          "origin": "补充需求",
+          "ref": ""
+        },
+        {
+          "id": "NEXT-07",
+          "module": "M10",
+          "title": "函数级恢复与精细暂停",
+          "description": "提高检查点粒度及跨版本结果对比能力。",
+          "acceptance": [
+            "不作为首版发布门槛",
+            "进入后续版本前单独评估范围与验收"
+          ],
+          "dependencies": [
+            "RUN-02"
+          ],
+          "section": "3.2",
+          "phase": 0,
+          "owner": "后端",
+          "kind": "功能",
+          "priority": "P2",
+          "origin": "补充需求",
+          "ref": ""
+        }
+      ]
+    },
+    {
+      "id": "TEAM-01",
+      "title": "协作与报告扩展",
+      "priority": "P2",
+      "module": "M04",
+      "description": "支持更多报告格式、企业模板与团队模板协作。",
+      "acceptance": [
+        "更多报告格式与企业模板：不作为首版发布门槛",
+        "团队模板与协作：不作为首版发布门槛"
+      ],
+      "dependencies": [
+        "REPORT-01",
+        "TEMPLATE-01"
+      ],
+      "section": "3.2",
+      "phase": 5,
+      "owner": "前后端协作",
+      "kind": "功能流程",
+      "origin": "补充需求",
+      "ref": "2026-10-17 · 按功能流程归并",
+      "children": [
+        {
+          "id": "NEXT-06",
+          "module": "M09",
+          "title": "更多报告格式与企业模板",
+          "description": "按需求增加 Markdown、PDF、SARIF 等。",
+          "acceptance": [
+            "不作为首版发布门槛",
+            "进入后续版本前单独评估范围与验收"
+          ],
+          "dependencies": [
+            "REP-02"
+          ],
+          "section": "3.2",
+          "phase": 0,
+          "owner": "前后端协作",
+          "kind": "功能",
+          "priority": "P2",
+          "origin": "补充需求",
+          "ref": ""
+        },
+        {
+          "id": "NEXT-08",
+          "module": "M04",
+          "title": "团队模板与协作",
+          "description": "模板共享、团队审阅与集中策略后续独立规划。",
+          "acceptance": [
+            "不作为首版发布门槛",
+            "进入后续版本前单独评估范围与验收"
+          ],
+          "dependencies": [
+            "TPL-03",
+            "REP-01"
+          ],
+          "section": "3.2",
+          "phase": 0,
+          "owner": "前后端协作",
+          "kind": "功能",
+          "priority": "P2",
+          "origin": "补充需求",
+          "ref": ""
+        }
+      ]
     }
   ],
   "phases": [
     {
       "id": 1,
-      "title": "工程与关键验证",
-      "days": "约 2 天",
-      "goal": "Electron 客户端骨架、真实 Pi 会话与 Java 跨文件语义查询"
+      "title": "客户端、服务与模型连通",
+      "days": "按实际进度协商",
+      "goal": "Electron、Pi 服务、SQLite 初始化、模型 ping"
     },
     {
       "id": 2,
-      "title": "真实审计闭环",
-      "days": "约 2 天",
-      "goal": "导入 → 快照 → 候选点 → Source 到 Sink 证据"
+      "title": "源码与调用链入库",
+      "days": "按实际进度协商",
+      "goal": "项目登记、预处理、边与路径步骤持久化"
     },
     {
       "id": 3,
-      "title": "核心输出与配置",
-      "days": "约 2 天",
-      "goal": "路径图、源码、文档模板与报告联动"
+      "title": "Loop 与 SSE 展示",
+      "days": "按实际进度协商",
+      "goal": "从 SQLite 分析、三类帧与前端真实反馈"
     },
     {
       "id": 4,
-      "title": "运行可靠性",
-      "days": "约 2 天",
-      "goal": "环境、停止恢复、限流与执行边界"
+      "title": "HTML 报告与状态收敛",
+      "days": "按实际进度协商",
+      "goal": "Pi /report、结果统计、异常处理"
     },
     {
       "id": 5,
-      "title": "回归与开源发布",
-      "days": "约 2 天",
-      "goal": "样例复核、安装包、README 和兼容矩阵"
+      "title": "端到端验证",
+      "days": "按实际进度协商",
+      "goal": "完成真实主链路样例后再迭代增强能力"
     }
   ],
-  "comparison": {
-    "newFunctionalScope": 0,
-    "summary": "当前文件与此前正式版主体一致，未发现实质新增功能。差异主要是缺少最新命名与文档式模板界面约定。",
-    "items": [
-      {
-        "title": "项目命名",
-        "source": "仍使用“Agent 源码审计客户端”通用标题。",
-        "resolution": "页面与产品统一使用 pi-audit-harness。",
-        "refs": [
-          "UI-04"
-        ]
-      },
-      {
-        "title": "模板新增与导入入口",
-        "source": "§3.2、§3.4、§4.4、§5 和 A06 仍描述底层规则配置导入。",
-        "resolution": "使用新增模板编辑器，支持 Markdown / SKILL.md / Skill 目录；保留底层发现规则与知识文档的能力边界。",
-        "refs": [
-          "TPL-02",
-          "TPL-03"
-        ]
-      },
-      {
-        "title": "最新原型视觉约束",
-        "source": "未记录冷色主题、配置页右侧空间、hover 与下拉箭头等细节。",
-        "resolution": "作为界面验收细节记录，不膨胀为独立后端模块。",
-        "refs": [
-          "UI-04"
-        ]
-      }
-    ]
+  "revision": {
+    "title": "按功能流程组织父需求与子需求",
+    "priorityMeaning": {
+      "P0": "当前必须跑通的 Agent 主流程",
+      "P1": "主链路之后的增强需求",
+      "P2": "更后续的能力规划"
+    },
+    "gitPolicy": "缺少 Git 时提示用户安装，不自动安装",
+    "workflow": [
+      "Electron + Pi 本地服务",
+      "手动模型配置与 ping",
+      "本地目录 / GitHub 输入",
+      "风险工具 → SQLite 调用链",
+      "Pi Loop → /analyze SSE",
+      "结果回写 → /report HTML"
+    ],
+    "grouping": "列表仅展示 15 个父需求，原 59 项细节完整保留为子需求。子需求继承所属父需求优先级。"
   }
 }
