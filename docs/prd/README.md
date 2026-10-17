@@ -11,3 +11,7 @@
 以 index.html 和 requirements.json 为当前范围；旧 Markdown PRD 仅作为背景。页面为静态需求定义，不代表功能已经实现。
 
 职责按前端、后端、前后端协作划分，不按个人身份划分。
+
+2026-10-18 新增“重要设计”看板：调用链状态机、结果回调一致性、短期会话与检查点恢复。ldb 暂按 LevelDB 理解，ZSet 需上层实现；恢复仍为 P1，具体选型与提升优先级待确认。
+
+会话快照方案已对齐：每个 sessionId 一个逻辑 ZSet，score 使用唯一递增 checkpoint，member 直接保存完整会话 JSON，按 score 降序读取最新有效快照。LevelDB 以有序键与反向迭代提供适配。

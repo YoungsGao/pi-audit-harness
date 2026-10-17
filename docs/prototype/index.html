@@ -56,6 +56,13 @@ select.input option,.project-switch select option{background:#17283f;color:#e1ee
 
 .docs-brand{color:inherit;text-decoration:none}.docs-brand:hover strong{color:#bde4ff}
 .trace-payload{margin-top:12px;border:1px solid #294565;border-radius:6px;background:#0d192a}.trace-payload summary{padding:10px 12px;cursor:pointer;color:#8fcaff}.trace-payload summary:hover{background:#193855;color:#e4f3ff}.trace-payload pre{margin:0;padding:14px;border-top:1px solid #294565;color:#acc5e3;white-space:pre-wrap;overflow-wrap:anywhere;font:11px/1.7 var(--mono)}
+/* Keep navigation reachable on short windows and when browser zoom is increased. */
+.sidebar{overflow-y:auto;overflow-x:hidden;overscroll-behavior-y:contain;scrollbar-width:thin;scrollbar-color:#416b94 var(--nav)}
+.sidebar>*{flex-shrink:0}
+.sidebar::-webkit-scrollbar{width:6px}
+.sidebar::-webkit-scrollbar-track{background:var(--nav)}
+.sidebar::-webkit-scrollbar-thumb{background:#416b94;border-radius:6px}
+.sidebar::-webkit-scrollbar-thumb:hover{background:#6b9cc6}
 </style>
 </head>
 <body>
