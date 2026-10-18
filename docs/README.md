@@ -16,4 +16,4 @@
 
 ## 发布
 
-Pages 使用 Deploy from a branch，发布分支 main 的**根目录**（Jekyll 负责根路径的 README 渲染）。站点静态资源都在 docs/ 下，因此页面地址为 `https://youngsgao.github.io/pi-audit-harness/docs/...`。static.yml 已移除；不依赖自定义 Actions。
+Pages 使用 Deploy from a branch，发布分支 main 的**根目录**。站点静态资源都在 docs/ 下，因此页面地址为 `https://youngsgao.github.io/pi-audit-harness/docs/...`；仓库根的 index.html 只做跳转，避免根路径用 Jekyll 主题渲染出白底页面。static.yml 已移除；不依赖自定义 Actions。

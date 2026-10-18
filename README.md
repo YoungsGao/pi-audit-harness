@@ -17,7 +17,7 @@
 查看首版范围与模块划分，从需求列表进入具体说明、验收条件和关联资料。
 
 - [需求总览](https://youngsgao.github.io/pi-audit-harness/docs/prd/index.html)
-- [需求列表与右侧详情](https://youngsgao.github.io/pi-audit-harness/docs/prd/index.html#requirements)
+- [需求列表](https://youngsgao.github.io/pi-audit-harness/docs/prd/index.html#requirements)
 - [关键设计](https://youngsgao.github.io/pi-audit-harness/docs/prd/index.html#design)
 
 ## 交互原型
@@ -50,8 +50,8 @@
 - 产品需求和原型左上角的项目名均返回文档站入口。
 - GitHub Pages 使用 **Deploy from a branch**，发布分支 `main` 的**根目录**；站点资源都在 `docs/` 下，因此指向站点的地址要带 `/docs`。
 - 页面之间的导航（首页 / 产品需求 / 交互原型 / 技术方案）全部使用**相对路径**，换域名或本地预览都不会失效。
-- 本文件的链接用绝对地址，因为同一份 README 会在三处渲染：GitHub 仓库页、Jekyll 根路径、以及 docs/ 下的阅读器；只有绝对地址在三处都跳到站点页面。
-- 仓库根路径 <https://youngsgao.github.io/pi-audit-harness/> 是 Jekyll 渲染的本文件，`/docs` 下才是静态站点。
+- 本文件的链接用绝对地址，因为同一份 README 会在三处渲染：GitHub 仓库页、根路径跳转、以及 docs/ 下的阅读器；只有绝对地址在三处都能跳到站点页面。
+- 仓库根路径 <https://youngsgao.github.io/pi-audit-harness/> 由根目录 index.html 直接跳转到 `/docs/`，与文档站同一套样式；不再使用 Jekyll 主题渲染本文件。
 - 首页与技术方案页读取仓库 `main` 分支的 Markdown：原文优先走 raw.githubusercontent.com，失败时切到 jsDelivr；目录通过 jsDelivr 文件清单接口发现，再退回 GitHub 公共树接口。
 - 默认读取 main 分支，配置位于 [docs/technical/assets/config.js](docs/technical/assets/config.js)。若发布分支变化，请同步修改 ref。
 - 目录读取失败时会提示并允许重试，同时显示随页面附带的索引，无需配置密钥。
