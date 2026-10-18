@@ -36,4 +36,4 @@ interface AuditTask {
 
 直接打开 HTML 可查看附带首页与指南。新增文件推送后，在线页面读取仓库目录发现它们；浏览器不会直接扫描本地磁盘。
 
-默认读取 main 分支；如 Pages 发布分支不同，修改 docs/assets/config.js 的 ref。公共目录接口暂不可用时会提示并允许重试，不需要配置密钥。
+默认读取 main 分支；如需调整，修改 docs/technical/assets/config.js 的 ref。目录优先由 jsDelivr 文件清单接口发现，失败时退回 GitHub 公共树接口；两者都不可用时提示重试并显示页面附带的索引，不需要配置密钥。
