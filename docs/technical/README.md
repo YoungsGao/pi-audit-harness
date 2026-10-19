@@ -6,9 +6,12 @@
 
 1. 复制 _template.md，改名为 01.系统架构.md 等文件名。
 2. 使用 Markdown 编写内容，可按主题建立子目录。
-3. 提交并推送到 Pages 发布分支。页面自动索引，不需要改 HTML 或运行 Actions。
+3. 在仓库根目录运行 `node scripts/gen-index.mjs`，重新生成 index.json 与 assets/fallback.js。
+4. 提交并推送到 Pages 发布分支。
 
-列表按文件名排序。下划线或点开头的文件不进入索引。
+页面的目录优先读仓库内的 index.json（随提交更新，几分钟内生效），因此不跑脚本的话，新文件要等 jsDelivr 文件清单缓存过期（约 12 小时）才会出现。
+
+列表按 README、数字前缀、其余文件的顺序排序，_template.md 排在最后。点开头的文件不进入索引。
 
 ## 支持的排版
 
@@ -34,6 +37,6 @@ interface AuditTask {
 
 ## 本地预览与在线索引
 
-直接打开 HTML 可查看附带首页与指南。新增文件推送后，在线页面读取仓库目录发现它们；浏览器不会直接扫描本地磁盘。
+直接打开 HTML 可查看附带首页与指南。在线页面读取仓库里的 index.json 得到目录；浏览器不会直接扫描本地磁盘。
 
-默认读取 main 分支；如需调整，修改 docs/technical/assets/config.js 的 ref。目录优先由 jsDelivr 文件清单接口发现，失败时退回 GitHub 公共树接口；两者都不可用时提示重试并显示页面附带的索引，不需要配置密钥。
+默认读取 main 分支；如需调整，修改 docs/technical/assets/config.js 的 ref。目录按 index.json → jsDelivr 文件清单 → GitHub 公共树接口的顺序获取，都不可用时提示重试并显示页面附带的索引，不需要配置密钥。

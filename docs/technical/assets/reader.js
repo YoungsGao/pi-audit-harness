@@ -12,7 +12,7 @@
     'https://raw.githubusercontent.com/' + C.owner + '/' + C.repo + '/' + encodeURIComponent(C.ref) + '/',
     'https://cdn.jsdelivr.net/gh/' + C.owner + '/' + C.repo + '@' + encodeURIComponent(C.ref) + '/'
   ];
-  const CACHE_TTL = 10 * 60 * 1000, CACHE_KEY = 'pi-docs:' + C.owner + '/' + C.repo + '@' + C.ref;
+  const CACHE_TTL = 10 * 60 * 1000, CACHE_KEY = 'pi-docs:v2:' + C.owner + '/' + C.repo + '@' + C.ref;
 
   function cacheGet(key) {
     try {
@@ -47,7 +47,7 @@
     if (!technical && !img && target.startsWith('docs/technical/')) {
       const rel = target.slice('docs/technical/'.length);
       if (!rel) return './technical/index.html';
-      if (/\.md$/i.test(rel) && !rel.startsWith('_')) return './technical/index.html#doc=' + encodeURIComponent(rel);
+      if (/\.md$/i.test(rel)) return './technical/index.html#doc=' + encodeURIComponent(rel);
     }
     // README 中用仓库相对路径（docs/...）时，映射到站点内相对路径
     if (!technical && !img && (target === 'docs' || target.startsWith('docs/'))) return './' + target.slice(5) + (target === 'docs' ? '/' : '');
@@ -86,15 +86,30 @@
     throw lastError || Error('读取失败');
   }
 
-  // 目录发现：jsDelivr 文件清单（无鉴权、不限流）→ GitHub 树接口 → 附带索引
+  // 目录发现：仓库内的 index.json（随提交更新，raw 数分钟内生效）
+  // → jsDelivr 文件清单（无鉴权、不限流，但分支清单有约 12 小时缓存）
+  // → GitHub 树接口（未鉴权 60 次/小时）
+  // → 页面附带的索引
   const LISTERS = [
+    {
+      name: 'index.json',
+      run: async () => {
+        const data = JSON.parse(await text(C.directory + '/index.json'));
+        const docs = (data.documents || []).filter(d => d && d.path);
+        if (!docs.length) throw Error('索引为空');
+        return docs.map(d => {
+          const known = (F.documents || []).find(x => x.path === d.path);
+          return { path: d.path, title: d.title || known?.title || d.path, content: known?.content };
+        });
+      }
+    },
     {
       name: 'jsDelivr',
       run: async () => {
         const r = await fetch('https://data.jsdelivr.com/v1/packages/gh/' + C.owner + '/' + C.repo + '@' + C.ref + '?structure=flat', { cache: 'no-cache' });
         if (!r.ok) throw Error('HTTP ' + r.status);
         const data = await r.json();
-        return (data.files || []).map(f => String(f.name).replace(/^\/+/, ''));
+        return toDocuments((data.files || []).map(f => String(f.name).replace(/^\/+/, '')));
       }
     },
     {
@@ -104,16 +119,15 @@
         if (!r.ok) throw Error('HTTP ' + r.status);
         const data = await r.json();
         if (data.truncated) throw Error('目录不完整');
-        return (data.tree || []).filter(x => x.type === 'blob').map(x => x.path);
+        return toDocuments((data.tree || []).filter(x => x.type === 'blob').map(x => x.path));
       }
     }
   ];
 
   function toDocuments(paths) {
     const prefix = C.directory + '/';
-    const hidden = p => p.slice(prefix.length).split('/').some(s => /^[_.]/.test(s));
     return paths
-      .filter(p => p.startsWith(prefix) && /\.md$/i.test(p) && !hidden(p))
+      .filter(p => p.startsWith(prefix) && /\.md$/i.test(p) && !p.slice(prefix.length).split('/').some(s => s.startsWith('.')))
       .map(p => {
         const path = p.slice(prefix.length), known = (F.documents || []).find(d => d.path === path);
         return { path, title: known?.title || path.split('/').pop().replace(/\.md$/i, ''), content: known?.content };
@@ -127,7 +141,7 @@
     let lastError;
     for (const lister of LISTERS) {
       try {
-        const docs = toDocuments(await lister.run());
+        const docs = await lister.run();
         if (!docs.length) throw Error('目录为空');
         cacheSet('list', docs.map(({ path, title }) => ({ path, title })));
         return { docs, via: lister.name };

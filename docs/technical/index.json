@@ -1,0 +1,16 @@
+{
+  "documents": [
+    {
+      "path": "README.md",
+      "title": "技术方案编写指南"
+    },
+    {
+      "path": "01.BUILD-01-项目构建技术方案.md",
+      "title": "BUILD-01 项目构建技术方案"
+    },
+    {
+      "path": "_template.md",
+      "title": "文档模板"
+    }
+  ]
+}
