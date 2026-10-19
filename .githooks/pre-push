@@ -1,0 +1,21 @@
+#!/bin/sh
+# 推送 main 前校验技术方案索引是否与目录一致。
+# 启用：git config core.hooksPath .githooks（每个 clone 一次）
+# 跳过：git push --no-verify
+set -e
+cd "$(git rev-parse --show-toplevel)"
+
+while read -r local_ref local_sha remote_ref remote_sha; do
+  [ "$remote_ref" = "refs/heads/main" ] || continue
+  [ "$local_sha" = "0000000000000000000000000000000000000000" ] && continue
+
+  node docs/technical/assets/gen-index.mjs >/dev/null
+
+  if ! git diff --quiet HEAD -- docs/technical/index.json docs/technical/assets/fallback.js; then
+    echo "" >&2
+    echo "索引与目录不一致，已重新生成：" >&2
+    git --no-pager diff --stat HEAD -- docs/technical/index.json docs/technical/assets/fallback.js >&2
+    echo "请 git add 后 git commit --amend，再重新推送。" >&2
+    exit 1
+  fi
+done

@@ -13,6 +13,20 @@
 
 列表按 README、数字前缀、其余文件的顺序排序，_template.md 排在最后。点开头的文件不进入索引。
 
+## 推送前自动校验
+
+仓库自带的 `.githooks/pre-push` 会在推送 main 前跑一次 gen-index.mjs。若 index.json 或 fallback.js 与当前目录、README 不一致，脚本会重新生成这两个文件并中止推送，此时按提示 `git add` 后 `git commit --amend` 即可。
+
+钩子文件在仓库里，不复制到 `.git/hooks`，靠一条配置让 git 去仓库目录找钩子。每个 clone 启用一次：
+
+~~~sh
+git config core.hooksPath .githooks
+~~~
+
+- 提交时需保证 `.githooks/pre-push` 有执行位（git 记为 100755）；丢了执行位 git 会静默跳过，可用 `ls -l .githooks/pre-push` 确认。
+- 临时跳过校验：`git push --no-verify`。
+- 关闭钩子：`git config --unset core.hooksPath`。
+
 ## 支持的排版
 
 支持标题、段落、粗体、斜体、链接、图片、引用、表格、有序/无序列表和代码块。原始 HTML 作为文本显示。
