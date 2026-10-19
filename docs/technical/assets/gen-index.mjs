@@ -1,12 +1,13 @@
 // 生成技术方案目录索引与页面附带的兜底数据。
-// 用法：node scripts/gen-index.mjs
-// 新增 / 删除 docs/technical/*.md 之后跑一次，提交 index.json 与 fallback.js。
+// 用法：node docs/technical/assets/gen-index.mjs
+// 新增 / 删除 docs/technical/*.md 之后跑一次，提交 index.json 与 assets/fallback.js。
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-const techDir = join(root, 'docs', 'technical');
+const here = dirname(fileURLToPath(import.meta.url)); // docs/technical/assets
+const techDir = resolve(here, '..');
+const root = resolve(techDir, '..', '..');
 
 const heading = (text, fallback) => {
   const m = text.match(/^#\s+(.+)$/m);

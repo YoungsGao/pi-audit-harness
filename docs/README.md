@@ -6,9 +6,10 @@
 - prd/index.html：产品需求。
 - prototype/index.html：交互原型。
 - technical/index.html：Markdown 技术方案索引与阅读器。
-- technical/assets/：仅这两个需要渲染 Markdown 的页面使用的样式与脚本（config / fallback / markdown / reader）。
+- technical/index.json：技术方案目录清单，由 assets/gen-index.mjs 生成，不要手改。
+- technical/assets/：仅这两个需要渲染 Markdown 的页面使用的样式与脚本（config / fallback / markdown / reader），以及索引生成器 gen-index.mjs。
 
-在 technical/ 新建 Markdown 后，跑一次 `node scripts/gen-index.mjs`（重新生成 technical/index.json 与 assets/fallback.js）再提交。点开头的文件不进入索引，_template.md 会以「文档模板」出现在列表末尾。
+在 technical/ 新建 Markdown 后，跑一次 `node docs/technical/assets/gen-index.mjs`（重新生成 technical/index.json 与 assets/fallback.js）再提交。点开头的文件不进入索引，_template.md 会以「文档模板」出现在列表末尾。
 
 首页与技术方案读取公开仓库 main 分支。分支变化时修改 technical/assets/config.js 的 ref。原文优先通过 raw.githubusercontent.com 读取，失败切到 jsDelivr。目录按 index.json → jsDelivr 文件清单 → GitHub 公共树接口的顺序获取（jsDelivr 分支清单有约 12 小时缓存，GitHub 接口未鉴权限 60 次/小时，所以以 index.json 为准）；都不可用时提示重试并显示附带 README/指南，无需密钥。
 

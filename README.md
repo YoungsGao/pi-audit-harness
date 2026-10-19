@@ -12,7 +12,7 @@
 | --- | --- |
 | [产品需求](https://youngsgao.github.io/pi-audit-harness/docs/prd/index.html) | 首版范围、需求总览、需求列表、右侧详情与关键设计 |
 | [交互原型](https://youngsgao.github.io/pi-audit-harness/docs/prototype/index.html) | 体验项目导入、模拟审计、调用链查看、模板管理、模型配置及报告导出 |
-| [技术方案](https://youngsgao.github.io/pi-audit-harness/docs/technical/index.html) | 在 [docs/technical](https://github.com/YoungsGao/pi-audit-harness/tree/main/docs/technical) 中使用 Markdown 编写技术方案，新增文件后运行 `node scripts/gen-index.mjs` 再推送，由[技术方案页面](https://youngsgao.github.io/pi-audit-harness/docs/technical/index.html)列出并渲染，[文档模板](https://github.com/YoungsGao/pi-audit-harness/blob/main/docs/technical/_template.md) |
+| [技术方案](https://youngsgao.github.io/pi-audit-harness/docs/technical/index.html) | 在 [docs/technical](https://github.com/YoungsGao/pi-audit-harness/tree/main/docs/technical) 中使用 Markdown 编写技术方案，新增文件后运行 `node docs/technical/assets/gen-index.mjs` 再推送，由[技术方案页面](https://youngsgao.github.io/pi-audit-harness/docs/technical/index.html)列出并渲染，[文档模板](https://github.com/YoungsGao/pi-audit-harness/blob/main/docs/technical/_template.md) |
 
 ## 当前进度
 

@@ -6,7 +6,7 @@
 
 1. 复制 _template.md，改名为 01.系统架构.md 等文件名。
 2. 使用 Markdown 编写内容，可按主题建立子目录。
-3. 在仓库根目录运行 `node scripts/gen-index.mjs`，重新生成 index.json 与 assets/fallback.js。
+3. 运行 `node docs/technical/assets/gen-index.mjs`，重新生成 technical/index.json 与 assets/fallback.js。
 4. 提交并推送到 Pages 发布分支。
 
 页面的目录优先读仓库内的 index.json（随提交更新，几分钟内生效），因此不跑脚本的话，新文件要等 jsDelivr 文件清单缓存过期（约 12 小时）才会出现。
