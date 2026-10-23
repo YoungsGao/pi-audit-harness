@@ -1,0 +1,36 @@
+{
+  "extends": "@electron-toolkit/tsconfig/tsconfig.node.json",
+  "include": [
+    "electron.vite.config.*",
+    "electron.env02-test.config.ts",
+    "electron.db01-test.config.ts",
+    "electron.db02-test.config.ts",
+    "electron.mod01-test.config.ts",
+    "electron.mod03-test.config.ts",
+    "tests/mod03-electron-main.ts",
+    "tests/mod01-electron-main.ts",
+    "tests/db02-electron-main.ts",
+    "tests/db02-cleanup-worker.ts",
+    "tests/db01-electron-main.ts",
+    "tests/db01-seed-worker.ts",
+    "tests/env02-electron-main.ts",
+    "tests/env02-operations-worker.ts",
+    "src/main/**/*",
+    "src/preload/**/*",
+    "src/service/**/*",
+    "src/shared/**/*",
+    "electron.source-test.config.ts",
+    "tests/source-electron-main.ts",
+    "electron.chains-test.config.ts",
+    "tests/chains-electron-main.ts",
+    "electron.scan-test.config.ts",
+    "tests/scan-electron-main.ts"
+  ],
+  "compilerOptions": {
+    "allowImportingTsExtensions": true,
+    "composite": true,
+    "types": [
+      "electron-vite/node"
+    ]
+  }
+}

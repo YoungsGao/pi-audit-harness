@@ -16,7 +16,23 @@
 
 ## 当前进度
 
-- 已完成 Pi SDK 的基础调用练习
-- 已实现读取目标源码、生成接口说明
-- 已实现工具调用日志和分析报告保存
-- 已通过小型 Express 示例核对接口识别结果
+- BUILD-01：Electron 客户端、TypeScript 本地服务、SQLite、Windows 系统凭据、模型配置和真实 Pi ping 已接通。
+- SOURCE-01：工具检测、本地 Java 源码登记、公开 GitHub 下载、三类风险规则、有界候选调用链及工作台已接通。
+- SQLite 保存必要调用边、路径、有序步骤、调查状态和证据；共享调用边的路径结论独立保存。
+- 工作台支持用户主动启动一次有界单路径模型审阅；完整 Goal / Loop、SSE、交互图和正式报告仍待后续实现。
+
+完成范围、关键代码、测试记录及当前限制见 [BUILD-01 / SOURCE-01 实现记录与学习指南](docs/technical/05.BUILD-SOURCE-实现记录与学习指南.md)。需求页面与交互原型描述产品范围，不表示全部功能已实现。
+
+## 启动桌面客户端
+
+当前验证平台为 Windows x64，使用 Node.js 24（需提供 `node:sqlite`）和 npm。
+
+```powershell
+cd desktop
+npm ci
+npm run dev
+```
+
+先在“项目管理”导入 Java 目录，再在“审计分析”生成候选路径。不配置模型也能预处理；模型请求需在配置保存、选择后由用户主动触发。完整命令见 [desktop/README.md](desktop/README.md)。
+
+`desktop/` 是正式桌面应用及 TypeScript 业务服务；`agent/`、`python/`、`contracts/` 和 `fixtures/` 保留早期 Pi / Python 取证练习，Python 工具并非桌面业务后端。

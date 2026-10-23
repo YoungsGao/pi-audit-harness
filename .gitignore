@@ -1,1 +1,13 @@
 .DS_Store
+node_modules/
+runs/
+.env
+.env.*
+!.env.example
+__pycache__/
+.venv/
+.pytest_cache/
+*.egg-info/
+*.log
+/tmp/
+/.migration-backups/
