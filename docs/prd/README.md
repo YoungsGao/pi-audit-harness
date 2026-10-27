@@ -1,13 +1,15 @@
 # pi-audit-harness 需求看板
 
-15 个父需求，59 个子需求；P0 5 项、P1 7 项、P2 3 项。
-导航：需求总览、需求列表、关键设计。详情侧栏覆盖 60%，不重排列表。职责按前端、后端、前后端协作区分。
+当前看板包含 15 个父需求、59 个子需求，详情覆盖职责、依赖与验收要求。产品范围以 index.html 和 requirements.json 为准；需求条目与交互原型不等于实现进度。
 
-关键设计顺序：
-1. 调用链状态机。
-2. SSE 三段帧：event 驱动状态，id 为事件游标，data 是 JSON。
-3. 会话管理（待确认）：优先验证 Pi SessionManager；LevelDB / ZSet 仅为备选。SSE id 与会话检查点不强绑定。
+当前已实现主流程、验证记录及未完成增强项见 [07 实现进度与验收](../technical/07.实现进度与验收.md)。
 
-会话恢复仍为 P1。当前范围以 index.html / requirements.json 为准，旧 Markdown 为背景资料；文档不代表功能已实现。
+| 需求组 | 对应项目技术文档 |
+| --- | --- |
+| BUILD-01 | [01 项目架构与运行](../technical/01.项目架构与运行.md) |
+| SOURCE-01 | [02 源码输入与预处理](../technical/02.源码输入与预处理.md)、[03 数据模型与持久化](../technical/03.数据模型与持久化.md) |
+| ANALYZE-01 | [04 Agent 分析与事件协议](../technical/04.Agent分析与事件协议.md) |
+| RESULT-01 | [05 审计工作台](../technical/05.审计工作台.md) |
+| REPORT-01 | [06 报告生成与管理](../technical/06.报告生成与管理.md) |
 
-当前实现范围和学习入口：[BUILD-01 / SOURCE-01 实现记录](../technical/05.BUILD-SOURCE-实现记录与学习指南.md)、[规则 / 查询 / 调用链存储](../technical/03.TPL-QRY-DB03-实现与学习指南.md)、[预处理 / 路径上下文 / 工作台](../technical/04.SCAN-UI-调用链预处理与工作台学习指南.md)。
+关键设计包括调用链状态机、SSE event/id/data、会话与尝试归属。当前已实现 SQLite 事件持久化和传输回放，Agent 检查点续跑仍属于后续恢复需求。

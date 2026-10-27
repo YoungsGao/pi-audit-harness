@@ -188,6 +188,7 @@ export function ModelsPage(): React.JSX.Element {
         </label>
         <button
           type="button"
+          className="button-primary"
           onClick={() => void select()}
           disabled={chosenId === (catalog?.selection.configId ?? '')}
         >
@@ -314,7 +315,9 @@ export function ModelsPage(): React.JSX.Element {
               {errors.apiKey}
             </p>
           )}
-          <button type="submit">{busy ? '处理中…' : '保存模型配置'}</button>
+          <button type="submit" className="button-primary">
+            {busy ? '处理中…' : '保存模型配置'}
+          </button>
           <p className="muted">离开此页面会丢弃未保存的草稿和密钥输入；已保存配置不受影响。</p>
         </form>
       </fieldset>

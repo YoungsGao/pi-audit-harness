@@ -1,38 +1,45 @@
 # pi-audit-harness
 
-面向企业蓝队的 Agent 源码审计客户端。以 Pi 扩展实现 Goal / Loop，通过代码查询与污点传播分析，呈现可复核的风险路径和源码证据。
+本地 Agent 源码审计客户端，面向 Java/Spring 源码的有界候选调用链、受控取证、传播核查和可复核报告。
 
-**Windows x64 · Electron + Pi SDK + Skill + Cli**
-
-## 文档导航
-
-[文档站](https://youngsgao.github.io/pi-audit-harness/)
-
-| 入口 | 内容 |
-| --- | --- |
-| [产品需求](https://youngsgao.github.io/pi-audit-harness/docs/prd/index.html) | 首版范围、需求总览、需求列表、右侧详情与关键设计 |
-| [交互原型](https://youngsgao.github.io/pi-audit-harness/docs/prototype/index.html) | 体验项目导入、模拟审计、调用链查看、模板管理、模型配置及报告导出 |
-| [技术方案](https://youngsgao.github.io/pi-audit-harness/docs/technical/index.html) | 在 [docs/technical](https://github.com/YoungsGao/pi-audit-harness/tree/main/docs/technical) 中使用 Markdown 编写技术方案，新增文件后运行 `node docs/technical/assets/gen-index.mjs` 再推送，由[技术方案页面](https://youngsgao.github.io/pi-audit-harness/docs/technical/index.html)列出并渲染，[文档模板](https://github.com/YoungsGao/pi-audit-harness/blob/main/docs/technical/_template.md) |
+**Windows x64 · Electron / React / TypeScript · Pi SDK 1.2.0 · SQLite**
 
 ## 当前进度
 
-- BUILD-01：Electron 客户端、TypeScript 本地服务、SQLite、Windows 系统凭据、模型配置和真实 Pi ping 已接通。
-- SOURCE-01：工具检测、本地 Java 源码登记、公开 GitHub 下载、三类风险规则、有界候选调用链及工作台已接通。
-- SQLite 保存必要调用边、路径、有序步骤、调查状态和证据；共享调用边的路径结论独立保存。
-- 工作台支持用户主动启动一次有界单路径模型审阅；完整 Goal / Loop、SSE、交互图和正式报告仍待后续实现。
+已实现构建与模型配置、源码输入、调用链预处理、受控 Agent 循环、持久化 SSE、四标签证据详情和 HTML 报告主流程，覆盖 28 个主流程子需求的当前范围。用户主动开始分析前，源码登记、预处理和历史查看不会调用模型。
 
-完成范围、关键代码、测试记录及当前限制见 [BUILD-01 / SOURCE-01 实现记录与学习指南](docs/technical/05.BUILD-SOURCE-实现记录与学习指南.md)。需求页面与交互原型描述产品范围，不表示全部功能已实现。
+| 模块 | 当前能力 |
+| --- | --- |
+| 构建与配置 | 本地认证服务、Windows 凭据、显式模型选择、主动 Pi ping |
+| 源码与扫描 | 本地 Java / 公开 GitHub、指纹检查、SQL/命令/路径遍历内置规则、有界候选路径 |
+| 分析 | SQLite 原子队列、真实 Pi 工具循环、预算/无进展停止、结构与原文核查、错误收敛 |
+| 结果 | 调用路径/传播证据/防护分析/分析过程、三段事件、历史尝试和断线补发 |
+| 报告 | 由已保存快照生成 HTML、路径与风险点分别统计、登记查询、摘要校验后打开 |
+| 工作台 | 固定导航、独立滚动、窄屏布局和键盘焦点 |
 
-## 启动桌面客户端
+本次 Node 回归 131 项通过。验证范围、命令和后续需求见 [实现进度与验收](docs/technical/07.实现进度与验收.md)。候选调用、模型结论与已确认漏洞不等价；未知和失败不计为安全。
 
-当前验证平台为 Windows x64，使用 Node.js 24（需提供 `node:sqlite`）和 npm。
+## 启动
+
+Windows x64，Node.js 24（包含 node:sqlite），在 `desktop` 目录执行：
 
 ```powershell
-cd desktop
 npm ci
 npm run dev
 ```
 
-先在“项目管理”导入 Java 目录，再在“审计分析”生成候选路径。不配置模型也能预处理；模型请求需在配置保存、选择后由用户主动触发。完整命令见 [desktop/README.md](desktop/README.md)。
+项目管理导入源码 → 审计分析预处理 → 配置并选择模型 → 明确开始路径分析 → 查看证据 → 报告页生成与打开。当前模型接口支持 OpenAI Chat Completions 兼容协议，Responses-only 服务尚未支持。
 
-`desktop/` 是正式桌面应用及 TypeScript 业务服务；`agent/`、`python/`、`contracts/` 和 `fixtures/` 保留早期 Pi / Python 取证练习，Python 工具并非桌面业务后端。
+完整使用和验证命令见 [桌面客户端说明](desktop/README.md)。API Key 存系统凭据库，运行数据库、生成报告、安装包与个人资料不提交 Git。
+
+## 文档
+
+| 入口 | 内容 |
+| --- | --- |
+| [文档站](https://youngsgao.github.io/pi-audit-harness/) | 项目入口 |
+| [产品需求](https://youngsgao.github.io/pi-audit-harness/docs/prd/index.html) | 需求范围、依赖与验收条目 |
+| [交互原型](https://youngsgao.github.io/pi-audit-harness/docs/prototype/index.html) | 产品交互参考，包含尚未实现内容 |
+| [技术文档](docs/technical/README.md) | 01—07 连续编号的实现架构、输入、数据、Agent、界面、报告和进度 |
+| [在线技术目录](https://youngsgao.github.io/pi-audit-harness/docs/technical/index.html) | 仓库 Markdown 阅读器 |
+
+`desktop/` 是当前正式桌面和 TypeScript 业务服务；`agent/`、`python/`、`contracts/`、`fixtures/` 保留早期取证原型，Python 不是桌面业务后端。当前不包含 Java LSP、不可变源码快照、Agent 检查点续跑或完整交互调用图；后续范围见进度文档。

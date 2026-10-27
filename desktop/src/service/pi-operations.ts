@@ -17,6 +17,7 @@ import { PiResultCollector } from './pi-result-collector.ts'
 import { createAuditExtension } from './pi/extensions/audit.ts'
 import { createReportExtension } from './pi/extensions/report.ts'
 import { normalizePiFailure } from './pi-errors.ts'
+import { runAgentLoop } from './chains/agent-loop.ts'
 
 type Session = CreateAgentSessionResult['session']
 
@@ -63,6 +64,12 @@ export class PiOperations {
   constructor(runtime: PiRuntime, ports: ModelPorts) {
     this.runtime = runtime
     this.ports = ports
+  }
+  reviewLoop(
+    input: import('./chains/path-analysis.ts').ReviewInput,
+    signal: AbortSignal
+  ): Promise<unknown> {
+    return runAgentLoop(this.runtime, this.ports, input, signal)
   }
 
   private async useSession<T>(

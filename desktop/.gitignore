@@ -21,3 +21,4 @@ out-chains-test/
 .chains-test-data/
 out-scan-test/
 .scan-test-data/
+.agent-learning/

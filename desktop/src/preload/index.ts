@@ -3,6 +3,18 @@ import type { IpcRendererEvent } from 'electron'
 import type { DesktopApi, ServiceStatus } from '../shared/desktop-api'
 
 const audit: DesktopApi = {
+  reports: (action, input) => ipcRenderer.invoke('reports:action', action, input),
+  openReport: (input) => ipcRenderer.invoke('reports:open', input),
+  startAnalysisStream: (input) => ipcRenderer.invoke('analysis:start-stream', input),
+  stopAnalysisStream: (id) => ipcRenderer.invoke('analysis:stop-stream', id),
+  onAnalysisStream: (callback) => {
+    const handler = (
+      _event: IpcRendererEvent,
+      notice: import('../shared/sse-contracts').StreamNotice
+    ): void => callback(notice)
+    ipcRenderer.on('analysis:stream', handler)
+    return () => ipcRenderer.removeListener('analysis:stream', handler)
+  },
   audit: (action, input) => ipcRenderer.invoke('audit:action', action, input),
   chooseSourceDirectory: () => ipcRenderer.invoke('sources:choose-directory'),
   getSourceTools: () => ipcRenderer.invoke('sources:tools'),

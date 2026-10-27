@@ -85,6 +85,15 @@ void app.whenReady().then(() => {
     assertClient(event)
     return service.testModel(typeof modelConfigId === 'string' ? modelConfigId : '')
   })
+  ipcMain.handle('reports:action', (event, action: 'generate' | 'list', input: unknown) => {
+    assertClient(event)
+    if (!['generate', 'list'].includes(action)) throw new Error('不允许的报告操作')
+    return service.report(action, input)
+  })
+  ipcMain.handle('reports:open', (event, input: unknown) => {
+    assertClient(event)
+    return service.openReport(input)
+  })
   ipcMain.handle('storage:get-overview', (event) => {
     assertClient(event)
     return service.getStorageOverview()
@@ -124,6 +133,20 @@ void app.whenReady().then(() => {
   ipcMain.handle('sources:list', (event) => {
     assertClient(event)
     return service.source('list')
+  })
+  ipcMain.handle(
+    'analysis:start-stream',
+    (event, input: import('../shared/sse-contracts').AnalyzeRequest) => {
+      assertClient(event)
+      return service.startAnalysisStream(input, (notice) => {
+        if (mainWindow && !mainWindow.isDestroyed())
+          mainWindow.webContents.send('analysis:stream', notice)
+      })
+    }
+  )
+  ipcMain.handle('analysis:stop-stream', (event, id: unknown) => {
+    assertClient(event)
+    if (typeof id === 'string') service.stopAnalysisStream(id)
   })
   ipcMain.handle('sources:local', (event, value: unknown) => {
     assertClient(event)

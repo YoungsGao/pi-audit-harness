@@ -8,6 +8,9 @@ import type { RequestContext, HealthData } from '../shared/service-protocol'
 import type { ModelPingData, PiRuntimeInfo } from '../shared/pi-contracts'
 import type { CodeQueryAction, RuleCatalog } from '../shared/code-query-contracts'
 import type { ChainAction } from './chains/service'
+import { serveAnalyze } from './analyze-http.ts'
+import type { AnalyzeStreamApi } from './analyze-http.ts'
+import type { ReportAction } from '../shared/report-contracts'
 
 export interface RunningHttpServer {
   port: number
@@ -15,6 +18,8 @@ export interface RunningHttpServer {
 }
 
 export interface LocalApi {
+  reportAction?: (action: ReportAction, input: unknown, signal: AbortSignal) => Promise<unknown>
+  analyzeStream?: AnalyzeStreamApi
   getRules?: () => RuleCatalog
   codeQuery?: (action: CodeQueryAction, input: unknown, signal: AbortSignal) => Promise<unknown>
   chainAction?: (action: ChainAction, input: unknown, signal: AbortSignal) => Promise<unknown>
@@ -66,6 +71,12 @@ export async function startHttpServer(
       if (request.headers.authorization !== 'Bearer ' + token)
         throw new ApiError('UNAUTHORIZED', '本地服务认证失败', 401)
       if (closing) throw new ApiError('SERVICE_STOPPING', '服务正在关闭', 503)
+      if (request.method === 'POST' && request.url === '/analyze') {
+        if (!api.analyzeStream)
+          throw new ApiError('ANALYSIS_NOT_READY', '流式分析服务尚未接入', 503)
+        await serveAnalyze(request, response, api.analyzeStream, controller.signal)
+        return
+      }
       if (request.method === 'GET' && request.url === '/health') {
         const runtime = api.getRuntime?.()
         const data: HealthData = {
@@ -84,6 +95,30 @@ export async function startHttpServer(
         send(200, successResult(context, api.getRules()))
         return
       }
+      if (
+        request.method === 'POST' &&
+        ['/reports/generate', '/reports/list', '/reports/file'].includes(request.url ?? '')
+      ) {
+        if (!api.reportAction) throw new ApiError('REPORT_NOT_READY', '报告服务尚未接入', 503)
+        if (!request.headers['content-type']?.toLowerCase().startsWith('application/json'))
+          throw new ApiError('REPORT_INVALID_INPUT', '报告请求必须为 JSON', 415)
+        const chunks: Buffer[] = []
+        let size = 0
+        for await (const chunk of request) {
+          size += chunk.length
+          if (size > 4096) throw new ApiError('REPORT_INVALID_INPUT', '报告请求超过 4KiB', 413)
+          chunks.push(chunk)
+        }
+        let value: unknown
+        try {
+          value = JSON.parse(Buffer.concat(chunks).toString('utf8'))
+        } catch {
+          throw new ApiError('REPORT_INVALID_INPUT', '报告 JSON 无效', 400)
+        }
+        const action = request.url!.slice('/reports/'.length) as ReportAction
+        send(200, successResult(context, await api.reportAction(action, value, controller.signal)))
+        return
+      }
       const codeRoutes = ['/code/search', '/code/read', '/code/risks']
       const chainRoutes = [
         '/chains/prepare',
@@ -91,7 +126,11 @@ export async function startHttpServer(
         '/chains/detail',
         '/chains/runs',
         '/chains/statistics',
-        '/chains/analyze'
+        '/chains/analyze',
+        '/chains/analyzePending',
+        '/chains/events',
+        '/chains/runState',
+        '/chains/history'
       ]
       if (
         request.method === 'POST' &&
@@ -253,6 +292,10 @@ export async function startHttpServer(
       throw new ApiError('NOT_FOUND', '接口不存在', 404)
     })()
       .catch((error: unknown) => {
+        if (response.headersSent) {
+          response.destroy()
+          return
+        }
         const failure = failureResult(context, error)
         send(failure.status, failure.body)
       })

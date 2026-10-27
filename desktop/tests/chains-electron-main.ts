@@ -46,7 +46,7 @@ void app.whenReady().then(async () => {
       ].join('\n')
     )
     await service.start()
-    assert.equal(service.getStatus().database?.schemaVersion, 6)
+    assert.equal(service.getStatus().database?.schemaVersion, 8)
     const firstPid = internals().child.pid
     const project = await request<SourceProject>('/sources/local', {
       projectName: 'TPL-QRY-DB03 Electron sample',

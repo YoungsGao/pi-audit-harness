@@ -132,7 +132,7 @@ test('rollback, immutable call-site identity, disconnected path and wrong-run re
   assert.throws(() => repo.saveGraph(disconnected), { code: 'CHAIN_INVALID_INPUT' })
   assert.throws(() => db.run('UPDATE call_paths SET truncated=1'), { code: 'DB_QUERY_FAILED' })
   db.run(
-    "INSERT INTO audit_runs VALUES ('other-run','project','queued','same','same',NULL,'now','now')"
+    "INSERT INTO audit_runs (id,project_id,status,source_stamp,rules_version,model_config_id,created_at,updated_at) VALUES ('other-run','project','queued','same','same',NULL,'now','now')"
   )
   assert.throws(() => db.run('UPDATE path_steps SET run_id=?', 'other-run'), {
     code: 'DB_QUERY_FAILED'
@@ -181,7 +181,7 @@ test('v4 upgrade preserves historical rows/checksums and new migration failure r
   db.run("INSERT INTO path_steps VALUES ('p',0,'e','r','old')")
   const checksums = db.all('SELECT checksum FROM schema_migrations ORDER BY version')
   migrate(db)
-  assert.equal(db.get('PRAGMA user_version').user_version, 6)
+  assert.equal(db.get('PRAGMA user_version').user_version, 8)
   assert.deepEqual(
     db.all('SELECT checksum FROM schema_migrations WHERE version<=4 ORDER BY version'),
     checksums
@@ -192,12 +192,12 @@ test('v4 upgrade preserves historical rows/checksums and new migration failure r
     migrate(db, [
       ...migrations,
       {
-        version: 7,
+        version: 9,
         name: 'broken',
         sql: 'CREATE TABLE no_commit(id); SELECT * FROM missing_table;'
       }
     ])
   )
-  assert.equal(db.get('PRAGMA user_version').user_version, 6)
+  assert.equal(db.get('PRAGMA user_version').user_version, 8)
   assert.equal(db.get("SELECT name FROM sqlite_schema WHERE name='no_commit'"), undefined)
 })

@@ -1,11 +1,16 @@
 import type { AuditAction } from './scan-contracts'
+import { AnalyzeSseParser } from './sse-parser.ts'
 export const auditActions: AuditAction[] = [
   'prepare',
   'runs',
   'list',
   'detail',
   'statistics',
-  'analyze'
+  'analyze',
+  'analyzePending',
+  'events',
+  'runState',
+  'history'
 ]
 const object = (v: unknown): v is Record<string, unknown> =>
   !!v && typeof v === 'object' && !Array.isArray(v)
@@ -83,6 +88,169 @@ function summary(v: Record<string, unknown>): boolean {
 }
 export function isAuditData(action: AuditAction, data: unknown): boolean {
   if (!object(data) || !safeJson(data)) return false
+  if (action === 'history') {
+    if (!(
+      exact(data, [
+        'projectId',
+        'runId',
+        'pathId',
+        'sessions',
+        'selectedSessionId',
+        'frames',
+        'nextAfterId',
+        'hasMore',
+        'historyExpired'
+      ]) &&
+      ['projectId', 'runId', 'pathId'].every((k) => text(data[k])) &&
+      nullableText(data.selectedSessionId) &&
+      count(data.nextAfterId) &&
+      typeof data.hasMore === 'boolean' &&
+      typeof data.historyExpired === 'boolean' &&
+      Array.isArray(data.sessions) &&
+      data.sessions.length <= 20 &&
+      data.sessions.every(
+        (s) =>
+          exact(s, [
+            'sessionId',
+            'attemptId',
+            'modelConfigId',
+            'state',
+            'minEventId',
+            'createdAt',
+            'finishedAt'
+          ]) &&
+          ['sessionId', 'modelConfigId', 'createdAt'].every((k) => text(s[k])) &&
+          nullableText(s.finishedAt) &&
+          count(s.attemptId) &&
+          Number(s.attemptId) > 0 &&
+          count(s.minEventId) &&
+          Number(s.minEventId) > 0 &&
+          ['queue', 'analyze', 'completed', 'error', 'timeout', 'stop', 'cancel'].includes(
+            String(s.state)
+          )
+      ) &&
+      Array.isArray(data.frames) &&
+      data.frames.length <= 50
+    ))
+      return false
+    const selected = data.sessions.find((s) => s.sessionId === data.selectedSessionId)
+    if (!selected)
+      return (
+        data.selectedSessionId === null && data.frames.length === 0 && data.sessions.length === 0
+      )
+    try {
+      const first = data.frames[0]
+      if (first && (!object(first) || !count(first.id) || Number(first.id) < selected.minEventId))
+        return false
+      const parser = new AnalyzeSseParser(
+        selected.sessionId,
+        first ? Number(first.id) - 1 : Number(data.nextAfterId)
+      )
+      for (const f of data.frames) {
+        if (
+          !object(f) ||
+          !exact(f, ['event', 'id', 'data']) ||
+          !object(f.data) ||
+          f.data.projectId !== data.projectId ||
+          f.data.runId !== data.runId ||
+          f.data.chainId !== data.pathId ||
+          f.data.attemptId !== selected.attemptId
+        )
+          return false
+        parser.push(
+          new TextEncoder().encode(
+            `event: ${f.event}\nid: ${f.id}\ndata: ${JSON.stringify(f.data)}\n\n`
+          )
+        )
+      }
+      parser.finish()
+      return !data.frames.length || data.frames.at(-1).id === data.nextAfterId
+    } catch {
+      return false
+    }
+  }
+  if (action === 'analyzePending')
+    return (
+      exact(data, ['projectId', 'runId', 'status', 'maxPaths']) &&
+      text(data.projectId) &&
+      text(data.runId) &&
+      data.status === 'running' &&
+      count(data.maxPaths) &&
+      Number(data.maxPaths) >= 1 &&
+      Number(data.maxPaths) <= 100
+    )
+  if (action === 'runState')
+    return (
+      exact(data, [
+        'projectId',
+        'runId',
+        'stage',
+        'status',
+        'sourceStamp',
+        'rulesVersion',
+        'modelConfigId',
+        'startedAt',
+        'finishedAt',
+        'errorCode',
+        'statistics'
+      ]) &&
+      ['projectId', 'runId', 'sourceStamp', 'rulesVersion'].every((k) => text(data[k])) &&
+      ['scanning', 'prepared', 'analyzing', 'completed', 'failed', 'interrupted'].includes(
+        String(data.stage)
+      ) &&
+      ['queued', 'running', 'completed', 'failed', 'cancelled'].includes(String(data.status)) &&
+      ['modelConfigId', 'startedAt', 'finishedAt', 'errorCode'].every((k) =>
+        nullableText(data[k])
+      ) &&
+      isAuditData('statistics', data.statistics)
+    )
+  if (action === 'events')
+    return (
+      exact(data, ['projectId', 'runId', 'pathId', 'events', 'nextSeq']) &&
+      text(data.projectId) &&
+      text(data.runId) &&
+      nullableText(data.pathId) &&
+      count(data.nextSeq) &&
+      Array.isArray(data.events) &&
+      data.events.length <= 100 &&
+      data.events.every(
+        (e, i, events) =>
+          exact(e, [
+            'eventId',
+            'projectId',
+            'runId',
+            'chainId',
+            'seq',
+            'time',
+            'type',
+            'summary',
+            'summaryMissing',
+            'toolCallId',
+            'toolName',
+            'status',
+            'durationMs',
+            'payload',
+            'truncated'
+          ]) &&
+          e.projectId === data.projectId &&
+          e.runId === data.runId &&
+          nullableText(e.chainId) &&
+          (data.pathId === null || e.chainId === data.pathId) &&
+          ['eventId', 'time', 'status'].every((k) => text(e[k])) &&
+          count(e.seq) &&
+          Number(e.seq) > 0 &&
+          (i === 0 || Number(e.seq) > Number(events[i - 1].seq)) &&
+          Number(e.seq) <= Number(data.nextSeq) &&
+          ['process', 'model', 'tool', 'result'].includes(String(e.type)) &&
+          nullableText(e.summary) &&
+          typeof e.summaryMissing === 'boolean' &&
+          e.summaryMissing === !e.summary &&
+          nullableText(e.toolCallId) &&
+          nullableText(e.toolName) &&
+          (e.durationMs === null || count(e.durationMs)) &&
+          typeof e.truncated === 'boolean'
+      )
+    )
   if (action === 'statistics') {
     const keys = ['paths', 'sinks', 'edges', 'dangerous', 'safe', 'unknown', ...status]
     return (
@@ -180,11 +348,13 @@ export function isAuditData(action: AuditAction, data: unknown): boolean {
             'taintIn',
             'taintOut',
             'evidence',
-            'defenseSummary'
+            'defenseSummary',
+            'propagation'
           ]) &&
           s.stepIndex === index &&
           [null, 0, 1].includes(s.dangerous as number | null) &&
           text(s.defenseSummary) &&
+          object(s.propagation) &&
           ['taintIn', 'taintOut', 'evidence'].every((k) => Array.isArray(s[k])) &&
           exact(s.edge, [
             'uid',

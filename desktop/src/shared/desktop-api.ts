@@ -29,6 +29,20 @@ export interface ServiceStatus {
 }
 
 export interface DesktopApi {
+  reports: (
+    action: 'generate' | 'list',
+    input: unknown
+  ) => Promise<ApiResult<import('./report-contracts').ReportData>>
+  openReport: (
+    input: unknown
+  ) => Promise<ApiResult<import('./report-contracts').ReportScope & { reportId: string }>>
+  startAnalysisStream: (
+    input: import('./sse-contracts').AnalyzeRequest
+  ) => Promise<ApiResult<import('./sse-contracts').StreamHandle>>
+  stopAnalysisStream: (connectionId: string) => Promise<void>
+  onAnalysisStream: (
+    callback: (notice: import('./sse-contracts').StreamNotice) => void
+  ) => () => void
   audit: (
     action: import('./scan-contracts').AuditAction,
     input: unknown

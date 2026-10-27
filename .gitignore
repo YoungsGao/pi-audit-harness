@@ -11,3 +11,7 @@ __pycache__/
 *.log
 /tmp/
 /.migration-backups/
+/.local/
+/SESSION_HANDOFF.md
+/desktop/scripts/learn-*.mjs
+/docs/technical/*学习*.md

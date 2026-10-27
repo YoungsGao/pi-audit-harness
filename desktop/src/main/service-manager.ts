@@ -1,4 +1,6 @@
 import { sourceRequest } from './source-client'
+import { connectAnalyze } from './analyze-stream-client'
+import type { AnalyzeRequest, StreamHandle, StreamNotice } from '../shared/sse-contracts'
 import { auditRequest } from './audit-client'
 import type { AuditAction, AuditData } from '../shared/scan-contracts'
 import type { SourceAction } from './source-client'
@@ -16,6 +18,10 @@ import { checkLocalHealth, postModelTest } from './service-client'
 import { ApiError } from '../shared/api-error.ts'
 import { isPiRuntimeInfo } from '../shared/pi-contracts.ts'
 import { randomUUID } from 'node:crypto'
+import { shell } from 'electron'
+import { reportRequest } from './report-client'
+import type { ReportAction, ReportData, ReportScope } from '../shared/report-contracts'
+import { verifyReportFile } from '../service/reports/files'
 import type { ApiResult } from '../shared/service-protocol'
 import type { ModelPingData } from '../shared/pi-contracts'
 import type { ServiceStatus } from '../shared/desktop-api'
@@ -36,6 +42,7 @@ async function waitForExit(exited: Promise<number>, milliseconds: number): Promi
 }
 
 export class ServiceManager {
+  private readonly streams = new Map<string, AbortController>()
   private status: ServiceStatus = { status: 'stopped', message: '本地服务尚未启动' }
   private child?: UtilityProcess
   private connection?: { port: number; token: string }
@@ -49,7 +56,9 @@ export class ServiceManager {
 
   constructor(
     private readonly onChange: (status: ServiceStatus) => void,
-    private readonly getDataRoot: () => string
+    private readonly getDataRoot: () => string,
+    private readonly reportOpener: (path: string) => Promise<string> = (path) =>
+      shell.openPath(path)
   ) {}
 
   getStatus(): ServiceStatus {
@@ -229,6 +238,116 @@ export class ServiceManager {
       }
     return auditRequest(connection.port, connection.token, action, input)
   }
+  async report(action: ReportAction, input: unknown): Promise<ApiResult<ReportData>> {
+    const connection = this.connection
+    if (!connection || this.status.status !== 'ready')
+      return {
+        ok: false,
+        requestId: randomUUID(),
+        error: { code: 'SERVICE_NOT_READY', message: '本地服务尚未就绪', retryable: true }
+      }
+    return reportRequest(connection.port, connection.token, action, input)
+  }
+  async openReport(input: unknown): Promise<ApiResult<ReportScope & { reportId: string }>> {
+    const result = await this.report('file', input)
+    if (!result.ok) return result
+    if (!('sha256' in result.data) || !('reportId' in result.data) || !result.data.sha256)
+      return {
+        ok: false,
+        requestId: result.requestId,
+        error: { code: 'REPORT_UNSAFE_FILE', message: '报告文件信息无效', retryable: false }
+      }
+    try {
+      const file = {
+        projectId: result.data.projectId,
+        runId: result.data.runId,
+        reportId: result.data.reportId,
+        filePath: result.data.filePath,
+        sha256: result.data.sha256
+      }
+      await verifyReportFile(this.getDataRoot(), file)
+      const error = await this.reportOpener(file.filePath)
+      if (error)
+        throw new ApiError('REPORT_OPEN_FAILED', '系统未能打开 HTML 报告，请检查默认浏览器', 502)
+      return {
+        ok: true,
+        requestId: result.requestId,
+        data: { projectId: file.projectId, runId: file.runId, reportId: file.reportId }
+      }
+    } catch (error) {
+      return {
+        ok: false,
+        requestId: result.requestId,
+        error: {
+          code: error instanceof ApiError ? error.code : 'REPORT_OPEN_FAILED',
+          message: error instanceof ApiError ? error.message : '无法打开已登记报告',
+          retryable: false
+        }
+      }
+    }
+  }
+  async startAnalysisStream(
+    input: AnalyzeRequest,
+    notify: (notice: StreamNotice) => void
+  ): Promise<ApiResult<StreamHandle>> {
+    const connection = this.connection,
+      requestId = randomUUID()
+    if (!connection || this.status.status !== 'ready')
+      return {
+        ok: false,
+        requestId,
+        error: { code: 'SERVICE_NOT_READY', message: '本地服务尚未就绪', retryable: true }
+      }
+    if (this.streams.size >= 2)
+      return {
+        ok: false,
+        requestId,
+        error: { code: 'SSE_BUSY', message: '请先关闭已有事件连接', retryable: true }
+      }
+    const id = randomUUID(),
+      controller = new AbortController()
+    this.streams.set(id, controller)
+    try {
+      const stream = await connectAnalyze(
+        connection.port,
+        connection.token,
+        input,
+        (frame) => notify({ connectionId: id, frame }),
+        controller.signal
+      )
+      void stream.done
+        .then(
+          () => {
+            if (!controller.signal.aborted) notify({ connectionId: id, ended: true })
+          },
+          (error) => {
+            if (!controller.signal.aborted)
+              notify({
+                connectionId: id,
+                errorCode: error instanceof ApiError ? error.code : 'SSE_DISCONNECTED'
+              })
+          }
+        )
+        .finally(() => this.streams.delete(id))
+      return { ok: true, requestId, data: { connectionId: id, sessionId: stream.sessionId } }
+    } catch (error) {
+      controller.abort()
+      this.streams.delete(id)
+      return {
+        ok: false,
+        requestId,
+        error: {
+          code: error instanceof ApiError ? error.code : 'SSE_CONNECT_FAILED',
+          message: error instanceof ApiError ? error.message : '事件连接失败，请按会话游标重连',
+          retryable: true
+        }
+      }
+    }
+  }
+  stopAnalysisStream(id: string): void {
+    this.streams.get(id)?.abort()
+    this.streams.delete(id)
+  }
 
   async source<T>(action: SourceAction, input?: unknown): Promise<ApiResult<T>> {
     const connection = this.connection
@@ -296,6 +415,8 @@ export class ServiceManager {
   }
 
   private cleanup(): Promise<void> {
+    for (const controller of this.streams.values()) controller.abort()
+    this.streams.clear()
     if (this.cleanupTask) return this.cleanupTask
     const child = this.child
     const exited = this.exited

@@ -20,6 +20,8 @@ import { ModelSettingsRepository } from './storage/model-settings-repository'
 import { MetadataRepository } from './storage/metadata-repository'
 import { MetadataService } from './storage/metadata-service'
 import { WindowsCredentialStore } from './storage/credential-store'
+import { ReportRepository } from './storage/report-repository'
+import { ReportService } from './reports/service'
 
 const parent = process.parentPort
 if (!parent) throw new Error('请通过 Electron 启动正式服务入口')
@@ -31,6 +33,7 @@ let metadata: MetadataService | undefined
 let sources: SourceService | undefined
 let queries: CodeQueryService | undefined
 let chains: CallChainService | undefined
+let reports: ReportService | undefined
 let initialized = false
 let closing = false
 let lastHeartbeat = Date.now()
@@ -50,6 +53,7 @@ function shutdown(exitCode = 0): void {
     await sources?.close()
     await chains?.close()
     await queries?.close()
+    await reports?.close()
     await metadata?.close()
     database?.close()
     process.exit(results.some((item) => item.status === 'rejected') ? 1 : exitCode)
@@ -97,6 +101,7 @@ parent.on('message', (event: { data: unknown }) => {
     queries = new CodeQueryService(new SourceRepository(database))
     chainRepository = new CallChainRepository(database)
     chainRepository.scans.recover()
+    new ReportRepository(database).recover()
     chains = new CallChainService(chainRepository, queries)
     metadata = new MetadataService(
       new MetadataRepository(database),
@@ -116,10 +121,19 @@ parent.on('message', (event: { data: unknown }) => {
   const currentRuntime = runtime
   const currentMetadata = metadata!
   const operations = new PiOperations(currentRuntime, currentMetadata.modelPorts())
-  chains!.analysis = new PathAnalysisService(chainRepository!, queries!, (input, signal) =>
-    operations.reviewPath(input, signal)
+  reports = new ReportService(database!, message.dataRoot)
+  chains!.analysis = new PathAnalysisService(
+    chainRepository!,
+    queries!,
+    (input, signal) => operations.reviewLoop(input, signal),
+    true
   )
   startingServer = startHttpServer(message.token, {
+    reportAction: (action, value, signal) => reports!.action(action, value, signal),
+    analyzeStream: {
+      open: (value) => chains!.openStream(value),
+      read: (input) => chains!.readStream(input)
+    },
     getRules: () => builtinRules,
     codeQuery: (action, value, signal) => queries!.action(action, value, signal),
     chainAction: (action, value, signal) => chains!.action(action, value, signal),

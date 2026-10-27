@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
+import { analysisErrorHelp } from '../../../shared/analysis-view'
 import type {
   SourceCatalog,
   SourceTools,
@@ -12,6 +13,7 @@ function unwrap<T>(result: ApiResult<T>): T {
   return result.data
 }
 export function SourcesPage(): React.JSX.Element {
+  const locked = useRef(false)
   const [tools, setTools] = useState<SourceTools | null>(null),
     [catalog, setCatalog] = useState<SourceCatalog | null>(null)
   const [name, setName] = useState(''),
@@ -19,29 +21,49 @@ export function SourcesPage(): React.JSX.Element {
     [url, setUrl] = useState(''),
     [choice, setChoice] = useState<DuplicateChoice>('reject')
   const [busy, setBusy] = useState(false),
+    [failed, setFailed] = useState(false),
     [message, setMessage] = useState(
       '请检测工具、点击刷新读取已有项目，或导入 Java 源码；不会执行项目代码或调用模型。'
     ),
     [opened, setOpened] = useState<SourceOpened | null>(null)
   async function run(work: () => Promise<string>): Promise<void> {
-    if (busy) return
+    if (locked.current) return
+    locked.current = true
     setBusy(true)
+    setFailed(false)
     setMessage('源码操作进行中…')
     try {
       setMessage(await work())
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : '本地服务通信失败')
+      setFailed(true)
+      const reason = error instanceof Error ? error.message : '本地服务通信失败'
+      setMessage(
+        '本次操作未完成：' +
+          reason +
+          '。' +
+          analysisErrorHelp(reason) +
+          '（导入失败时尚无 runId/chainId；projectId 以成功登记记录为准。）'
+      )
     } finally {
       setBusy(false)
+      locked.current = false
     }
   }
   async function refresh(): Promise<void> {
     setCatalog(unwrap(await window.audit.listSources()))
   }
+  async function refreshAfterSave(): Promise<string> {
+    try {
+      await refresh()
+      return ''
+    } catch {
+      return '；登记已提交，但列表刷新失败，请手动刷新项目列表。'
+    }
+  }
   return (
-    <section className="card" aria-label="源码导入">
+    <section className="card sources-page" aria-label="源码导入">
       <h2>源码导入与项目登记</h2>
-      <p role="status" data-testid="source-status">
+      <p role={failed ? 'alert' : 'status'} data-testid="source-status">
         {message}
       </p>
       <button
@@ -56,7 +78,7 @@ export function SourcesPage(): React.JSX.Element {
         重新检测 Git 与 rg
       </button>
       {tools && (
-        <div>
+        <div className="source-tools">
           <p>
             Git：{tools.git.state} {tools.git.version}
           </p>
@@ -76,76 +98,102 @@ export function SourcesPage(): React.JSX.Element {
       )}
       <fieldset disabled={busy}>
         <legend>导入参数</legend>
-        <label>
-          源码项目名称
-          <input aria-label="源码项目名称" value={name} onChange={(e) => setName(e.target.value)} />
-        </label>
-        <label>
-          重复来源处理
-          <select
-            aria-label="重复来源处理"
-            value={choice}
-            onChange={(e) => setChoice(e.target.value as DuplicateChoice)}
-          >
-            <option value="reject">先提示冲突</option>
-            <option value="open">打开已有记录（不重新下载）</option>
-            <option value="new">创建独立记录/下载独立副本</option>
-          </select>
-        </label>
-        <label>
-          本地源码目录
-          <input aria-label="本地源码目录" value={path} onChange={(e) => setPath(e.target.value)} />
-        </label>
-        <button
-          onClick={() =>
-            void run(async () => {
-              const selected = await window.audit.chooseSourceDirectory()
-              if (selected) setPath(selected)
-              return selected ? '已选择目录，点击导入后才登记' : '已取消目录选择'
-            })
-          }
-        >
-          选择源码文件夹
-        </button>
-        <button
-          onClick={() =>
-            void run(async () => {
-              const saved = unwrap(
-                await window.audit.importLocalSource({ projectName: name, path, duplicate: choice })
-              )
-              await refresh()
-              return '源码登记成功：' + saved.projectId
-            })
-          }
-        >
-          导入本地源码
-        </button>
-        <label>
-          公开 GitHub URL
-          <input
-            aria-label="公开 GitHub URL"
-            value={url}
-            onChange={(e) => setUrl(e.target.value)}
-          />
-        </label>
-        <button
-          disabled={tools?.git.state !== 'available'}
-          onClick={() =>
-            void run(async () => {
-              const saved = unwrap(
-                await window.audit.importGithubSource({
-                  projectName: name,
-                  gitUrl: url,
-                  duplicate: choice
+        <div className="form-grid">
+          <label>
+            源码项目名称
+            <input
+              aria-label="源码项目名称"
+              placeholder="为这份源码起一个名称"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
+          </label>
+          <label>
+            重复来源处理
+            <select
+              aria-label="重复来源处理"
+              value={choice}
+              onChange={(e) => setChoice(e.target.value as DuplicateChoice)}
+            >
+              <option value="reject">先提示冲突</option>
+              <option value="open">打开已有记录（不重新下载）</option>
+              <option value="new">创建独立记录/下载独立副本</option>
+            </select>
+          </label>
+        </div>
+        <div className="source-import-options">
+          <section className="source-option" aria-label="从本地目录导入">
+            <h3>本地源码</h3>
+            <p>选择电脑上的 Java 项目目录。</p>
+            <label>
+              本地源码目录
+              <input
+                aria-label="本地源码目录"
+                value={path}
+                onChange={(e) => setPath(e.target.value)}
+              />
+            </label>
+            <button
+              onClick={() =>
+                void run(async () => {
+                  const selected = await window.audit.chooseSourceDirectory()
+                  if (selected) setPath(selected)
+                  return selected ? '已选择目录，点击导入后才登记' : '已取消目录选择'
                 })
-              )
-              await refresh()
-              return '仓库下载并登记成功：' + saved.projectId
-            })
-          }
-        >
-          下载公开 GitHub 仓库
-        </button>
+              }
+            >
+              选择源码文件夹
+            </button>
+            <button
+              className="button-primary"
+              onClick={() =>
+                void run(async () => {
+                  const saved = unwrap(
+                    await window.audit.importLocalSource({
+                      projectName: name,
+                      path,
+                      duplicate: choice
+                    })
+                  )
+                  return '源码登记成功：' + saved.projectId + (await refreshAfterSave())
+                })
+              }
+            >
+              导入本地源码
+            </button>
+          </section>
+          <section className="source-option" aria-label="从公开仓库导入">
+            <h3>公开 GitHub 仓库</h3>
+            <p>下载独立副本后登记，需要本机可用的 Git。</p>
+            <label>
+              公开 GitHub URL
+              <input
+                aria-label="公开 GitHub URL"
+                placeholder="https://github.com/owner/repository"
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+              />
+            </label>
+            <button
+              className="button-primary"
+              disabled={tools?.git.state !== 'available'}
+              onClick={() =>
+                void run(async () => {
+                  const saved = unwrap(
+                    await window.audit.importGithubSource({
+                      projectName: name,
+                      gitUrl: url,
+                      duplicate: choice
+                    })
+                  )
+                  return '仓库下载并登记成功：' + saved.projectId + (await refreshAfterSave())
+                })
+              }
+            >
+              下载公开 GitHub 仓库
+            </button>
+          </section>
+        </div>
       </fieldset>
       <p>
         首批校验 Java

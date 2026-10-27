@@ -1,4 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
+import { AnalysisStreamPanel } from './AnalysisStreamPanel'
+import { CallChainDetail } from './CallChainDetail'
+import { detailSelectionKey, parseDetailSelection } from '../../../shared/path-detail-view'
+import type { DetailTab } from '../../../shared/path-detail-view'
+import type { RunState } from '../../../shared/agent-contracts'
+import { analysisErrorHelp } from '../../../shared/analysis-view'
 import type { SourceProject } from '../../../shared/source-contracts'
 import type { ModelCatalog } from '../../../shared/model-settings'
 import type { ApiResult } from '../../../shared/service-protocol'
@@ -39,6 +45,15 @@ const scanLabel: Record<string, string> = {
 }
 const verdictLabel = { unknown: '未知', safe: '当前路径已阻断', dangerous: '静态证据支持风险' }
 export function AuditPage(): React.JSX.Element {
+  const [initialSelection] = useState(() => {
+    try {
+      return parseDetailSelection(localStorage.getItem(detailSelectionKey))
+    } catch {
+      return null
+    }
+  })
+  const restoreSelection = useRef(initialSelection)
+  const [detailTab, setDetailTab] = useState<DetailTab>(initialSelection?.tab ?? 'path')
   const [projects, setProjects] = useState<SourceProject[]>([]),
     [models, setModels] = useState<ModelCatalog | null>(null)
   const [projectId, setProjectId] = useState(''),
@@ -48,7 +63,10 @@ export function AuditPage(): React.JSX.Element {
   const [runs, setRuns] = useState<ScanRun[]>([]),
     [listing, setListing] = useState<PathList | null>(null),
     [stats, setStats] = useState<ScanStatistics | null>(null),
-    [detail, setDetail] = useState<PathDetail | null>(null)
+    [detail, setDetail] = useState<PathDetail | null>(null),
+    [runState, setRunState] = useState<RunState | null>(null),
+    [readError, setReadError] = useState(''),
+    [readAt, setReadAt] = useState('')
   const [offset, setOffset] = useState(0),
     [revision, refresh] = useState(0),
     [busy, setBusy] = useState(false),
@@ -67,6 +85,11 @@ export function AuditPage(): React.JSX.Element {
         const data = unwrap(catalog)
         setModels(data)
         setModelId(data.selection.configId ?? '')
+        if (
+          initialSelection &&
+          unwrap(sources).projects.some((p) => p.projectId === initialSelection.projectId)
+        )
+          setProjectId(initialSelection.projectId)
       })
       .catch((e: unknown) => {
         if (active) setError(e instanceof Error ? e.message : '读取项目与模型失败')
@@ -75,16 +98,35 @@ export function AuditPage(): React.JSX.Element {
       active = false
       mounted.current = false
     }
-  }, [])
+  }, [initialSelection])
   useEffect(() => {
     let active = true
     const epoch = selectionEpoch.current
     if (projectId)
       void request<ScanCatalog>('runs', { projectId })
-        .then((data) => {
+        .then(async (data) => {
           if (!active || epoch !== selectionEpoch.current) return
+          const saved =
+            restoreSelection.current?.projectId === projectId ? restoreSelection.current : null
+          const restoredRun = data.runs.find((run) => run.runId === saved?.runId)
+          let restoredPath = ''
+          if (restoredRun && saved) {
+            try {
+              await request<PathDetail>('detail', {
+                projectId,
+                runId: restoredRun.runId,
+                pathId: saved.pathId
+              })
+              restoredPath = saved.pathId
+            } catch (e) {
+              if (!(e instanceof Error && e.message.startsWith('CHAIN_NOT_FOUND：'))) throw e
+            }
+          }
+          if (!active || epoch !== selectionEpoch.current) return
+          restoreSelection.current = null
           setRuns(data.runs)
-          setRunId(data.runs[0]?.runId ?? '')
+          setRunId(restoredRun?.runId ?? data.runs[0]?.runId ?? '')
+          setPathId(restoredPath)
         })
         .catch((e: unknown) => {
           if (active) setError(e instanceof Error ? e.message : '读取任务失败')
@@ -94,25 +136,52 @@ export function AuditPage(): React.JSX.Element {
     }
   }, [projectId])
   useEffect(() => {
+    if (
+      !detail ||
+      detail.projectId !== projectId ||
+      detail.runId !== runId ||
+      detail.pathId !== pathId
+    )
+      return
+    try {
+      localStorage.setItem(
+        detailSelectionKey,
+        JSON.stringify({ projectId, runId, pathId, tab: detailTab })
+      )
+    } catch {
+      // Storage can be disabled; SQLite history remains available through explicit selection.
+    }
+  }, [projectId, runId, pathId, detailTab, detail])
+  useEffect(() => {
     let active = true,
       inFlight = false
     const read = async (): Promise<void> => {
       if (!projectId || !runId || inFlight) return
       inFlight = true
       try {
-        const [paths, totals, history, current] = await Promise.all([
+        const [paths, totals, history, current, state] = await Promise.all([
           request<PathList>('list', { projectId, runId, limit: 20, offset }),
           request<ScanStatistics>('statistics', { projectId, runId }),
           request<ScanCatalog>('runs', { projectId }),
           pathId
             ? request<PathDetail>('detail', { projectId, runId, pathId })
-            : Promise.resolve(null)
+            : Promise.resolve(null),
+          request<RunState>('runState', { projectId, runId })
         ])
         if (!active) return
         setListing(paths)
         setStats(totals)
         setRuns(history.runs)
         setDetail(current)
+        setRunState(state)
+        setReadError('')
+        setReadAt(new Date().toLocaleTimeString())
+        if (totals.analyzing === 0)
+          setMessage((previous) =>
+            previous.startsWith('后端正在串行')
+              ? `本批待办处理已结束：失败 ${totals.failed} 条，仍待分析 ${totals.pending} 条；风险未知 ${totals.unknown} 条。`
+              : previous
+          )
         if (current && current.status !== 'analyzing')
           setMessage((previous) =>
             previous.startsWith('路径已由后端领取')
@@ -121,7 +190,11 @@ export function AuditPage(): React.JSX.Element {
           )
         if (!pathId && paths.paths[0]) setPathId(paths.paths[0].pathId)
       } catch (e) {
-        if (active) setError(e instanceof Error ? e.message : '读取调用链失败')
+        if (active)
+          setReadError(
+            (e instanceof Error ? e.message : '读取调用链失败') +
+              ` · projectId=${projectId} / runId=${runId} / chainId=${pathId || '未选择'}`
+          )
       } finally {
         inFlight = false
       }
@@ -143,7 +216,20 @@ export function AuditPage(): React.JSX.Element {
     try {
       await work()
     } catch (e) {
-      if (mounted.current) setError(e instanceof Error ? e.message : '操作失败')
+      if (mounted.current) {
+        setError(
+          (e instanceof Error ? e.message : '操作失败') +
+            ` · projectId=${projectId || '尚未生成'} / runId=${runId || '尚未生成'} / chainId=${pathId || '尚未生成'}`
+        )
+        setMessage('本次操作未确认成功。请查看错误原因并刷新数据库状态。')
+        refresh((n) => n + 1)
+        if (projectId)
+          void request<ScanCatalog>('runs', { projectId })
+            .then((data) => {
+              if (mounted.current) setRuns(data.runs)
+            })
+            .catch(() => {})
+      }
     } finally {
       locked.current = false
       if (mounted.current) setBusy(false)
@@ -185,6 +271,7 @@ export function AuditPage(): React.JSX.Element {
               value={projectId}
               disabled={busy}
               onChange={(e) => {
+                restoreSelection.current = null
                 selectionEpoch.current++
                 setProjectId(e.target.value)
                 setRunId('')
@@ -193,6 +280,9 @@ export function AuditPage(): React.JSX.Element {
                 setListing(null)
                 setStats(null)
                 setDetail(null)
+                setRunState(null)
+                setReadError('')
+                setReadAt('')
                 setOffset(0)
                 setError('')
               }}
@@ -217,6 +307,9 @@ export function AuditPage(): React.JSX.Element {
                 setDetail(null)
                 setListing(null)
                 setStats(null)
+                setRunState(null)
+                setReadError('')
+                setReadAt('')
                 setOffset(0)
               }}
             >
@@ -231,6 +324,7 @@ export function AuditPage(): React.JSX.Element {
           </label>
         </div>
         <button
+          className="button-primary"
           disabled={busy || !projectId || selectedRun?.state === 'scanning'}
           onClick={() =>
             void action(async () => {
@@ -264,7 +358,11 @@ export function AuditPage(): React.JSX.Element {
             <span>规则：{selectedRun.rulesVersion}</span>
             <p>源码指纹：{selectedRun.sourceStamp}</p>
             {selectedRun.errorCode && (
-              <p role="alert">{selectedRun.errorCode} · 请检查源码后重新预处理。</p>
+              <p role="alert">
+                {selectedRun.errorCode} · {analysisErrorHelp(selectedRun.errorCode)}
+                <br />
+                projectId={projectId} / runId={runId}
+              </p>
             )}
             <ul>
               {selectedRun.warnings.map((w, i) => (
@@ -277,6 +375,18 @@ export function AuditPage(): React.JSX.Element {
           </div>
         )}
       </section>
+      {runState && (
+        <p data-testid="audit-run-state">
+          任务阶段：{runState.stage} · 状态：{runState.status} · 最近成功读取：{readAt}
+        </p>
+      )}
+      {readError && (
+        <p role="alert" data-testid="audit-read-error">
+          当前数据库状态未确认：{readError}
+          <br />
+          下方仅为上次成功读取的快照，不能据此认定任务仍在运行或已完成。请检查服务与磁盘后刷新。
+        </p>
+      )}
       {stats && (
         <section className="audit-stats" aria-label="调用链统计" data-testid="audit-statistics">
           {(
@@ -378,78 +488,70 @@ export function AuditPage(): React.JSX.Element {
           <h2>路径详情</h2>
           {detail ? (
             <>
-              <p className="audit-id">{detail.pathId}</p>
-              <p>
-                {statusLabel[detail.status]} · {verdictLabel[detail.verdict]}
-              </p>
-              <p className="muted">
-                来源：{detail.sourceRef ?? '尚未确认'}
-                {detail.truncated ? ' · 部分覆盖：' + detail.truncationReason : ''}
-              </p>
-              <ol className="audit-steps">
-                {detail.steps.map((s) => (
-                  <li key={s.stepIndex}>
-                    <strong>{s.edge.functionName}</strong>
-                    <span> → {s.edge.calledFunctionName}</span>
-                    <p>
-                      {s.edge.filePath}:{s.edge.callLine}:{s.edge.callColumn} ·{' '}
-                      {s.edge.resolutionStatus} · {s.edge.isSink ? '候选 Sink' : '候选调用'}
-                    </p>
-                    {s.edge.arguments.length > 0 && (
-                      <pre>
-                        {s.edge.arguments.map((a) => `参数 ${a.index}: ${a.text}`).join('\n')}
-                      </pre>
-                    )}
-                    {s.defenseSummary && <p>防护证据：{s.defenseSummary}</p>}
-                  </li>
-                ))}
-              </ol>
-              {detail.summary && <pre className="audit-summary">{detail.summary}</pre>}
-              <label>
-                本次分析模型
-                <select
-                  aria-label="路径分析模型"
-                  value={modelId}
-                  disabled={busy || stats?.analyzing !== 0}
-                  onChange={(e) => setModelId(e.target.value)}
-                >
-                  <option value="">请选择已保存配置</option>
-                  {models?.models.map((m) => (
-                    <option value={m.configId} key={m.configId}>
-                      {m.name} · {m.modelId}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <p className="muted">
-                开始后将把当前路径的源码片段发送给所选模型，执行一次有界审阅。完整循环取证和 SSE
-                在后续需求中接入。
-              </p>
-              <button
-                data-testid="start-path-analysis"
-                disabled={
-                  busy ||
-                  !modelId ||
-                  !!stats?.analyzing ||
-                  !['pending', 'failed', 'unresolved'].includes(detail.status)
-                }
-                onClick={() =>
-                  void action(async () => {
-                    await request('analyze', {
-                      projectId,
-                      runId,
-                      pathId: detail.pathId,
-                      modelConfigId: modelId
+              <CallChainDetail detail={detail} tab={detailTab} onTabChange={setDetailTab}>
+                <label>
+                  本次分析模型
+                  <select
+                    aria-label="路径分析模型"
+                    value={modelId}
+                    disabled={busy || stats?.analyzing !== 0}
+                    onChange={(e) => setModelId(e.target.value)}
+                  >
+                    <option value="">请选择已保存配置</option>
+                    {models?.models.map((m) => (
+                      <option value={m.configId} key={m.configId}>
+                        {m.name} · {m.modelId}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <p className="muted">
+                  开始后将通过 Pi
+                  受控工具读取源码并发送给所选模型，在预算内循环补证。分析待办队列会串行处理当前任务的
+                  pending 路径；失败后停止，剩余待办保留。
+                </p>
+                <AnalysisStreamPanel
+                  key={runId + ':' + detail.pathId}
+                  projectId={projectId}
+                  runId={runId}
+                  chainId={detail.pathId}
+                  modelConfigId={modelId}
+                  detail={detail}
+                  statistics={stats}
+                  sourceStamp={selectedRun?.sourceStamp ?? ''}
+                  rulesVersion={selectedRun?.rulesVersion ?? ''}
+                  disabled={
+                    busy ||
+                    !!readError ||
+                    !modelId ||
+                    !!stats?.analyzing ||
+                    !['pending', 'failed', 'unresolved'].includes(detail.status)
+                  }
+                  onUpdate={() => refresh((n) => n + 1)}
+                />
+                <button
+                  disabled={
+                    busy || !!readError || !modelId || !!stats?.analyzing || !stats?.pending
+                  }
+                  data-testid="start-pending-analysis"
+                  onClick={() =>
+                    void action(async () => {
+                      await request('analyzePending', {
+                        projectId,
+                        runId,
+                        modelConfigId: modelId,
+                        maxPaths: 10
+                      })
+                      if (mounted.current) {
+                        setMessage('后端正在串行处理待办路径，每次最多 10 条。')
+                        refresh((n) => n + 1)
+                      }
                     })
-                    if (mounted.current) {
-                      setMessage('路径已由后端领取，正在分析；结果提交后从数据库刷新。')
-                      refresh((n) => n + 1)
-                    }
-                  })
-                }
-              >
-                开始分析当前路径
-              </button>
+                  }
+                >
+                  分析本任务待办路径（最多 10 条）
+                </button>
+              </CallChainDetail>
             </>
           ) : (
             <p>选择一条调用链查看函数顺序、源码位置和覆盖限制。</p>

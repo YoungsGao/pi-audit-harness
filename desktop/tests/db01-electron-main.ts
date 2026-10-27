@@ -60,7 +60,7 @@ void app.whenReady().then(async () => {
     })
     await window.loadFile(join(__dirname, '../renderer/index.html'))
     await service.start()
-    assert.equal(service.getStatus().database?.schemaVersion, 6)
+    assert.equal(service.getStatus().database?.schemaVersion, 8)
     assert.deepEqual(
       ((await service.getStorageOverview()) as { data: { counts: unknown } }).data.counts,
       { projects: 0, runs: 0, results: 0, reports: 0 }

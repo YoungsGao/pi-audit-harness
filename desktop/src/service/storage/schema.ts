@@ -3,6 +3,8 @@ import { ApiError } from '../../shared/api-error.ts'
 import { LocalDatabase } from './database.ts'
 import { callChainMigration } from './call-chain-migration.ts'
 import { scanMigration } from './scan-migration.ts'
+import { analysisMigration } from './analysis-migration.ts'
+import { streamMigration } from './stream-migration.ts'
 
 // 十六进制 ASCII「PIAU」，用来避免把别的 SQLite 文件当成本应用数据库。
 const APPLICATION_ID = 0x50494155
@@ -142,6 +144,16 @@ CREATE INDEX idx_source_import_key ON source_imports(source_key,registered_at);
     version: 6,
     name: 'scan-progress-and-path-attempts',
     sql: scanMigration
+  },
+  {
+    version: 7,
+    name: 'analysis-events-run-lifecycle-and-reports',
+    sql: analysisMigration
+  },
+  {
+    version: 8,
+    name: 'taint-review-and-session-scoped-stream-events',
+    sql: streamMigration
   }
 ]
 

@@ -13,7 +13,8 @@ export async function createManagedSession(
   resources: ResourceLoader,
   tools: string[],
   signal: AbortSignal,
-  onExtensionError: () => void = () => {}
+  onExtensionError: () => void = () => {},
+  profile: { contextWindow: number; maxTokens: number } = { contextWindow: 8192, maxTokens: 512 }
 ): Promise<CreateAgentSessionResult['session']> {
   const sdk = await waitWithSignal(loadPiSdk(), signal)
   const directory = join(runtime.workDir, randomUUID())
@@ -41,8 +42,8 @@ export async function createManagedSession(
         name: config.name,
         reasoning: false,
         input: ['text'],
-        contextWindow: 8192,
-        maxTokens: 512,
+        contextWindow: profile.contextWindow,
+        maxTokens: profile.maxTokens,
         cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }
       }
     ]

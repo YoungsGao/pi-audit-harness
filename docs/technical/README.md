@@ -1,66 +1,27 @@
-# 技术方案编写指南
+# 项目技术文档
 
-技术方案由人工使用 Markdown 编写；index.html 负责索引与阅读。
+更新：2026-10-27。以下记录当前项目实现，按架构到验收连续编号。需求与原型中的增强项不自动视为已实现，完成范围以第 07 篇为准。
 
-## 当前实现与学习入口
+| 编号 | 文档 | 内容 |
+| --- | --- | --- |
+| 01 | [项目架构与运行](01.项目架构与运行.md) | 进程边界、认证、凭据、模型协议、依赖和启动 |
+| 02 | [源码输入与预处理](02.源码输入与预处理.md) | 来源校验、内容指纹、下载生命周期、规则、查询与候选图 |
+| 03 | [数据模型与持久化](03.数据模型与持久化.md) | schema v8、三张核心链路表、任务/尝试/事件、报告快照 |
+| 04 | [Agent 分析与事件协议](04.Agent分析与事件协议.md) | 受控循环、传播核查、预算、固定接口、SSE 和错误恢复 |
+| 05 | [审计工作台](05.审计工作台.md) | 四标签、三段过程、选择恢复、固定导航、响应式布局 |
+| 06 | [报告生成与管理](06.报告生成与管理.md) | Pi 命令、快照、HTML、风险点口径、登记与校验打开 |
+| 07 | [实现进度与验收](07.实现进度与验收.md) | 子需求映射、验证命令、测试结果和后续范围 |
 
-| 文档 | 阅读用途 |
-| --- | --- |
-| [BUILD-01 / SOURCE-01 实现记录与学习指南](05.BUILD-SOURCE-实现记录与学习指南.md) | 当前总入口；16 个子需求范围、启动、模型配置、存储与源码输入关键代码、回归记录 |
-| [TPL-01 / QRY-01 / DB-03](03.TPL-QRY-DB03-实现与学习指南.md) | 风险规则、基础源码查询与必要调用链持久化；记录 schema v5 阶段 |
-| [SCAN-01 / SCAN-03 / UI-01](04.SCAN-UI-调用链预处理与工作台学习指南.md) | 当前 schema v6、跨文件候选图、路径上下文、工作台和有界审阅 |
-| [BUILD-01 原始技术方案](01.BUILD-01-项目构建技术方案.md) | 实现前的方案，具体接口和驱动以实现记录为准 |
-| [TypeScript 后端恢复记录](02.TypeScript后端恢复记录.md) | 历史技术路线记录，不代表当前功能进度 |
+## 维护约定
 
-## 新增文档
+技术目录只发布项目架构、接口、数据、实现决策和验收记录；个人学习资料与实验输出保留在本地排除目录，不进入线上索引。修改编号时同时更新所有相对链接。
 
-1. 复制 _template.md，改名为 01.系统架构.md 等文件名。
-2. 使用 Markdown 编写内容，可按主题建立子目录。
-3. 运行 `node docs/technical/assets/gen-index.mjs`，重新生成 technical/index.json 与 assets/fallback.js。
-4. 提交并推送到 Pages 发布分支。
+新增项目文档可参照 [_template.md](_template.md)。修改 Markdown 或根 README 后，在仓库根目录运行：
 
-页面的目录优先读仓库内的 index.json（随提交更新，几分钟内生效），因此不跑脚本的话，新文件要等 jsDelivr 文件清单缓存过期（约 12 小时）才会出现。
+```sh
+node docs/technical/assets/gen-index.mjs
+```
 
-列表按 README、数字前缀、其余文件的顺序排序，_template.md 排在最后。点开头的文件不进入索引。
+脚本生成 index.json 和 assets/fallback.js，二者必须与内容一起提交。目录按 README、数字编号、模板排序。阅读器支持相对 Markdown 和图片链接，在线目录优先读取仓库 index.json。
 
-## 推送前自动校验
-
-仓库自带的 `.githooks/pre-push` 会在推送 main 前跑一次 gen-index.mjs。若 index.json 或 fallback.js 与当前目录、README 不一致，脚本会重新生成这两个文件并中止推送，此时按提示 `git add` 后 `git commit --amend` 即可。
-
-钩子文件在仓库里，不复制到 `.git/hooks`，靠一条配置让 git 去仓库目录找钩子。每个 clone 启用一次：
-
-~~~sh
-git config core.hooksPath .githooks
-~~~
-
-- 提交时需保证 `.githooks/pre-push` 有执行位（git 记为 100755）；丢了执行位 git 会静默跳过，可用 `ls -l .githooks/pre-push` 确认。
-- 临时跳过校验：`git push --no-verify`。
-- 关闭钩子：`git config --unset core.hooksPath`。
-
-## 支持的排版
-
-支持标题、段落、粗体、斜体、链接、图片、引用、表格、有序/无序列表和代码块。原始 HTML 作为文本显示。
-
-~~~ts
-interface AuditTask {
-  chainId: string;
-  status: "init" | "queue" | "analyze" | "completed";
-}
-~~~
-
-| 内容 | 建议 |
-| --- | --- |
-| 背景与目标 | 说明问题和预期结果 |
-| 模块与流程 | 说明模块职责和接口 |
-| 数据模型 | 列字段、约束与状态 |
-| 异常与验收 | 写失败场景和验证方式 |
-
-## 文档链接
-
-相对 Markdown 链接会在阅读器中打开对应文档。图片使用相对路径或 HTTPS 地址。
-
-## 本地预览与在线索引
-
-直接打开 HTML 可查看附带首页与指南。在线页面读取仓库里的 index.json 得到目录；浏览器不会直接扫描本地磁盘。
-
-默认读取 main 分支；如需调整，修改 docs/technical/assets/config.js 的 ref。目录按 index.json → jsDelivr 文件清单 → GitHub 公共树接口的顺序获取，都不可用时提示重试并显示页面附带的索引，不需要配置密钥。
+仓库已有 `.githooks/pre-push`，启用方式为 `git config core.hooksPath .githooks`；推送 main 前会校验生成索引一致性。正常发布应先生成、检查并提交索引，不绕过检查。

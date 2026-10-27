@@ -17,16 +17,16 @@ function fixture(t) {
 }
 test('first boot creates domain tables, migration/cleanup ledgers, indexes and version; repeat is safe', (t) => {
   const db = fixture(t)
-  assert.equal(db.all("SELECT name FROM sqlite_schema WHERE type='table'").length, 13)
-  assert.equal(db.get('PRAGMA user_version').user_version, 6)
+  assert.equal(db.all("SELECT name FROM sqlite_schema WHERE type='table'").length, 16)
+  assert.equal(db.get('PRAGMA user_version').user_version, 8)
   assert.equal(db.get('PRAGMA journal_mode').journal_mode, 'wal')
   assert.equal(db.get('PRAGMA synchronous').synchronous, 2)
   assert.equal(
     db.all("SELECT name FROM sqlite_schema WHERE type='index' AND name LIKE 'idx_%'").length,
-    12
+    14
   )
   migrate(db)
-  assert.equal(db.get('SELECT count(*) AS n FROM schema_migrations').n, 6)
+  assert.equal(db.get('SELECT count(*) AS n FROM schema_migrations').n, 8)
 })
 test('failed migration rolls back DDL and version together', (t) => {
   const db = fixture(t)
@@ -34,15 +34,15 @@ test('failed migration rolls back DDL and version together', (t) => {
     migrate(db, [
       ...migrations,
       {
-        version: 7,
+        version: 9,
         name: 'broken',
         sql: 'CREATE TABLE temporary_new (id INTEGER); INSERT INTO table_does_not_exist VALUES (1);'
       }
     ])
   )
-  assert.equal(db.get('PRAGMA user_version').user_version, 6)
+  assert.equal(db.get('PRAGMA user_version').user_version, 8)
   assert.equal(db.get("SELECT name FROM sqlite_schema WHERE name='temporary_new'"), undefined)
-  assert.equal(db.get('SELECT count(*) AS n FROM schema_migrations').n, 6)
+  assert.equal(db.get('SELECT count(*) AS n FROM schema_migrations').n, 8)
 })
 test('newer version and modified history are rejected without resetting data', (t) => {
   const db = fixture(t)
@@ -56,9 +56,9 @@ test('newer version and modified history are rejected without resetting data', (
       code: 'DB_MIGRATION_MISMATCH'
     }
   )
-  db.exec('PRAGMA user_version = 7')
+  db.exec('PRAGMA user_version = 9')
   assert.throws(() => migrate(db), { code: 'DB_SCHEMA_TOO_NEW' })
-  assert.equal(db.get('PRAGMA user_version').user_version, 7)
+  assert.equal(db.get('PRAGMA user_version').user_version, 9)
 })
 test('unrecognized database and invalid migration plan rejected', (t) => {
   const root = mkdtempSync(join(tmpdir(), 'pi-db01-foreign-'))

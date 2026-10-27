@@ -334,7 +334,7 @@ export class CallChainRepository {
     )
     if (!path) throw new ApiError('CHAIN_NOT_FOUND', '未找到对应项目与任务的调用路径', 404)
     const steps = this.db.all(
-      `SELECT e.*,s.step_index,s.dangerous AS step_dangerous,s.taint_in_json,s.taint_out_json,s.evidence_json,s.defense_summary
+      `SELECT e.*,s.step_index,s.dangerous AS step_dangerous,s.taint_in_json,s.taint_out_json,s.evidence_json,s.defense_summary,s.propagation_json
       FROM path_steps s JOIN call_edges e ON e.uid=s.edge_uid AND e.run_id=s.run_id AND e.project_id=s.project_id
       WHERE s.project_id=? AND s.run_id=? AND s.path_id=? ORDER BY s.step_index`,
       input.projectId,
@@ -350,7 +350,8 @@ export class CallChainRepository {
         taintIn: JSON.parse(String(step.taint_in_json)),
         taintOut: JSON.parse(String(step.taint_out_json)),
         evidence: JSON.parse(String(step.evidence_json)),
-        defenseSummary: step.defense_summary
+        defenseSummary: step.defense_summary,
+        propagation: JSON.parse(String(step.propagation_json))
       }))
     }
   }

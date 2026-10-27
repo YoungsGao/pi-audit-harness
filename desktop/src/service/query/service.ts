@@ -12,6 +12,7 @@ import { scanJava } from '../sources/scan.ts'
 import type { SourceScan } from '../sources/scan.ts'
 import { command } from '../sources/process.ts'
 import { builtinRules, findRiskCandidates } from '../rules/builtin.ts'
+import { indexJavaFile } from '../scanning/java-index.ts'
 
 export function queryInput(value: unknown, keys: string[]): Record<string, unknown> {
   if (
@@ -54,6 +55,43 @@ export class CodeQueryService {
     const project = this.repo.get(queryText(projectId, 80))
     if (!project) throw new ApiError('SOURCE_NOT_FOUND', '未找到已登记源码项目', 404)
     return project
+  }
+  async methodContext(
+    projectId: string,
+    filePath: string,
+    methodKey: string,
+    signal: AbortSignal
+  ): Promise<{
+    filePath: string
+    startLine: number
+    endLine: number
+    text: string
+    complete: boolean
+  } | null> {
+    const { scan } = await this.scope(projectId, signal)
+    const source = await this.readSource(scan, filePath, signal)
+    if (Buffer.byteLength(source) > 256 * 1024) return null
+    let method
+    try {
+      method = indexJavaFile(filePath, source).methods.find((m) => m.key === methodKey)
+    } catch {
+      return null
+    }
+    if (!method) return null
+    const first = source.slice(0, method.start).split('\n').length
+    const last = source.slice(0, method.end + 1).split('\n').length
+    const endLine = Math.min(last, first + 79)
+    const full = source
+      .split('\n')
+      .slice(first - 1, endLine)
+      .join('\n')
+    return {
+      filePath,
+      startLine: first,
+      endLine,
+      text: full.slice(0, 12000),
+      complete: endLine === last && full.length <= 12000
+    }
   }
 
   async action(action: CodeQueryAction, value: unknown, signal?: AbortSignal): Promise<unknown> {

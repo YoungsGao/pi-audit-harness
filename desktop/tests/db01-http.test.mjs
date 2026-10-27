@@ -32,7 +32,7 @@ test('authenticated fixed read route returns saved rows; no SQL/write route; hea
   assert.equal(result.data.results[0].id, 'fixture-path-one')
   assert.ok(result.requestId)
   const health = await checkLocalHealth(server.port, 'fixture-secret')
-  assert.equal(health.database.schemaVersion, 6)
+  assert.equal(health.database.schemaVersion, 8)
   assert.equal(health.pi, 'not-integrated')
   for (const [method, path] of [
     ['POST', '/storage/overview'],

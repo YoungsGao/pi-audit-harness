@@ -65,7 +65,7 @@ export class AuditRepository {
         now
       )
       tx.run(
-        `INSERT INTO audit_runs VALUES (?, ?, 'completed', ?, ?, NULL, ?, ?)`,
+        `INSERT INTO audit_runs (id,project_id,status,source_stamp,rules_version,model_config_id,created_at,updated_at) VALUES (?, ?, 'completed', ?, ?, NULL, ?, ?)`,
         input.run.id,
         project.id,
         input.run.sourceStamp,
@@ -113,7 +113,7 @@ export class AuditRepository {
       }
       if (input.report)
         tx.run(
-          "INSERT INTO reports VALUES (?, ?, ?, ?, 'ready', ?, ?)",
+          "INSERT INTO reports (id,run_id,project_id,file_path,status,summary,created_at) VALUES (?, ?, ?, ?, 'ready', ?, ?)",
           input.report.id,
           input.run.id,
           project.id,

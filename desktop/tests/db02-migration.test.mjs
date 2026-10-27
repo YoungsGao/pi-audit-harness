@@ -37,7 +37,7 @@ test('real v1 data and references survive v2 migration; no invented legacy Git c
   )
   const oldChecksum = db.get('SELECT checksum FROM schema_migrations WHERE version=1').checksum
   migrate(db)
-  assert.equal(db.get('PRAGMA user_version').user_version, 6)
+  assert.equal(db.get('PRAGMA user_version').user_version, 8)
   const preserved = db.get("SELECT * FROM model_configs WHERE id='legacy-model'")
   assert.equal(preserved.model_id, 'explicit-model')
   assert.equal(preserved.secret_ref, null)

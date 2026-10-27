@@ -65,6 +65,7 @@ export interface PathDetail extends PathSummary {
     taintOut: unknown[]
     evidence: unknown[]
     defenseSummary: string
+    propagation: Record<string, unknown>
   }[]
 }
 export interface PathList {
@@ -88,7 +89,17 @@ export interface ScanOutput {
   graph: CandidateGraph
   summary: ScanSummary
 }
-export type AuditAction = 'prepare' | 'runs' | 'list' | 'detail' | 'statistics' | 'analyze'
+export type AuditAction =
+  | 'prepare'
+  | 'runs'
+  | 'list'
+  | 'detail'
+  | 'statistics'
+  | 'analyze'
+  | 'analyzePending'
+  | 'events'
+  | 'runState'
+  | 'history'
 export interface AnalysisAccepted {
   projectId: string
   runId: string
@@ -96,4 +107,13 @@ export interface AnalysisAccepted {
   status: 'analyzing'
 }
 export type AuditData =
-  PreparedScan | ScanCatalog | PathList | PathDetail | ScanStatistics | AnalysisAccepted
+  | PreparedScan
+  | ScanCatalog
+  | PathList
+  | PathDetail
+  | ScanStatistics
+  | AnalysisAccepted
+  | import('./agent-contracts').AnalysisEvents
+  | import('./agent-contracts').RunState
+  | import('./agent-contracts').QueueAccepted
+  | import('./sse-contracts').AnalysisHistory

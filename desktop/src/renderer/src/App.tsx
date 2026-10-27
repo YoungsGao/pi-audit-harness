@@ -1,5 +1,6 @@
 import { SourcesPage } from './components/SourcesPage'
 import { AuditPage } from './components/AuditPage'
+import { ReportsPage } from './components/ReportsPage'
 import { ModelsPage } from './components/ModelsPage'
 import { useEffect, useRef, useState } from 'react'
 import { MetadataCard } from './components/MetadataCard'
@@ -22,10 +23,50 @@ const pages = [
     title: '审计分析',
     description: '预处理源码，查看数据库中的调用链、分析状态和路径证据。'
   },
-  { id: 'reports', title: '审计报告', description: '后续查看并打开已生成的 HTML 报告。' }
+  { id: 'reports', title: '审计报告', description: '按已保存任务生成、查询并打开 HTML 报告。' }
 ] as const
 
 type PageId = (typeof pages)[number]['id']
+
+function PageIcon({ page }: { page: PageId }): React.JSX.Element {
+  const paths: Record<PageId, React.JSX.Element> = {
+    models: (
+      <>
+        <path d="M4 7h16M4 17h16" />
+        <circle cx="9" cy="7" r="3" />
+        <circle cx="15" cy="17" r="3" />
+      </>
+    ),
+    projects: <path d="M3 7a2 2 0 0 1 2-2h5l2 3h7a2 2 0 0 1 2 2v9H3Z" />,
+    analysis: (
+      <>
+        <circle cx="5" cy="6" r="2" />
+        <circle cx="19" cy="6" r="2" />
+        <circle cx="12" cy="18" r="2" />
+        <path d="m6 8 5 8m7-8-5 8M7 6h10" />
+      </>
+    ),
+    reports: (
+      <>
+        <path d="M6 3h8l4 4v14H6ZM14 3v5h4M9 12h6M9 16h6" />
+      </>
+    )
+  }
+  return (
+    <svg
+      className="nav-icon"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      {paths[page]}
+    </svg>
+  )
+}
 
 function describeApp(info: AppInfo): string {
   return `客户端通信正常：${info.name} ${info.version} / Electron ${info.electron} / Node ${info.node}`
@@ -37,7 +78,21 @@ function App(): React.JSX.Element {
   const [bridgeMessage, setBridgeMessage] = useState('正在读取客户端信息…')
   const [service, setService] = useState<ServiceStatus | null>(null)
   const statusEvents = useRef(0)
+  const workspace = useRef<HTMLElement>(null)
   const page = pages.find((item) => item.id === pageId)!
+  const serviceLabel = service
+    ? {
+        starting: '本地服务启动中',
+        ready: '本地服务就绪',
+        failed: '本地服务异常',
+        stopping: '本地服务停止中',
+        stopped: '本地服务已停止'
+      }[service.status]
+    : '正在读取服务状态'
+
+  useEffect(() => {
+    workspace.current?.scrollTo({ top: 0 })
+  }, [pageId])
 
   useEffect(() => {
     let active = true
@@ -93,66 +148,98 @@ function App(): React.JSX.Element {
 
   return (
     <div className="app-shell">
+      <a className="skip-link" href="#workspace-main">
+        跳转到正文
+      </a>
       <aside className="sidebar">
-        <div className="brand">Pi Audit Harness</div>
-        <p className="muted">源码审计客户端</p>
+        <div className="brand-lockup">
+          <svg className="brand-mark" viewBox="0 0 40 40" fill="none" aria-hidden="true">
+            <path d="M12 11h16M12 11l8 18 8-18" stroke="currentColor" strokeWidth="1.5" />
+            <circle cx="12" cy="11" r="4" />
+            <circle cx="28" cy="11" r="4" />
+            <circle cx="20" cy="29" r="4" />
+          </svg>
+          <div className="brand-copy">
+            <div className="brand">Pi Audit Harness</div>
+            <p>源码审计工作台</p>
+          </div>
+        </div>
         <nav aria-label="主导航">
           {pages.map((item) => (
             <button
               key={item.id}
               type="button"
+              title={item.title}
               aria-current={pageId === item.id ? 'page' : undefined}
               onClick={() => setPageId(item.id)}
             >
-              {item.title}
+              <PageIcon page={item.id} />
+              <span className="nav-label">{item.title}</span>
             </button>
           ))}
         </nav>
-        <div className="phase">本地源码审计 · 调用链工作台</div>
-      </aside>
-      <main>
-        <header>
-          <h1>{page.title}</h1>
-          <p className="muted">{page.description}</p>
-        </header>
-        {pageId === 'models' ? (
-          <ModelsPage />
-        ) : pageId === 'projects' ? (
-          <>
-            <SourcesPage />
-            <MetadataCard />
-          </>
-        ) : pageId === 'analysis' ? (
-          <AuditPage />
-        ) : (
-          <section className="card" aria-label="当前页面">
-            <h2>{page.title}</h2>
-            <p>具体功能将在对应 P0 步骤接入。</p>
-          </section>
-        )}
-        <StorageCard />
-        <section className="card" aria-label="运行状态">
-          <h2>运行状态</h2>
-          <p role="status">服务状态：{service?.status ?? '读取中'}</p>
-          {service?.pi && (
-            <div>
-              <p>
-                Pi 状态：{service.pi.state} / 版本：{service.pi.sdkVersion}
-              </p>
-              <p>{service.pi.message}</p>
-              {service.pi.code && <p>Pi 错误码：{service.pi.code}</p>}
-            </div>
-          )}
-          <p>{service?.message ?? '正在读取本地服务状态…'}</p>
-          {service?.code && <p className="muted">错误码：{service.code}</p>}
-          {service?.requestId && <p className="muted">请求编号：{service.requestId}</p>}
-          <p className="muted" role="status">
-            {bridgeMessage}
+        <div className="sidebar-footer">
+          <div className="sidebar-status" title={serviceLabel}>
+            <span className="status-dot" data-state={service?.status ?? 'loading'} />
+            <span>{serviceLabel}</span>
+          </div>
+          <p className="phase">
+            本地源码审计
+            <br />
+            调用链与证据
           </p>
-          <button type="button" disabled={checking} onClick={checkDesktopConnection}>
-            {checking ? '检查中…' : '检查客户端与服务'}
-          </button>
-        </section>
+        </div>
+      </aside>
+      <main id="workspace-main" className="workspace-main" ref={workspace} tabIndex={-1}>
+        <div className="workspace-content">
+          <header className="workspace-header">
+            <div>
+              <h1>{page.title}</h1>
+              <p>{page.description}</p>
+            </div>
+            <span className="workspace-location">
+              <span className="status-dot" data-state={service?.status ?? 'loading'} />
+              {serviceLabel}
+            </span>
+          </header>
+          {pageId === 'models' ? (
+            <ModelsPage />
+          ) : pageId === 'projects' ? (
+            <>
+              <SourcesPage />
+              <MetadataCard />
+            </>
+          ) : pageId === 'analysis' ? (
+            <AuditPage />
+          ) : (
+            <ReportsPage />
+          )}
+          <div className="workspace-diagnostics">
+            <StorageCard />
+            <section className="card runtime-card" aria-label="运行状态">
+              <h2>运行状态</h2>
+              <p role="status">服务状态：{service?.status ?? '读取中'}</p>
+              {service?.pi && (
+                <div>
+                  <p>
+                    Pi 状态：{service.pi.state} / 版本：{service.pi.sdkVersion}
+                  </p>
+                  <p>{service.pi.message}</p>
+                  {service.pi.code && <p>Pi 错误码：{service.pi.code}</p>}
+                </div>
+              )}
+              <p>{service?.message ?? '正在读取本地服务状态…'}</p>
+              {service?.code && <p className="muted">错误码：{service.code}</p>}
+              {service?.requestId && <p className="muted">请求编号：{service.requestId}</p>}
+              <p className="muted" role="status">
+                {bridgeMessage}
+              </p>
+              <button type="button" disabled={checking} onClick={checkDesktopConnection}>
+                {checking ? '检查中…' : '检查客户端与服务'}
+              </button>
+            </section>
+          </div>
+        </div>
       </main>
     </div>
   )
