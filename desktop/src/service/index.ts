@@ -1,4 +1,5 @@
 import { SourceService } from './sources/service'
+import { TemplateService } from './rules/template-service'
 import { SourceRepository } from './sources/repository'
 import { CodeQueryService } from './query/service'
 import { CallChainService } from './chains/service'
@@ -22,6 +23,7 @@ import { MetadataService } from './storage/metadata-service'
 import { WindowsCredentialStore } from './storage/credential-store'
 import { ReportRepository } from './storage/report-repository'
 import { ReportService } from './reports/service'
+import { ReviewService } from './reviews/service'
 
 const parent = process.parentPort
 if (!parent) throw new Error('请通过 Electron 启动正式服务入口')
@@ -48,7 +50,7 @@ function shutdown(exitCode = 0): void {
   clearInterval(watchdog)
   void (async () => {
     const running = server ?? (await startingServer?.catch(() => undefined))
-    const results = await Promise.allSettled([runtime?.close(), running?.close()])
+    const results = await Promise.allSettled([chains?.close(), runtime?.close(), running?.close()])
     // 先停止接收请求并等待 HTTP/Pi 清理，再关闭本服务唯一的数据库连接。
     await sources?.close()
     await chains?.close()
@@ -98,7 +100,7 @@ parent.on('message', (event: { data: unknown }) => {
     database = openStorage(message.dataRoot)
     repository = new AuditRepository(database)
     sources = new SourceService(database, message.dataRoot)
-    queries = new CodeQueryService(new SourceRepository(database))
+    queries = new CodeQueryService(new SourceRepository(database), { dataRoot: message.dataRoot })
     chainRepository = new CallChainRepository(database)
     chainRepository.scans.recover()
     new ReportRepository(database).recover()
@@ -129,6 +131,10 @@ parent.on('message', (event: { data: unknown }) => {
     true
   )
   startingServer = startHttpServer(message.token, {
+    reviewAction: (action, value, signal) =>
+      new ReviewService(database!, queries!).action(action, value, signal),
+    templateAction: (action, value, signal) =>
+      new TemplateService(database!).action(action, value, signal),
     reportAction: (action, value, signal) => reports!.action(action, value, signal),
     analyzeStream: {
       open: (value) => chains!.openStream(value),

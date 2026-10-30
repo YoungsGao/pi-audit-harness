@@ -1,4 +1,11 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { SourceDisclosure } from './SourceDisclosure'
+import { ManualRiskForm } from './ManualRiskForm'
+import { AuditReviewEditor } from './AuditReviewEditor'
+import type { ReviewSelection } from './AuditReviewEditor'
+import { RunReviewPanel } from './RunReviewPanel'
+import { RunControlPanel } from './RunControlPanel'
+import type { DisclosureScope } from '../../../shared/input-enhancements'
 import { AnalysisStreamPanel } from './AnalysisStreamPanel'
 import { CallChainDetail } from './CallChainDetail'
 import { detailSelectionKey, parseDetailSelection } from '../../../shared/path-detail-view'
@@ -45,6 +52,14 @@ const scanLabel: Record<string, string> = {
 }
 const verdictLabel = { unknown: '未知', safe: '当前路径已阻断', dangerous: '静态证据支持风险' }
 export function AuditPage(): React.JSX.Element {
+  const [reviewSelection, setReviewSelection] = useState<
+    (ReviewSelection & { projectId: string }) | null
+  >(null)
+  const [disclosure, setDisclosure] = useState<DisclosureScope | null>(null)
+  const onDisclosureChange = useCallback(
+    (scope: DisclosureScope | null) => setDisclosure(scope),
+    []
+  )
   const [initialSelection] = useState(() => {
     try {
       return parseDetailSelection(localStorage.getItem(detailSelectionKey))
@@ -235,7 +250,17 @@ export function AuditPage(): React.JSX.Element {
       if (mounted.current) setBusy(false)
     }
   }
+  const onReviewChange = useCallback(
+    (selection: ReviewSelection | null) =>
+      setReviewSelection(selection ? { ...selection, projectId } : null),
+    [projectId]
+  )
   const selectedRun = runs.find((run) => run.runId === runId)
+  const canSend =
+    disclosure?.authorized === true &&
+    disclosure.projectId === projectId &&
+    disclosure.runId === runId &&
+    disclosure.configId === modelId
   return (
     <div className="audit-page">
       <section className="card" aria-label="审计工作台">
@@ -323,13 +348,30 @@ export function AuditPage(): React.JSX.Element {
             </select>
           </label>
         </div>
+        {projectId && (
+          <AuditReviewEditor
+            key={projectId}
+            projectId={projectId}
+            disabled={busy}
+            onChange={onReviewChange}
+          />
+        )}
         <button
           className="button-primary"
-          disabled={busy || !projectId || selectedRun?.state === 'scanning'}
+          disabled={
+            busy ||
+            !projectId ||
+            selectedRun?.state === 'scanning' ||
+            reviewSelection?.projectId !== projectId
+          }
           onClick={() =>
             void action(async () => {
               setMessage('正在校验源码、提取调用并写入候选队列…')
-              const prepared = await request<PreparedScan>('prepare', { projectId })
+              const prepared = await request<PreparedScan>('prepare', {
+                projectId,
+                templateRefs: reviewSelection?.templateRefs,
+                projectReviewRevision: reviewSelection?.projectReviewRevision
+              })
               if (!mounted.current) return
               const history = await request<ScanCatalog>('runs', { projectId })
               selectionEpoch.current++
@@ -375,10 +417,38 @@ export function AuditPage(): React.JSX.Element {
           </div>
         )}
       </section>
+      {projectId && runId && (
+        <RunReviewPanel
+          key={'review:' + projectId + ':' + runId}
+          projectId={projectId}
+          runId={runId}
+        />
+      )}
+      {projectId && runId && (
+        <ManualRiskForm
+          key={'manual:' + projectId + ':' + runId}
+          projectId={projectId}
+          runId={runId}
+          disabled={busy || !!stats?.analyzing || selectedRun?.state === 'failed'}
+          onSaved={(id) => {
+            setPathId(id)
+            setOffset(0)
+            refresh((n) => n + 1)
+          }}
+        />
+      )}
       {runState && (
         <p data-testid="audit-run-state">
           任务阶段：{runState.stage} · 状态：{runState.status} · 最近成功读取：{readAt}
         </p>
+      )}
+      {projectId && runId && (
+        <RunControlPanel
+          key={'control:' + projectId + ':' + runId}
+          projectId={projectId}
+          runId={runId}
+          onChanged={() => refresh((n) => n + 1)}
+        />
       )}
       {readError && (
         <p role="alert" data-testid="audit-read-error">
@@ -488,7 +558,17 @@ export function AuditPage(): React.JSX.Element {
           <h2>路径详情</h2>
           {detail ? (
             <>
-              <CallChainDetail detail={detail} tab={detailTab} onTabChange={setDetailTab}>
+              <CallChainDetail
+                detail={detail}
+                tab={detailTab}
+                onTabChange={setDetailTab}
+                paths={listing?.paths ?? []}
+                onSelectPath={(selected) => {
+                  setPathId(selected)
+                  setDetail(null)
+                  setDetailTab('path')
+                }}
+              >
                 <label>
                   本次分析模型
                   <select
@@ -524,14 +604,29 @@ export function AuditPage(): React.JSX.Element {
                     busy ||
                     !!readError ||
                     !modelId ||
+                    !canSend ||
                     !!stats?.analyzing ||
                     !['pending', 'failed', 'unresolved'].includes(detail.status)
                   }
                   onUpdate={() => refresh((n) => n + 1)}
                 />
+                {modelId && (
+                  <SourceDisclosure
+                    key={projectId + ':' + runId + ':' + modelId}
+                    projectId={projectId}
+                    runId={runId}
+                    modelConfigId={modelId}
+                    onChange={onDisclosureChange}
+                  />
+                )}
                 <button
                   disabled={
-                    busy || !!readError || !modelId || !!stats?.analyzing || !stats?.pending
+                    busy ||
+                    !!readError ||
+                    !modelId ||
+                    !canSend ||
+                    !!stats?.analyzing ||
+                    !stats?.pending
                   }
                   data-testid="start-pending-analysis"
                   onClick={() =>

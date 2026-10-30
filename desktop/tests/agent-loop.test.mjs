@@ -23,6 +23,12 @@ async function batchFixture(t, budgets = {}) {
   })
   const prepared = await h.chains.action('prepare', { projectId: project.projectId })
   const scope = { projectId: project.projectId, runId: prepared.runId }
+  const disclosure = await h.chains.action('disclosure', { ...scope, modelConfigId: 'model' })
+  await h.chains.action('authorize', {
+    ...scope,
+    modelConfigId: 'model',
+    scopeKey: disclosure.scopeKey
+  })
   const input = { ...scope, pathId: prepared.pathIds[0], modelConfigId: 'model' }
   assert.equal(h.repo.detail(input).steps.length, 3)
   return { ...h, scope, input }
@@ -213,7 +219,7 @@ test('reports track generation, verified output file and transaction statistics 
     'REPORT_INTERRUPTED'
   )
 })
-test('v6 upgrade preserves checksums and historical graph; failed v9 migration leaves v8 intact', async (t) => {
+test('v6 upgrade preserves checksums and historical graph; failed v11 migration leaves v10 intact', async (t) => {
   const root = await mkdtemp(join(tmpdir(), 'pi-agent-migration-')),
     db = new LocalDatabase(root)
   t.after(async () => {
@@ -230,14 +236,14 @@ test('v6 upgrade preserves checksums and historical graph; failed v9 migration l
   assert.throws(() =>
     migrate(db, [
       ...migrations,
-      { version: 9, name: 'broken', sql: 'CREATE TABLE rollback_me(id); SELECT * FROM absent;' }
+      { version: 13, name: 'broken', sql: 'CREATE TABLE rollback_me(id); SELECT * FROM absent;' }
     ])
   )
-  assert.equal(db.get('PRAGMA user_version').user_version, 8)
+  assert.equal(db.get('PRAGMA user_version').user_version, 12)
   assert.equal(db.get("SELECT name FROM sqlite_schema WHERE name='rollback_me'"), undefined)
 })
 
-test('fixed authenticated queue/state/event endpoints preserve scope and cursor; source mutation fails instead of using stale evidence', async (t) => {
+test('fixed authenticated queue/state/event endpoints preserve scope and cursor; source mutation cannot change task evidence', async (t) => {
   const { chains, repo, scope, source, model } = await fixture(t)
   const server = await startHttpServer('local-fixture-token', {
     chainAction: (action, input, signal) => chains.action(action, input, signal)
@@ -271,10 +277,10 @@ test('fixed authenticated queue/state/event endpoints preserve scope and cursor;
   await writeFile(join(source, 'Changed.java'), 'class Changed {}')
   await chains.action('analyzePending', { ...scope, modelConfigId: 'model' })
   await chains.analysis.waitForIdle()
-  assert.equal(repo.scans.statistics(scope.projectId, scope.runId).failed, 1)
+  assert.equal(repo.scans.statistics(scope.projectId, scope.runId).failed, 0)
   assert.equal(repo.scans.statistics(scope.projectId, scope.runId).safe, 0)
-  assert.ok(model.requests.length <= before + 1)
-  assert.ok(repo.list(scope).paths.some((p) => p.summary.includes('QUERY_SOURCE_CHANGED')))
+  assert.ok(model.requests.length > before)
+  assert.ok(repo.list(scope).paths.every((p) => !p.summary.includes('QUERY_SOURCE_CHANGED')))
 })
 
 test('two SQLite connections claim different pending rows, explicit retry increments attempt and stale result is rejected', async (t) => {

@@ -14,7 +14,9 @@ export async function preprocessJava(
   sourceStamp: string,
   files: { filePath: string; source: string }[],
   signal: AbortSignal,
-  limits: { maxResults?: number; maxDepth?: number; maxNodes?: number; maxPaths?: number } = {}
+  limits: { maxResults?: number; maxDepth?: number; maxNodes?: number; maxPaths?: number } = {},
+  manual?: import('../../shared/code-query-contracts').RiskCandidate,
+  semanticResolver?: (methods: JavaMethod[], calls: JavaCall[]) => Promise<ScanWarning[]>
 ): Promise<ScanOutput> {
   const maxResults = limits.maxResults ?? 100,
     methods: JavaMethod[] = [],
@@ -52,7 +54,9 @@ export async function preprocessJava(
         'Java 语法解析失败或超过解析范围，保留文本 Sink 候选，不补造调用者。'
       )
     }
-    const candidates = findRiskCandidates(file.filePath, file.source, maxResults + 1 - risks.length)
+    const candidates = manual
+      ? []
+      : findRiskCandidates(file.filePath, file.source, maxResults + 1 - risks.length)
     for (const candidate of candidates) {
       if (risks.length >= maxResults) {
         candidateOverflow = true
@@ -61,7 +65,15 @@ export async function preprocessJava(
       risks.push({ candidate, source: file.source, failed })
     }
   }
+  if (manual)
+    risks.push({
+      candidate: manual,
+      source: files.find((f) => f.filePath === manual.filePath)!.source,
+      failed: false
+    })
   resolveCallTargets(methods, calls)
+  if (semanticResolver)
+    warnings.push(...(await semanticResolver(methods, calls)).slice(0, 50 - warnings.length))
   const edgeMap = new Map<string, CallEdge>(),
     sinkUids: string[] = [],
     entryByKey = new Map(methods.map((m) => [m.key, m.entry]))
@@ -78,7 +90,7 @@ export async function preprocessJava(
       calledFilePath: call.target?.filePath ?? null,
       callLine: call.line,
       callColumn: call.column,
-      resolutionStatus: call.target ? 'candidate' : 'unresolved',
+      resolutionStatus: call.semantic ? 'confirmed' : call.target ? 'candidate' : 'unresolved',
       isSink: false,
       ruleId: null,
       arguments: []
@@ -117,7 +129,7 @@ export async function preprocessJava(
       callColumn: call?.column ?? candidate.startColumn,
       isSink: true,
       ruleId: candidate.ruleId,
-      resolutionStatus: 'candidate',
+      resolutionStatus: call?.semantic ? 'confirmed' : 'candidate',
       arguments: candidate.arguments
     }
     const uid = callEdgeUid(runId, edge)

@@ -14,7 +14,8 @@ export async function createManagedSession(
   tools: string[],
   signal: AbortSignal,
   onExtensionError: () => void = () => {},
-  profile: { contextWindow: number; maxTokens: number } = { contextWindow: 8192, maxTokens: 512 }
+  profile: { contextWindow: number; maxTokens: number } = { contextWindow: 8192, maxTokens: 512 },
+  sessionManager?: import('@earendil-works/pi-coding-agent').SessionManager
 ): Promise<CreateAgentSessionResult['session']> {
   const sdk = await waitWithSignal(loadPiSdk(), signal)
   const directory = join(runtime.workDir, randomUUID())
@@ -60,7 +61,7 @@ export async function createManagedSession(
       tools,
       noTools: 'builtin',
       thinkingLevel: 'off',
-      sessionManager: sdk.SessionManager.inMemory(runtime.workDir),
+      sessionManager: sessionManager ?? sdk.SessionManager.inMemory(runtime.workDir),
       settingsManager: sdk.SettingsManager.inMemory({
         retry: { enabled: false },
         compaction: { enabled: false }

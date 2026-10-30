@@ -28,12 +28,18 @@ export default defineConfig(
       '**/.scan-test-data',
       '**/.chains-test-data',
       '**/out-mod03-test',
-      '**/.mod03-test-data'
+      '**/.mod03-test-data',
+      '**/out-templates-test',
+      '**/.templates-test-data',
+      '**/.review-test-data',
+      '**/out-review-test',
+      '**/out-run-test',
+      '**/.run-test-data'
     ]
   },
   tseslint.configs.recommended,
   {
-    files: ['tests/**/*.mjs'],
+    files: ['tests/**/*.mjs', 'scripts/query-*.mjs', 'scripts/manual-lab*.mjs'],
     rules: { '@typescript-eslint/explicit-function-return-type': 'off' }
   },
   eslintPluginReact.configs.flat.recommended,

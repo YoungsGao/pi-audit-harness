@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { isDeepStrictEqual } from 'node:util'
 import { basename, isAbsolute } from 'node:path'
 import { ApiError } from '../../shared/api-error.ts'
@@ -9,6 +9,8 @@ import type {
 } from '../../shared/call-chain-contracts.ts'
 import type { LocalDatabase, Row } from './database.ts'
 import { ScanRepository } from './scan-repository.ts'
+import { appendEvent } from './analysis-events.ts'
+import type { ManualRiskPoint } from '../../shared/input-enhancements'
 import type { ScanSummary } from '../../shared/scan-contracts'
 
 function hash(value: unknown): string {
@@ -83,7 +85,40 @@ export class CallChainRepository {
     this.scans = new ScanRepository(db)
   }
 
-  saveGraph(input: CandidateGraph, summary?: ScanSummary): GraphSaved {
+  manualPoint(projectId: string, runId: string, pathId: string): ManualRiskPoint | null {
+    const row = this.db.get(
+      `SELECT snapshot_id AS snapshotId,file_path AS filePath,line,
+      column_number AS column,function_key AS functionKey,rule_id AS ruleId,note
+      FROM manual_risk_points WHERE project_id=? AND run_id=? AND path_id=?`,
+      projectId,
+      runId,
+      pathId
+    )
+    return row
+      ? {
+          snapshotId: String(row.snapshotId),
+          filePath: String(row.filePath),
+          line: Number(row.line),
+          column: Number(row.column),
+          functionKey: row.functionKey === null ? null : String(row.functionKey),
+          ruleId: String(row.ruleId),
+          note: String(row.note)
+        }
+      : null
+  }
+  saveGraph(
+    input: CandidateGraph,
+    summary?: ScanSummary,
+    manual?: {
+      snapshotId: string
+      filePath: string
+      line: number
+      column: number
+      functionKey: string | null
+      ruleId: string
+      note: string
+    }
+  ): GraphSaved {
     if (
       !text(input.projectId, 80) ||
       !text(input.runId, 80) ||
@@ -180,8 +215,23 @@ export class CallChainRepository {
           existing.rules_version !== input.rulesVersion)
       )
         throw new ApiError('CHAIN_RUN_CONFLICT', '任务绑定的项目、源码或规则版本不一致', 409)
-      if (existing && existing.status !== 'queued')
+      if (existing && existing.status !== 'queued' && !manual)
         throw new ApiError('CHAIN_RUN_CLOSED', '不能向已开始分析的任务追加候选', 409)
+      if (
+        manual &&
+        (tx.get(
+          "SELECT path_id FROM call_paths WHERE run_id=? AND status='analyzing'",
+          input.runId
+        ) ||
+          Number(tx.get('SELECT count(*) AS n FROM call_paths WHERE run_id=?', input.runId)!.n) +
+            paths.length >
+            1000)
+      )
+        throw new ApiError(
+          'MANUAL_RUN_BUSY',
+          '任务正在分析或路径总数超过 1000，请结束后登记或创建新任务',
+          409
+        )
       if (!existing)
         tx.run(
           "INSERT INTO audit_runs (id,project_id,status,source_stamp,rules_version,model_config_id,created_at,updated_at) VALUES (?,?,'queued',?,?,NULL,?,?)",
@@ -230,6 +280,7 @@ export class CallChainRepository {
           JSON.stringify(edge.arguments)
         )
       }
+      let addedPaths = false
       for (const path of paths) {
         if (
           tx.get(
@@ -239,6 +290,7 @@ export class CallChainRepository {
           )
         )
           continue
+        addedPaths = true
         tx.run(
           `INSERT INTO call_paths (path_id,run_id,project_id,path_hash,sink_edge_id,verdict,dangerous,result_summary,created_at,source_ref,rule_id,status,truncated,truncation_reason,updated_at)
           VALUES (?,?,?,?,?,'unknown',NULL,'',?,?,?,'pending',?,?,?)`,
@@ -266,6 +318,64 @@ export class CallChainRepository {
         )
       }
       if (summary) this.scans.finish(tx, input.runId, summary)
+      if (manual) {
+        for (const path of paths) {
+          const old = tx.get(
+            `SELECT * FROM manual_risk_points WHERE run_id=? AND file_path=? AND line=? AND column_number=? AND path_id=?`,
+            input.runId,
+            manual.filePath,
+            manual.line,
+            manual.column,
+            path.pathId
+          )
+          if (old) {
+            if (old.note !== manual.note || old.rule_id !== manual.ruleId)
+              throw new ApiError(
+                'MANUAL_POINT_CONFLICT',
+                '该位置已登记其他调查内容，请查看已有记录或创建新任务',
+                409
+              )
+            continue
+          }
+          tx.run(
+            'INSERT INTO manual_risk_points VALUES (?,?,?,?,?,?,?,?,?,?,?,?)',
+            randomUUID(),
+            input.projectId,
+            input.runId,
+            manual.snapshotId,
+            path.pathId,
+            manual.filePath,
+            manual.line,
+            manual.column,
+            manual.functionKey,
+            manual.ruleId,
+            manual.note,
+            now
+          )
+        }
+        if (addedPaths)
+          tx.run(
+            "UPDATE audit_runs SET status='queued',stage='prepared',finished_at=NULL,error_code=NULL WHERE id=? AND NOT EXISTS (SELECT 1 FROM call_paths WHERE run_id=? AND status='analyzing')",
+            input.runId,
+            input.runId
+          )
+        tx.run(
+          `UPDATE scan_runs SET state=CASE WHEN state='empty' OR EXISTS(SELECT 1 FROM call_paths WHERE run_id=? AND truncated=1) THEN 'partial' ELSE state END,
+          truncated=EXISTS(SELECT 1 FROM call_paths WHERE run_id=? AND truncated=1),
+          candidate_count=(SELECT count(*) FROM call_edges WHERE run_id=? AND is_sink=1) WHERE run_id=?`,
+          input.runId,
+          input.runId,
+          input.runId,
+          input.runId
+        )
+        if (addedPaths)
+          appendEvent(tx, input.projectId, input.runId, null, {
+            type: 'process',
+            status: 'manual_risk_added',
+            summary: '手工风险点已加入统一调查队列',
+            payload: manual
+          })
+      }
       return {
         projectId: input.projectId,
         runId: input.runId,
@@ -341,8 +451,10 @@ export class CallChainRepository {
       input.runId,
       input.pathId
     )
+    const manualPoint = this.manualPoint(input.projectId, input.runId, input.pathId)
     return {
       ...pathFrom(path),
+      ...(manualPoint ? { manualPoint } : {}),
       steps: steps.map((step) => ({
         stepIndex: Number(step.step_index),
         edge: edgeFrom(step),

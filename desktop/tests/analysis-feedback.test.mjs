@@ -192,7 +192,7 @@ test('transient result writes retry at most three times without another Pi reque
   await writeFile(join(h.source, 'Demo.java'), 'class Demo { void changed() {} }')
   h.chains.analysis.start(h.scope.projectId, newRun.runId, newRun.pathIds[0], 'model')
   await h.chains.analysis.waitForIdle()
-  assert.match(
+  assert.doesNotMatch(
     h.repo.detail({ projectId: h.scope.projectId, runId: newRun.runId, pathId: newRun.pathIds[0] })
       .summary,
     /SOURCE_CHANGED/

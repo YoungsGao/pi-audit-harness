@@ -11,6 +11,8 @@ import {
   savedEvidence
 } from '../../../shared/path-detail-view'
 import type { DetailTab } from '../../../shared/path-detail-view'
+import { CallPathGraph } from './CallPathGraph'
+import { HumanReviewPanel } from './HumanReviewPanel'
 
 const checkNames = {
   source: '来源',
@@ -77,11 +79,15 @@ export function CallChainDetail({
   detail,
   tab,
   onTabChange,
+  paths = [],
+  onSelectPath = () => {},
   children
 }: {
   detail: PathDetail
   tab: DetailTab
   onTabChange: (tab: DetailTab) => void
+  paths?: import('../../../shared/scan-contracts').PathSummary[]
+  onSelectPath?: (pathId: string) => void
   children: ReactNode
 }): React.JSX.Element {
   const id = useId()
@@ -91,6 +97,16 @@ export function CallChainDetail({
     steps.some((s) => s.evidence.length || Object.keys(s.propagation).length)
   return (
     <>
+      {detail.manualPoint && (
+        <aside className="input-help" data-testid="manual-risk-provenance">
+          <strong>手工补充的待调查位置</strong>
+          <p>
+            快照 {detail.manualPoint.snapshotId} · {detail.manualPoint.filePath}:
+            {detail.manualPoint.line}:{detail.manualPoint.column}
+          </p>
+          <p>{publicAnalysisText(detail.manualPoint.note)}</p>
+        </aside>
+      )}
       <p className="audit-id" data-testid="detail-path-id">
         {detail.pathId}
       </p>
@@ -162,35 +178,45 @@ export function CallChainDetail({
           {item.id === 'path' && (
             <>
               <h3>调用路径</h3>
-              <p className="muted">
-                按真实步骤编号展示候选调用；函数、文件与行号来自已保存的调用链。
-                进入“分析过程”可查看调试记录或明确发起分析。
-              </p>
-              <ol className="audit-steps">
-                {steps.map((s) => (
-                  <li key={s.stepIndex}>
-                    <strong>
-                      第 {s.stepIndex + 1} 步 · {publicAnalysisText(s.edge.functionName)}
-                    </strong>
-                    <span> → {publicAnalysisText(s.edge.calledFunctionName)}</span>
-                    <p>
-                      {publicAnalysisText(s.edge.filePath)}:{s.edge.callLine}:{s.edge.callColumn} ·{' '}
-                      {s.edge.resolutionStatus} · {s.edge.isSink ? '候选 Sink' : '候选调用'}
-                    </p>
-                    {s.edge.calledFilePath && (
-                      <p>被调用函数文件：{publicAnalysisText(s.edge.calledFilePath)}</p>
-                    )}
-                    {!!s.edge.arguments.length && (
-                      <pre>
-                        {s.edge.arguments
-                          .map((a) => publicAnalysisText(`参数 ${a.index}: ${a.text}`))
-                          .join('\n')}
-                      </pre>
-                    )}
-                  </li>
-                ))}
-              </ol>
-              {!steps.length && <p>没有已保存的路径步骤。</p>}
+              <CallPathGraph
+                key={detail.pathId}
+                detail={detail}
+                paths={paths}
+                onSelectPath={onSelectPath}
+                onEvidence={() => onTabChange('evidence')}
+              />
+              <details className="path-step-list">
+                <summary>查看有序步骤记录</summary>
+                <p className="muted">
+                  按真实步骤编号展示候选调用；函数、文件与行号来自已保存的调用链。
+                  进入“分析过程”可查看调试记录或明确发起分析。
+                </p>
+                <ol className="audit-steps">
+                  {steps.map((s) => (
+                    <li key={s.stepIndex}>
+                      <strong>
+                        第 {s.stepIndex + 1} 步 · {publicAnalysisText(s.edge.functionName)}
+                      </strong>
+                      <span> → {publicAnalysisText(s.edge.calledFunctionName)}</span>
+                      <p>
+                        {publicAnalysisText(s.edge.filePath)}:{s.edge.callLine}:{s.edge.callColumn}{' '}
+                        · {s.edge.resolutionStatus} · {s.edge.isSink ? '候选 Sink' : '候选调用'}
+                      </p>
+                      {s.edge.calledFilePath && (
+                        <p>被调用函数文件：{publicAnalysisText(s.edge.calledFilePath)}</p>
+                      )}
+                      {!!s.edge.arguments.length && (
+                        <pre>
+                          {s.edge.arguments
+                            .map((a) => publicAnalysisText(`参数 ${a.index}: ${a.text}`))
+                            .join('\n')}
+                        </pre>
+                      )}
+                    </li>
+                  ))}
+                </ol>
+                {!steps.length && <p>没有已保存的路径步骤。</p>}
+              </details>
             </>
           )}
           {item.id === 'evidence' && (
@@ -287,6 +313,7 @@ export function CallChainDetail({
           {item.id === 'process' && children}
         </section>
       ))}
+      <HumanReviewPanel key={detail.pathId} detail={detail} />
     </>
   )
 }

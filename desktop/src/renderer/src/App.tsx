@@ -2,6 +2,7 @@ import { SourcesPage } from './components/SourcesPage'
 import { AuditPage } from './components/AuditPage'
 import { ReportsPage } from './components/ReportsPage'
 import { ModelsPage } from './components/ModelsPage'
+import { TemplatesPage } from './components/TemplatesPage'
 import { useEffect, useRef, useState } from 'react'
 import { MetadataCard } from './components/MetadataCard'
 import { StorageCard } from './components/StorageCard'
@@ -23,13 +24,27 @@ const pages = [
     title: '审计分析',
     description: '预处理源码，查看数据库中的调用链、分析状态和路径证据。'
   },
-  { id: 'reports', title: '审计报告', description: '按已保存任务生成、查询并打开 HTML 报告。' }
+  {
+    id: 'templates',
+    title: '审计模板',
+    description: '编辑、预览或导入审计知识文档；创建任务时按版本选择。'
+  },
+  {
+    id: 'reports',
+    title: '审计报告',
+    description: '筛选已保存结果，保留独立人工结论，生成 HTML 或导出 JSON。'
+  }
 ] as const
 
 type PageId = (typeof pages)[number]['id']
 
 function PageIcon({ page }: { page: PageId }): React.JSX.Element {
   const paths: Record<PageId, React.JSX.Element> = {
+    templates: (
+      <>
+        <path d="M5 3h14v18H5ZM8 7h8M8 11h8M8 15h5" />
+      </>
+    ),
     models: (
       <>
         <path d="M4 7h16M4 17h16" />
@@ -160,7 +175,7 @@ function App(): React.JSX.Element {
             <circle cx="20" cy="29" r="4" />
           </svg>
           <div className="brand-copy">
-            <div className="brand">Pi Audit Harness</div>
+            <div className="brand">pi-audit-harness</div>
             <p>源码审计工作台</p>
           </div>
         </div>
@@ -209,6 +224,8 @@ function App(): React.JSX.Element {
               <SourcesPage />
               <MetadataCard />
             </>
+          ) : pageId === 'templates' ? (
+            <TemplatesPage />
           ) : pageId === 'analysis' ? (
             <AuditPage />
           ) : (

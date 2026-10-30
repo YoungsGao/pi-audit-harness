@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { auditActions, isAuditData } from '../shared/audit-validation.ts'
+import { runControlInput } from '../shared/run-contracts.ts'
 import type { AuditAction, AuditData } from '../shared/scan-contracts'
 import type { ApiResult } from '../shared/service-protocol'
 
@@ -20,6 +21,8 @@ export async function auditRequest(
   })
   if (!auditActions.includes(action)) return failed()
   try {
+    if (action === 'stop' || action === 'resume' || action === 'recovery')
+      runControlInput(action, input)
     const response = await fetch(`http://127.0.0.1:${port}/chains/${action}`, {
       method: 'POST',
       headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
@@ -28,7 +31,8 @@ export async function auditRequest(
       signal: AbortSignal.timeout(action === 'prepare' ? 90000 : 10000)
     })
     const raw = await response.text()
-    if (raw.length > 1000000) return failed()
+    // 2000 项快照清单可包含较长相对路径；仍单独设置有界响应上限。
+    if (raw.length > (action === 'snapshot' ? 20 * 1024 * 1024 : 1000000)) return failed()
     const body = JSON.parse(raw)
     if (
       body?.ok === false &&

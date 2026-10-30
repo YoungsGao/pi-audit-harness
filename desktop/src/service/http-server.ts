@@ -18,6 +18,16 @@ export interface RunningHttpServer {
 }
 
 export interface LocalApi {
+  reviewAction?: (
+    action: import('../shared/review-contracts').ReviewAction,
+    input: unknown,
+    signal: AbortSignal
+  ) => Promise<unknown>
+  templateAction?: (
+    action: import('../shared/template-contracts').TemplateAction,
+    input: unknown,
+    signal: AbortSignal
+  ) => Promise<unknown>
   reportAction?: (action: ReportAction, input: unknown, signal: AbortSignal) => Promise<unknown>
   analyzeStream?: AnalyzeStreamApi
   getRules?: () => RuleCatalog
@@ -95,9 +105,80 @@ export async function startHttpServer(
         send(200, successResult(context, api.getRules()))
         return
       }
+      const templateRoutes = ['list', 'save', 'import', 'project', 'saveProject', 'run'].map(
+        (action) => '/templates/' + action
+      )
       if (
         request.method === 'POST' &&
-        ['/reports/generate', '/reports/list', '/reports/file'].includes(request.url ?? '')
+        ['/reviews/get', '/reviews/save', '/reviews/source'].includes(request.url ?? '')
+      ) {
+        if (!api.reviewAction) throw new ApiError('REVIEW_NOT_READY', '复核服务尚未就绪', 503)
+        if (!request.headers['content-type']?.toLowerCase().startsWith('application/json'))
+          throw new ApiError('REVIEW_INVALID_INPUT', '复核请求必须为JSON', 415)
+        const chunks: Buffer[] = []
+        let size = 0
+        for await (const chunk of request) {
+          size += chunk.length
+          if (size > 32768) throw new ApiError('REVIEW_INVALID_INPUT', '复核请求超过32KiB', 413)
+          chunks.push(chunk)
+        }
+        let value: unknown
+        try {
+          value = JSON.parse(Buffer.concat(chunks).toString('utf8'))
+        } catch {
+          throw new ApiError('REVIEW_INVALID_INPUT', '复核JSON无效', 400)
+        }
+        send(
+          200,
+          successResult(
+            context,
+            await api.reviewAction(
+              request.url!.slice(
+                '/reviews/'.length
+              ) as import('../shared/review-contracts').ReviewAction,
+              value,
+              controller.signal
+            )
+          )
+        )
+        return
+      }
+      if (request.method === 'POST' && templateRoutes.includes(request.url ?? '')) {
+        if (!api.templateAction) throw new ApiError('TEMPLATE_NOT_READY', '模板服务尚未就绪', 503)
+        if (!request.headers['content-type']?.toLowerCase().startsWith('application/json'))
+          throw new ApiError('TEMPLATE_INPUT_INVALID', '模板请求必须为 JSON', 415)
+        const chunks: Buffer[] = []
+        let size = 0
+        for await (const chunk of request) {
+          size += chunk.length
+          if (size > 128 * 1024)
+            throw new ApiError('TEMPLATE_INPUT_INVALID', '模板请求超过 128KiB', 413)
+          chunks.push(chunk)
+        }
+        let value: unknown
+        try {
+          value = JSON.parse(Buffer.concat(chunks).toString('utf8'))
+        } catch {
+          throw new ApiError('TEMPLATE_INPUT_INVALID', '模板请求 JSON 无效', 400)
+        }
+        const action = request.url!.slice(
+          '/templates/'.length
+        ) as import('../shared/template-contracts').TemplateAction
+        send(
+          200,
+          successResult(context, await api.templateAction(action, value, controller.signal))
+        )
+        return
+      }
+      if (
+        request.method === 'POST' &&
+        [
+          '/reports/generate',
+          '/reports/list',
+          '/reports/file',
+          '/reports/preview',
+          '/reports/export'
+        ].includes(request.url ?? '')
       ) {
         if (!api.reportAction) throw new ApiError('REPORT_NOT_READY', '报告服务尚未接入', 503)
         if (!request.headers['content-type']?.toLowerCase().startsWith('application/json'))
@@ -119,8 +200,15 @@ export async function startHttpServer(
         send(200, successResult(context, await api.reportAction(action, value, controller.signal)))
         return
       }
-      const codeRoutes = ['/code/search', '/code/read', '/code/risks']
+      const codeRoutes = ['/code/search', '/code/read', '/code/risks', '/code/query']
       const chainRoutes = [
+        '/chains/stop',
+        '/chains/recovery',
+        '/chains/resume',
+        '/chains/snapshot',
+        '/chains/disclosure',
+        '/chains/authorize',
+        '/chains/manualRisk',
         '/chains/prepare',
         '/chains/list',
         '/chains/detail',

@@ -7,8 +7,14 @@ import { builtinRules } from '../rules/builtin.ts'
 import type { EventInput, QueueAccepted } from '../../shared/agent-contracts'
 import { validateTaint, reconcileTaint } from './taint-validation.ts'
 import { retryWrite } from '../storage/retry-write.ts'
+import type { RecoveryExecution } from './recovery.ts'
 
 export interface ReviewInput {
+  recovery?: RecoveryExecution
+  reviewConfig?: import('../../shared/template-contracts').RunReviewConfig
+  authorizeModel?: (model: Readonly<import('../../shared/pi-contracts').ModelConfig>) => void
+  observedModel?: (modelId: string) => void
+  manualPoint?: unknown
   projectId: string
   runId: string
   pathId: string
@@ -88,6 +94,8 @@ export class PathAnalysisService {
   private readonly reviewer: PathReviewer
   private readonly closing = new AbortController()
   private active?: Promise<void>
+  private activeScope?: { projectId: string; runId: string }
+  private runCancellation?: AbortController
   private readonly agentMode: boolean
   private persistenceFailure?: { projectId: string; runId: string; pathId: string }
   assertPersistence(projectId: string, runId: string, pathId?: string): void {
@@ -108,6 +116,16 @@ export class PathAnalysisService {
     if (this.persistenceFailure)
       this.assertPersistence(this.persistenceFailure.projectId, this.persistenceFailure.runId)
   }
+  private finishActive(projectId: string, runId: string): void {
+    try {
+      this.repo.scans.recovery.settle({ projectId, runId })
+    } catch {
+      this.persistenceFailure ??= { projectId, runId, pathId: '' }
+    }
+    this.active = undefined
+    this.activeScope = undefined
+    this.runCancellation = undefined
+  }
   constructor(
     repo: CallChainRepository,
     query: CodeQueryService,
@@ -123,32 +141,96 @@ export class PathAnalysisService {
     this.assertWritable()
     if (this.closing.signal.aborted) throw new ApiError('ANALYSIS_STOPPED', '分析服务已停止', 503)
     if (this.active) throw new ApiError('ANALYSIS_BUSY', '已有路径正在分析，请等待结束', 409, true)
+    this.repo.scans.recovery.assertStart({ projectId, runId })
     const path = this.repo.detail({ projectId, runId, pathId }) as unknown as PathDetail
     if (path.steps.length > 16)
       throw new ApiError('ANALYSIS_LIMIT', '当前单路径分析最多读取 16 步，请缩小展开深度', 413)
-    const attempt = this.repo.scans.claim(projectId, runId, pathId, modelConfigId)
-    this.active = this.review({ projectId, runId, pathId, modelConfigId, path }, attempt).finally(
-      () => {
-        this.active = undefined
+    this.repo.scans.disclosure.require(projectId, runId, modelConfigId)
+    if (this.agentMode)
+      this.repo.scans.recovery.binding({ projectId, runId }, pathId, modelConfigId)
+    let execution: RecoveryExecution | undefined
+    const attempt = this.repo.scans.claim(
+      projectId,
+      runId,
+      pathId,
+      modelConfigId,
+      (_path, claimedAttempt) => {
+        if (this.agentMode)
+          execution = this.repo.scans.recovery.begin(
+            { projectId, runId },
+            pathId,
+            modelConfigId,
+            claimedAttempt,
+            false
+          )
+        else this.repo.scans.recovery.setState({ projectId, runId }, 'running')
       }
     )
+    this.runCancellation = new AbortController()
+    this.activeScope = { projectId, runId }
+    this.active = this.review(
+      { projectId, runId, pathId, modelConfigId, path },
+      attempt,
+      execution
+    ).finally(() => {
+      this.finishActive(projectId, runId)
+    })
     return { projectId, runId, pathId, status: 'analyzing' }
   }
   startPending(
     projectId: string,
     runId: string,
     modelConfigId: string,
-    maxPaths = 10
+    maxPaths = 10,
+    recoveryPathId?: string
   ): QueueAccepted {
     this.assertWritable()
     if (this.closing.signal.aborted) throw new ApiError('ANALYSIS_STOPPED', '分析服务已停止', 503)
     if (this.active) throw new ApiError('ANALYSIS_BUSY', '已有路径正在分析，请等待结束', 409, true)
+    this.repo.scans.recovery.assertStart({ projectId, runId })
     if (!Number.isInteger(maxPaths) || maxPaths < 1 || maxPaths > 100)
       throw new ApiError('QUERY_INVALID_INPUT', '每次队列最多处理 100 条路径', 400)
-    const first = this.repo.scans.claimNext(projectId, runId, modelConfigId)
+    this.repo.scans.disclosure.require(projectId, runId, modelConfigId)
+    let executionForItem: RecoveryExecution | undefined
+    const onClaim = (pathId: string, attempt: number): void => {
+      executionForItem = this.agentMode
+        ? this.repo.scans.recovery.begin(
+            { projectId, runId },
+            pathId,
+            modelConfigId,
+            attempt,
+            pathId === recoveryPathId &&
+              !!this.repo.scans.recovery.db.get(
+                'SELECT path_id FROM path_recovery WHERE path_id=?',
+                pathId
+              )
+          )
+        : undefined
+      if (!this.agentMode) this.repo.scans.recovery.setState({ projectId, runId }, 'running')
+      if (executionForItem && pathId === recoveryPathId && !executionForItem.resuming)
+        this.repo.scans.recovery.db.run(
+          'UPDATE path_recovery SET receipt_json=? WHERE path_id=?',
+          JSON.stringify({
+            mode: 'restart',
+            checkpointId: null,
+            reusedSteps: [],
+            reason: '从已提交路径边界继续，先前完成路径不重复调查',
+            createdAt: new Date().toISOString()
+          }),
+          pathId
+        )
+    }
+    const first = recoveryPathId
+      ? {
+          pathId: recoveryPathId,
+          attempt: this.repo.scans.claim(projectId, runId, recoveryPathId, modelConfigId, onClaim)
+        }
+      : this.repo.scans.claimNext(projectId, runId, modelConfigId, onClaim)
     if (!first)
       throw new ApiError('ANALYSIS_EMPTY_QUEUE', '没有 pending 路径；失败路径需明确单独重试', 409)
     const deadline = Date.now() + 10 * 60 * 1000
+    this.runCancellation = new AbortController()
+    this.activeScope = { projectId, runId }
     this.active = (async () => {
       let item: typeof first | null = first
       for (let index = 0; item && index < maxPaths; index++) {
@@ -157,9 +239,11 @@ export class PathAnalysisService {
           runId,
           pathId: item.pathId
         }) as unknown as PathDetail
+        const execution = executionForItem
         await this.review(
           { projectId, runId, modelConfigId, pathId: item.pathId, path },
-          item.attempt
+          item.attempt,
+          execution
         )
         if (this.persistenceFailure) break
         const final = this.repo.detail({
@@ -171,11 +255,12 @@ export class PathAnalysisService {
           final.status === 'failed' ||
           this.repo.scans.state(projectId, runId).errorCode !== null ||
           this.closing.signal.aborted ||
+          this.runCancellation?.signal.aborted ||
           Date.now() >= deadline ||
           index + 1 >= maxPaths
         )
           break
-        item = this.repo.scans.claimNext(projectId, runId, modelConfigId)
+        item = this.repo.scans.claimNext(projectId, runId, modelConfigId, onClaim)
       }
     })()
       .catch(() => {
@@ -191,23 +276,25 @@ export class PathAnalysisService {
         }
       })
       .finally(() => {
-        this.active = undefined
+        this.finishActive(projectId, runId)
       })
     return { projectId, runId, status: 'running', maxPaths }
   }
   private async review(
     base: Pick<ReviewInput, 'projectId' | 'runId' | 'pathId' | 'modelConfigId' | 'path'>,
-    attempt: number
+    attempt: number,
+    execution?: RecoveryExecution
   ): Promise<void> {
     const signal = AbortSignal.any([
       this.closing.signal,
+      ...(this.runCancellation ? [this.runCancellation.signal] : []),
       AbortSignal.timeout(this.agentMode ? 120000 : 90000)
     ])
     try {
       if (base.path.steps.length === 0 || base.path.steps.length > 16)
         throw new ApiError('ANALYSIS_LIMIT', '单路径必须包含 1 到 16 步', 413)
       const run = this.repo.scans.state(base.projectId, base.runId)
-      if (this.query.project(base.projectId).sourceStamp !== run.sourceStamp)
+      if (!execution && this.query.project(base.projectId).sourceStamp !== run.sourceStamp)
         throw new ApiError(
           'ANALYSIS_SOURCE_CHANGED',
           '任务源码版本与登记版本不一致，请重新预处理',
@@ -222,6 +309,7 @@ export class PathAnalysisService {
           'read',
           {
             projectId: base.projectId,
+            runId: base.runId,
             filePath: step.edge.filePath,
             startLine: Math.max(1, step.edge.callLine - 5),
             endLine: Math.max(step.edge.callLine, ...step.edge.arguments.map((a) => a.endLine))
@@ -239,14 +327,16 @@ export class PathAnalysisService {
             base.projectId,
             step.edge.filePath,
             step.edge.callerKey,
-            signal
+            signal,
+            base.runId
           )
           const callee = step.edge.calledFilePath
             ? await this.query.methodContext(
                 base.projectId,
                 step.edge.calledFilePath,
                 step.edge.calleeKey,
-                signal
+                signal,
+                base.runId
               )
             : null
           const ranges = [caller ?? item, ...(callee ? [callee] : [])]
@@ -264,17 +354,40 @@ export class PathAnalysisService {
       }
       if (!this.agentMode) for (const step of base.path.steps) await readStep(step.stepIndex)
       const listing = this.repo.list({ projectId: base.projectId, runId: base.runId })
+      const disclosure = this.repo.scans.disclosure.require(
+        base.projectId,
+        base.runId,
+        base.modelConfigId
+      )
+      let transmissionId = ''
       const input: ReviewInput = {
+        ...(execution ? { recovery: execution } : {}),
         ...base,
+        reviewConfig: this.repo.scans.templates.run(base.projectId, base.runId),
         rulesVersion: String(listing.rulesVersion),
         rule: builtinRules.rules.find((r) => r.id === base.path.ruleId),
         evidence,
         readStep,
-        recordEvent: (event) =>
+        manualPoint: this.repo.manualPoint(base.projectId, base.runId, base.pathId),
+        authorizeModel: (model) => {
+          execution?.assertLive()
+          transmissionId = this.repo.scans.disclosure.beforeSend(
+            disclosure,
+            base.pathId,
+            attempt,
+            model
+          )
+        },
+        observedModel: (modelId) => {
+          if (transmissionId) this.repo.scans.disclosure.observed(transmissionId, modelId)
+        },
+        recordEvent: (event) => {
+          execution?.assertLive()
           this.repo.scans.events.append(base.projectId, base.runId, base.pathId, {
             ...event,
             attemptId: attempt
           })
+        }
       }
       if (input.rulesVersion !== builtinRules.version)
         throw new ApiError('ANALYSIS_RULES_CHANGED', '历史规则版本不匹配，请重新预处理', 409)
@@ -293,8 +406,9 @@ export class PathAnalysisService {
         result.verdict === 'dangerous'
       )
         result.verdict = 'unknown'
-      await retryWrite(() =>
-        this.repo.scans.complete(
+      await retryWrite(() => {
+        execution?.assertLive()
+        return this.repo.scans.complete(
           base.pathId,
           attempt,
           result,
@@ -302,14 +416,20 @@ export class PathAnalysisService {
           base.path.truncated ||
             base.path.steps.some((s) => s.edge.resolutionStatus === 'unresolved')
         )
-      )
+      })
     } catch (error) {
       try {
         await retryWrite(() =>
           this.repo.scans.analysisFailed(
             base.pathId,
             attempt,
-            error instanceof ApiError ? error.code : 'ANALYSIS_FAILED'
+            this.closing.signal.aborted
+              ? 'RUN_INTERRUPTED'
+              : this.runCancellation?.signal.aborted
+                ? 'RUN_USER_STOP'
+                : error instanceof ApiError
+                  ? error.code
+                  : 'ANALYSIS_FAILED'
           )
         )
       } catch {
@@ -326,6 +446,46 @@ export class PathAnalysisService {
   async close(): Promise<void> {
     this.closing.abort()
     await this.active
+  }
+  stop(projectId: string, runId: string): import('../../shared/run-contracts').RunRecoveryView {
+    const scope = { projectId, runId },
+      active =
+        !!this.active &&
+        this.activeScope?.projectId === projectId &&
+        this.activeScope.runId === runId
+    this.repo.scans.recovery.requestStop(scope, active)
+    if (active && this.repo.scans.recovery.control(scope).state === 'stop_requested') {
+      this.runCancellation?.abort(new ApiError('RUN_USER_STOP', '用户请求停止当前任务', 409))
+      this.repo.scans.recovery.setState(scope, 'waiting_external')
+    }
+    return this.repo.scans.recovery.view(scope)
+  }
+  recovery(projectId: string, runId: string): import('../../shared/run-contracts').RunRecoveryView {
+    return this.repo.scans.recovery.view({ projectId, runId })
+  }
+  resume(
+    projectId: string,
+    runId: string,
+    key: string,
+    maxPaths: number
+  ): import('../../shared/run-contracts').RunRecoveryView {
+    this.assertWritable()
+    if (this.active) throw new ApiError('ANALYSIS_BUSY', '已有执行正在退出或运行，请等待', 409)
+    const scope = { projectId, runId },
+      plan = this.recovery(projectId, runId)
+    if (plan.recoveryKey !== key)
+      throw new ApiError('RUN_PLAN_CHANGED', '恢复清单已变化，请刷新后核对', 409)
+    if (!plan.canResume || !plan.candidatePathId || !plan.modelConfigId)
+      throw new ApiError('RUN_RECOVERY_BLOCKED', '当前任务不满足恢复条件，请查看恢复说明', 409)
+    this.repo.scans.disclosure.require(projectId, runId, plan.modelConfigId)
+    this.repo.scans.recovery.setState(scope, 'idle')
+    try {
+      this.startPending(projectId, runId, plan.modelConfigId, maxPaths, plan.candidatePathId)
+    } catch (error) {
+      this.repo.scans.recovery.setState(scope, plan.state)
+      throw error
+    }
+    return this.recovery(projectId, runId)
   }
   async waitForIdle(): Promise<void> {
     await this.active

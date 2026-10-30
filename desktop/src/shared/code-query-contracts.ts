@@ -42,4 +42,4 @@ export interface RiskQueryResult {
   truncated: boolean
 }
 
-export type CodeQueryAction = 'search' | 'read' | 'risks'
+export type CodeQueryAction = 'search' | 'read' | 'risks' | 'query'

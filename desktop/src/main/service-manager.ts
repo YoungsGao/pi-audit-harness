@@ -2,6 +2,7 @@ import { sourceRequest } from './source-client'
 import { connectAnalyze } from './analyze-stream-client'
 import type { AnalyzeRequest, StreamHandle, StreamNotice } from '../shared/sse-contracts'
 import { auditRequest } from './audit-client'
+import { templateRequest } from './template-client'
 import type { AuditAction, AuditData } from '../shared/scan-contracts'
 import type { SourceAction } from './source-client'
 import { utilityProcess } from 'electron'
@@ -18,8 +19,10 @@ import { checkLocalHealth, postModelTest } from './service-client'
 import { ApiError } from '../shared/api-error.ts'
 import { isPiRuntimeInfo } from '../shared/pi-contracts.ts'
 import { randomUUID } from 'node:crypto'
-import { shell } from 'electron'
+import { shell, dialog } from 'electron'
+import { saveReportCopy } from './report-export'
 import { reportRequest } from './report-client'
+import { reviewRequest } from './review-client'
 import type { ReportAction, ReportData, ReportScope } from '../shared/report-contracts'
 import { verifyReportFile } from '../service/reports/files'
 import type { ApiResult } from '../shared/service-protocol'
@@ -58,7 +61,23 @@ export class ServiceManager {
     private readonly onChange: (status: ServiceStatus) => void,
     private readonly getDataRoot: () => string,
     private readonly reportOpener: (path: string) => Promise<string> = (path) =>
-      shell.openPath(path)
+      shell.openPath(path),
+    private readonly reportDestination: (
+      file: import('../shared/report-contracts').ReportFile
+    ) => Promise<string | null> = async (file) => {
+      const selected = await dialog.showSaveDialog({
+        title: '另存审计结果',
+        defaultPath: `pi-audit-harness-${file.reportId}.${file.format}`,
+        filters: [
+          {
+            name: file.format === 'json' ? 'JSON 审计结果' : 'HTML 审计报告',
+            extensions: [file.format]
+          }
+        ],
+        properties: ['showOverwriteConfirmation']
+      })
+      return selected.canceled ? null : (selected.filePath ?? null)
+    }
   ) {}
 
   getStatus(): ServiceStatus {
@@ -228,6 +247,19 @@ export class ServiceManager {
     return this.getStatus()
   }
 
+  async templates(
+    action: import('../shared/template-contracts').TemplateAction,
+    input: unknown
+  ): Promise<ApiResult<import('../shared/template-contracts').TemplateData>> {
+    const connection = this.connection
+    if (!connection || this.status.status !== 'ready')
+      return {
+        ok: false,
+        requestId: randomUUID(),
+        error: { code: 'SERVICE_NOT_READY', message: '本地服务尚未就绪', retryable: true }
+      }
+    return templateRequest(connection.port, connection.token, action, input)
+  }
   async audit(action: AuditAction, input: unknown): Promise<ApiResult<AuditData>> {
     const connection = this.connection
     if (!connection || this.status.status !== 'ready')
@@ -248,6 +280,19 @@ export class ServiceManager {
       }
     return reportRequest(connection.port, connection.token, action, input)
   }
+  async review(
+    action: import('../shared/review-contracts').ReviewAction,
+    input: unknown
+  ): Promise<ApiResult<import('../shared/review-contracts').ReviewData>> {
+    const connection = this.connection
+    if (!connection || this.status.status !== 'ready')
+      return {
+        ok: false,
+        requestId: randomUUID(),
+        error: { code: 'SERVICE_NOT_READY', message: '本地服务尚未就绪', retryable: true }
+      }
+    return reviewRequest(connection.port, connection.token, action, input)
+  }
   async openReport(input: unknown): Promise<ApiResult<ReportScope & { reportId: string }>> {
     const result = await this.report('file', input)
     if (!result.ok) return result
@@ -259,12 +304,15 @@ export class ServiceManager {
       }
     try {
       const file = {
+        format: result.data.format,
         projectId: result.data.projectId,
         runId: result.data.runId,
         reportId: result.data.reportId,
         filePath: result.data.filePath,
         sha256: result.data.sha256
       }
+      if (file.format !== 'html')
+        throw new ApiError('REPORT_FORMAT_UNSUPPORTED', 'JSON结果请使用另存文件操作', 400)
       await verifyReportFile(this.getDataRoot(), file)
       const error = await this.reportOpener(file.filePath)
       if (error)
@@ -281,6 +329,54 @@ export class ServiceManager {
         error: {
           code: error instanceof ApiError ? error.code : 'REPORT_OPEN_FAILED',
           message: error instanceof ApiError ? error.message : '无法打开已登记报告',
+          retryable: false
+        }
+      }
+    }
+  }
+  async saveReport(
+    input: unknown
+  ): Promise<ApiResult<import('../shared/report-contracts').ReportSaveResult>> {
+    const result = await this.report('file', input)
+    if (!result.ok) return result
+    if (!('sha256' in result.data) || !('reportId' in result.data) || !result.data.sha256)
+      return {
+        ok: false,
+        requestId: result.requestId,
+        error: { code: 'REPORT_UNSAFE_FILE', message: '报告文件信息无效', retryable: false }
+      }
+    const file: import('../shared/report-contracts').ReportFile = {
+      projectId: result.data.projectId,
+      runId: result.data.runId,
+      reportId: result.data.reportId,
+      filePath: result.data.filePath,
+      sha256: result.data.sha256,
+      format: result.data.format
+    }
+    try {
+      const destination = await this.reportDestination(file)
+      const savedPath = destination
+        ? await saveReportCopy(this.getDataRoot(), file, destination)
+        : null
+      return {
+        ok: true,
+        requestId: result.requestId,
+        data: {
+          projectId: file.projectId,
+          runId: file.runId,
+          reportId: file.reportId,
+          cancelled: !destination,
+          savedPath
+        }
+      }
+    } catch (error) {
+      return {
+        ok: false,
+        requestId: result.requestId,
+        error: {
+          code: error instanceof ApiError ? error.code : 'REPORT_SAVE_FAILED',
+          message:
+            error instanceof ApiError ? error.message : '文件另存未完成，请检查目录权限并重试',
           retryable: false
         }
       }

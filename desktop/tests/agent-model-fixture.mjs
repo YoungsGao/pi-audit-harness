@@ -3,7 +3,8 @@ import { createServer } from 'node:http'
 export async function createAgentModelFixture({
   mode = 'finish',
   delayMs = 0,
-  supportPing = false
+  supportPing = false,
+  beforeReply
 } = {}) {
   const requests = []
   const server = createServer(async (request, response) => {
@@ -11,6 +12,7 @@ export async function createAgentModelFixture({
     for await (const part of request) parts.push(part)
     const body = JSON.parse(Buffer.concat(parts).toString('utf8'))
     requests.push(body)
+    await beforeReply?.(body)
     if (mode === 'unavailable') {
       response.writeHead(503, { 'Content-Type': 'application/json' })
       response.end(JSON.stringify({ error: { message: 'local fixture temporarily unavailable' } }))
@@ -55,6 +57,7 @@ export async function createAgentModelFixture({
     const indexes = new Set(tools.map((e) => e.stepIndex))
     const stepIndex = context.steps.find((s) => !indexes.has(s.stepIndex))?.stepIndex
     await new Promise((r) => setTimeout(r, delayMs))
+    if (response.destroyed) return
     if (mode === 'hold') return
     response.writeHead(200, { 'Content-Type': 'text/event-stream' })
     const chunk = (delta, finish_reason) => ({
@@ -166,6 +169,9 @@ export async function createAgentModelFixture({
   return {
     baseUrl: `http://127.0.0.1:${server.address().port}/v1`,
     requests,
+    setMode(next) {
+      mode = next
+    },
     async close() {
       server.closeAllConnections()
       await new Promise((r) => server.close(r))

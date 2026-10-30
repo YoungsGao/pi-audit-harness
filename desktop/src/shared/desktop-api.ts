@@ -29,10 +29,23 @@ export interface ServiceStatus {
 }
 
 export interface DesktopApi {
+  reviews: (
+    action: import('./review-contracts').ReviewAction,
+    input: unknown
+  ) => Promise<ApiResult<import('./review-contracts').ReviewData>>
+  templates: (
+    action: Exclude<import('./template-contracts').TemplateAction, 'import'>,
+    input: unknown
+  ) => Promise<ApiResult<import('./template-contracts').TemplateData>>
+  importTemplateDocument: (
+    kind: 'file' | 'directory'
+  ) => Promise<ApiResult<import('./template-contracts').TemplateImport> | null>
+  openHelpLink: (id: import('./help-links').HelpLink) => Promise<void>
   reports: (
-    action: 'generate' | 'list',
+    action: Exclude<import('./report-contracts').ReportAction, 'file'>,
     input: unknown
   ) => Promise<ApiResult<import('./report-contracts').ReportData>>
+  saveReport: (input: unknown) => Promise<ApiResult<import('./report-contracts').ReportSaveResult>>
   openReport: (
     input: unknown
   ) => Promise<ApiResult<import('./report-contracts').ReportScope & { reportId: string }>>

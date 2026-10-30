@@ -4,6 +4,9 @@ import type { LocalDatabase, SqlSession } from './database.ts'
 import { AnalysisEventRepository, appendEvent } from './analysis-events.ts'
 import type { RunState } from '../../shared/agent-contracts'
 import { createStreamSession, StreamRepository } from './stream-events.ts'
+import { DisclosureRepository } from './disclosure-repository.ts'
+import { TemplateRepository } from './template-repository.ts'
+import { RunRecoveryStore } from '../chains/recovery.ts'
 
 export interface ReviewResult {
   verdict: Verdict | 'invalid'
@@ -16,15 +19,28 @@ export interface ReviewResult {
   } & Partial<import('../../shared/taint-contracts').TaintReview>)[]
 }
 export class ScanRepository {
+  readonly recovery: RunRecoveryStore
+  readonly templates: TemplateRepository
+  readonly disclosure: import('./disclosure-repository.ts').DisclosureRepository
   private readonly db: LocalDatabase
   readonly events: AnalysisEventRepository
   readonly streams: StreamRepository
   constructor(db: LocalDatabase) {
     this.db = db
+    this.recovery = new RunRecoveryStore(db)
+    this.templates = new TemplateRepository(db)
+    this.disclosure = new DisclosureRepository(db)
     this.events = new AnalysisEventRepository(db)
     this.streams = new StreamRepository(db)
   }
-  begin(projectId: string, runId: string, sourceStamp: string, rulesVersion: string): void {
+  begin(
+    projectId: string,
+    runId: string,
+    sourceStamp: string,
+    rulesVersion: string,
+    templateRefs: unknown = [],
+    projectReviewRevision?: unknown
+  ): void {
     const now = new Date().toISOString()
     this.db.transaction((tx) => {
       tx.run(
@@ -36,6 +52,7 @@ export class ScanRepository {
         now,
         now
       )
+      this.templates.freeze(tx, projectId, runId, templateRefs, projectReviewRevision)
       tx.run(
         "INSERT INTO scan_runs (run_id,project_id,state,started_at) VALUES (?,?,'scanning',?)",
         runId,
@@ -155,14 +172,21 @@ export class ScanRepository {
       )
     } as ScanStatistics
   }
-  claim(projectId: string, runId: string, pathId: string, modelId: string): number {
-    return this.claimWork(projectId, runId, pathId, modelId)!.attempt
+  claim(
+    projectId: string,
+    runId: string,
+    pathId: string,
+    modelId: string,
+    onClaim?: (pathId: string, attempt: number) => void
+  ): number {
+    return this.claimWork(projectId, runId, pathId, modelId, onClaim)!.attempt
   }
   private claimWork(
     projectId: string,
     runId: string,
     requestedPath: string | null,
-    modelId: string
+    modelId: string,
+    onClaim?: (pathId: string, attempt: number) => void
   ): { pathId: string; attempt: number } | null {
     return this.db.transaction((tx) => {
       const selected = requestedPath
@@ -225,6 +249,7 @@ export class ScanRepository {
         runId
       )
       createStreamSession(tx, projectId, runId, pathId, attempt, modelId)
+      onClaim?.(pathId, attempt)
       appendEvent(tx, projectId, runId, pathId, {
         type: 'process',
         status: 'analyzing',
@@ -254,6 +279,15 @@ export class ScanRepository {
         attempt
       )
       if (!current) throw new ApiError('ANALYSIS_STALE', '旧分析尝试不能覆盖当前路径', 409)
+      const guard = tx.get('SELECT state,attempt FROM path_recovery WHERE path_id=?', pathId)
+      const control = tx.get('SELECT state FROM run_controls WHERE run_id=?', current.run_id)
+      if (
+        ['stop_requested', 'waiting_external', 'stopped', 'interrupted'].includes(
+          String(control?.state)
+        ) ||
+        (guard && (guard.attempt !== attempt || guard.state !== 'running'))
+      )
+        throw new ApiError('RUN_USER_STOP', '停止屏障或新执行已阻止旧结果提交', 409)
       const verdict =
         result.verdict === 'invalid' || (uncertain && result.verdict === 'safe')
           ? 'unknown'
@@ -301,6 +335,12 @@ export class ScanRepository {
         pathId,
         attempt
       )
+      tx.run(
+        "UPDATE path_recovery SET state='completed',updated_at=? WHERE path_id=? AND attempt=?",
+        now,
+        pathId,
+        attempt
+      )
       this.refreshRun(tx, String(current.run_id))
       const project = tx.get('SELECT project_id FROM audit_runs WHERE id=?', current.run_id)!
       appendEvent(tx, String(project.project_id), String(current.run_id), pathId, {
@@ -329,19 +369,39 @@ export class ScanRepository {
         attempt
       )
       if (!current) return
+      const control = tx.get('SELECT state FROM run_controls WHERE run_id=?', current.run_id)
+      const interrupted = code === 'RUN_INTERRUPTED'
+      const userStop =
+        code === 'RUN_USER_STOP' ||
+        ['stop_requested', 'waiting_external', 'stopped'].includes(String(control?.state))
+      const finalCode = userStop ? 'RUN_USER_STOP' : interrupted ? 'ANALYSIS_INTERRUPTED' : code
       tx.run(
         "UPDATE path_attempts SET phase='failed',error_code=?,finished_at=? WHERE path_id=? AND attempt=?",
-        code,
+        finalCode,
         new Date().toISOString(),
         pathId,
         attempt
       )
       tx.run(
         "UPDATE call_paths SET status=?,verdict='unknown',dangerous=NULL,result_summary=?,updated_at=? WHERE path_id=?",
-        /AGENT_(?:NO_PROGRESS|ROUND_LIMIT|TOOL_LIMIT|REQUEST_LIMIT|EVIDENCE_LIMIT)/.test(code)
+        userStop ||
+          interrupted ||
+          /AGENT_(?:NO_PROGRESS|ROUND_LIMIT|TOOL_LIMIT|REQUEST_LIMIT|EVIDENCE_LIMIT)/.test(code)
           ? 'unresolved'
           : 'failed',
-        '分析未完成：' + code,
+        '分析未完成：' + finalCode,
+        new Date().toISOString(),
+        pathId
+      )
+      tx.run(
+        'UPDATE path_recovery SET state=?,updated_at=? WHERE path_id=? AND attempt=?',
+        userStop ? 'stopped' : interrupted ? 'interrupted' : 'failed',
+        new Date().toISOString(),
+        pathId,
+        attempt
+      )
+      tx.run(
+        "UPDATE recovery_requests SET state='uncertain',finished_at=? WHERE path_id=? AND state='started'",
         new Date().toISOString(),
         pathId
       )
@@ -349,17 +409,28 @@ export class ScanRepository {
       const run = tx.get('SELECT project_id FROM audit_runs WHERE id=?', current.run_id)!
       tx.run(
         "UPDATE audit_runs SET status='failed',stage='failed',error_code=?,finished_at=? WHERE id=?",
-        code,
+        finalCode,
         new Date().toISOString(),
         current.run_id
       )
+      if (userStop || interrupted)
+        tx.run(
+          'UPDATE audit_runs SET status=?,stage=? WHERE id=?',
+          userStop ? 'cancelled' : 'failed',
+          'interrupted',
+          current.run_id
+        )
       appendEvent(tx, String(run.project_id), String(current.run_id), pathId, {
         type: 'result',
-        status: 'failed',
-        summary: '路径分析失败',
+        status: userStop ? 'stopped' : interrupted ? 'interrupted' : 'failed',
+        summary: userStop
+          ? '用户停止，未提交路径保留未知'
+          : interrupted
+            ? '执行中断，可核对检查点恢复'
+            : '路径分析失败',
         payload: {
           attempt,
-          errorCode: code,
+          errorCode: finalCode,
           statistics: this.statistics(String(run.project_id), String(current.run_id))
         }
       })
@@ -426,14 +497,16 @@ export class ScanRepository {
         })
       }
     })
+    this.recovery.recover()
   }
   claimNext(
     projectId: string,
     runId: string,
-    modelId: string
+    modelId: string,
+    onClaim?: (pathId: string, attempt: number) => void
   ): { pathId: string; attempt: number } | null {
     this.state(projectId, runId)
-    return this.claimWork(projectId, runId, null, modelId)
+    return this.claimWork(projectId, runId, null, modelId, onClaim)
   }
   state(projectId: string, runId: string): RunState {
     const row = this.db.get(

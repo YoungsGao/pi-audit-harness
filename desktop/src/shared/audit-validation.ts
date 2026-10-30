@@ -1,6 +1,14 @@
 import type { AuditAction } from './scan-contracts'
 import { AnalyzeSseParser } from './sse-parser.ts'
+import { isRunRecoveryView } from './run-contracts.ts'
 export const auditActions: AuditAction[] = [
+  'stop',
+  'recovery',
+  'resume',
+  'snapshot',
+  'disclosure',
+  'authorize',
+  'manualRisk',
   'prepare',
   'runs',
   'list',
@@ -87,7 +95,81 @@ function summary(v: Record<string, unknown>): boolean {
   )
 }
 export function isAuditData(action: AuditAction, data: unknown): boolean {
+  if (['stop', 'recovery', 'resume'].includes(action)) return isRunRecoveryView(data)
+  if (action === 'snapshot')
+    return (
+      exact(data, [
+        'projectId',
+        'runId',
+        'snapshotId',
+        'sourceStamp',
+        'commit',
+        'createdAt',
+        'ignored',
+        'files'
+      ]) &&
+      ['projectId', 'runId', 'snapshotId', 'sourceStamp', 'createdAt'].every((k) =>
+        text(data[k])
+      ) &&
+      nullableText(data.commit) &&
+      Array.isArray(data.ignored) &&
+      data.ignored.length <= 10 &&
+      data.ignored.every(text) &&
+      Array.isArray(data.files) &&
+      data.files.length > 0 &&
+      data.files.length <= 2000 &&
+      data.files.every(
+        (f) =>
+          exact(f, ['filePath', 'sha256', 'size']) &&
+          text(f.filePath) &&
+          typeof f.sha256 === 'string' &&
+          /^[a-f0-9]{64}$/.test(f.sha256) &&
+          count(f.size)
+      )
+    )
   if (!object(data) || !safeJson(data)) return false
+  if (action === 'disclosure' || action === 'authorize')
+    return (
+      exact(data, [
+        'projectId',
+        'runId',
+        'snapshotId',
+        'scopeKey',
+        'reviewContextHash',
+        'configId',
+        'revision',
+        'baseUrl',
+        'modelId',
+        'fileCount',
+        'totalBytes',
+        'categories',
+        'authorized'
+      ]) &&
+      ['projectId', 'runId', 'snapshotId', 'configId', 'baseUrl', 'modelId'].every((k) =>
+        text(data[k])
+      ) &&
+      typeof data.scopeKey === 'string' &&
+      /^[a-f0-9]{64}$/.test(data.scopeKey) &&
+      typeof data.reviewContextHash === 'string' &&
+      /^[a-f0-9]{64}$/.test(data.reviewContextHash) &&
+      count(data.revision) &&
+      Number(data.revision) > 0 &&
+      count(data.fileCount) &&
+      count(data.totalBytes) &&
+      Array.isArray(data.categories) &&
+      data.categories.length <= 10 &&
+      data.categories.every(text) &&
+      typeof data.authorized === 'boolean'
+    )
+  if (action === 'manualRisk')
+    return (
+      exact(data, ['projectId', 'runId', 'pathIds', 'snapshotId']) &&
+      ['projectId', 'runId', 'snapshotId'].every((k) => text(data[k])) &&
+      Array.isArray(data.pathIds) &&
+      data.pathIds.length > 0 &&
+      data.pathIds.length <= 100 &&
+      data.pathIds.every(text)
+    )
   if (action === 'history') {
     if (!(
       exact(data, [
@@ -195,9 +277,16 @@ export function isAuditData(action: AuditAction, data: unknown): boolean {
         'statistics'
       ]) &&
       ['projectId', 'runId', 'sourceStamp', 'rulesVersion'].every((k) => text(data[k])) &&
-      ['scanning', 'prepared', 'analyzing', 'completed', 'failed', 'interrupted'].includes(
-        String(data.stage)
-      ) &&
+      [
+        'scanning',
+        'prepared',
+        'analyzing',
+        'completed',
+        'failed',
+        'interrupted',
+        'stopping',
+        'stopped'
+      ].includes(String(data.stage)) &&
       ['queued', 'running', 'completed', 'failed', 'cancelled'].includes(String(data.status)) &&
       ['modelConfigId', 'startedAt', 'finishedAt', 'errorCode'].every((k) =>
         nullableText(data[k])
@@ -334,8 +423,24 @@ export function isAuditData(action: AuditAction, data: unknown): boolean {
       data.paths.every((p) => path(p) && p.projectId === data.projectId && p.runId === data.runId)
     )
   if (action === 'detail') {
-    const { steps, ...base } = data
+    const { steps, manualPoint, ...base } = data
     return (
+      (manualPoint === undefined ||
+        (exact(manualPoint, [
+          'snapshotId',
+          'filePath',
+          'line',
+          'column',
+          'functionKey',
+          'ruleId',
+          'note'
+        ]) &&
+          ['snapshotId', 'filePath', 'ruleId', 'note'].every((k) => text(manualPoint[k])) &&
+          nullableText(manualPoint.functionKey) &&
+          count(manualPoint.line) &&
+          Number(manualPoint.line) > 0 &&
+          count(manualPoint.column) &&
+          Number(manualPoint.column) > 0)) &&
       path(base) &&
       Array.isArray(steps) &&
       steps.length <= 32 &&

@@ -1,4 +1,6 @@
-import { app, BrowserWindow, dialog, ipcMain } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
+import { helpLinks } from '../shared/help-links'
+import { templateActions } from '../shared/template-contracts'
 import type { IpcMainInvokeEvent } from 'electron'
 import { join } from 'node:path'
 import { ServiceManager } from './service-manager'
@@ -32,7 +34,7 @@ function createWindow(): void {
     height: 760,
     minWidth: 860,
     minHeight: 600,
-    title: 'Pi Audit Harness',
+    title: 'pi-audit-harness',
     autoHideMenuBar: true,
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
@@ -67,11 +69,16 @@ void app.whenReady().then(() => {
   ipcMain.handle('app:get-info', (event): AppInfo => {
     assertClient(event)
     return {
-      name: app.getName(),
+      name: 'pi-audit-harness',
       version: app.getVersion(),
       electron: process.versions.electron,
       node: process.versions.node
     }
+  })
+  ipcMain.handle('help:open', (event, id: unknown) => {
+    assertClient(event)
+    if (typeof id !== 'string' || !Object.hasOwn(helpLinks, id)) throw new Error('不支持的帮助链接')
+    return shell.openExternal(helpLinks[id as keyof typeof helpLinks])
   })
   ipcMain.handle('service:get-status', (event) => {
     assertClient(event)
@@ -85,15 +92,31 @@ void app.whenReady().then(() => {
     assertClient(event)
     return service.testModel(typeof modelConfigId === 'string' ? modelConfigId : '')
   })
-  ipcMain.handle('reports:action', (event, action: 'generate' | 'list', input: unknown) => {
+  ipcMain.handle(
+    'reports:action',
+    (event, action: import('../shared/report-contracts').ReportAction, input: unknown) => {
+      assertClient(event)
+      if (!['generate', 'list', 'preview', 'export'].includes(action))
+        throw new Error('不允许的报告操作')
+      return service.report(action, input)
+    }
+  )
+  ipcMain.handle('reports:save', (event, input: unknown) => {
     assertClient(event)
-    if (!['generate', 'list'].includes(action)) throw new Error('不允许的报告操作')
-    return service.report(action, input)
+    return service.saveReport(input)
   })
   ipcMain.handle('reports:open', (event, input: unknown) => {
     assertClient(event)
     return service.openReport(input)
   })
+  ipcMain.handle(
+    'reviews:action',
+    (event, action: import('../shared/review-contracts').ReviewAction, input: unknown) => {
+      assertClient(event)
+      if (!['get', 'save', 'source'].includes(action)) throw new Error('不允许的复核操作')
+      return service.review(action, input)
+    }
+  )
   ipcMain.handle('storage:get-overview', (event) => {
     assertClient(event)
     return service.getStorageOverview()
@@ -122,6 +145,26 @@ void app.whenReady().then(() => {
   ipcMain.handle('sources:tools', (event) => {
     assertClient(event)
     return service.source('tools')
+  })
+  ipcMain.handle(
+    'templates:action',
+    (event, action: import('../shared/template-contracts').TemplateAction, input: unknown) => {
+      assertClient(event)
+      if (action === 'import' || !templateActions.includes(action))
+        throw new Error('不允许的模板操作')
+      return service.templates(action, input)
+    }
+  )
+  ipcMain.handle('templates:import-document', async (event, kind: unknown) => {
+    assertClient(event)
+    if (kind !== 'file' && kind !== 'directory') throw new Error('不支持的导入方式')
+    const result = await dialog.showOpenDialog(mainWindow!, {
+      title: kind === 'file' ? '选择 Markdown / SKILL.md 文档' : '选择含 SKILL.md 的目录',
+      properties: kind === 'file' ? ['openFile'] : ['openDirectory'],
+      ...(kind === 'file' ? { filters: [{ name: 'Markdown 文档', extensions: ['md'] }] } : {})
+    })
+    if (result.canceled || !result.filePaths[0]) return null
+    return service.templates('import', { path: result.filePaths[0], kind })
   })
   ipcMain.handle(
     'audit:action',

@@ -181,7 +181,7 @@ test('v4 upgrade preserves historical rows/checksums and new migration failure r
   db.run("INSERT INTO path_steps VALUES ('p',0,'e','r','old')")
   const checksums = db.all('SELECT checksum FROM schema_migrations ORDER BY version')
   migrate(db)
-  assert.equal(db.get('PRAGMA user_version').user_version, 8)
+  assert.equal(db.get('PRAGMA user_version').user_version, 12)
   assert.deepEqual(
     db.all('SELECT checksum FROM schema_migrations WHERE version<=4 ORDER BY version'),
     checksums
@@ -192,12 +192,12 @@ test('v4 upgrade preserves historical rows/checksums and new migration failure r
     migrate(db, [
       ...migrations,
       {
-        version: 9,
+        version: 13,
         name: 'broken',
         sql: 'CREATE TABLE no_commit(id); SELECT * FROM missing_table;'
       }
     ])
   )
-  assert.equal(db.get('PRAGMA user_version').user_version, 8)
+  assert.equal(db.get('PRAGMA user_version').user_version, 12)
   assert.equal(db.get("SELECT name FROM sqlite_schema WHERE name='no_commit'"), undefined)
 })

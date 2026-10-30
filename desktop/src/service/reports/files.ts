@@ -3,7 +3,7 @@ import { lstat, realpath, mkdir, writeFile, rename, unlink, readFile } from 'nod
 import { join, resolve } from 'node:path'
 import { ApiError } from '../../shared/api-error.ts'
 import { reportId } from '../../shared/report-contracts.ts'
-import type { ReportFile } from '../../shared/report-contracts'
+import type { ReportFile, ReportFormat } from '../../shared/report-contracts'
 
 const same = (a: string, b: string): boolean =>
   process.platform === 'win32' ? a.toLowerCase() === b.toLowerCase() : a === b
@@ -18,16 +18,27 @@ async function ownedDirectory(dataRoot: string): Promise<string> {
     throw new ApiError('REPORT_UNSAFE_FILE', '报告目录不是应用持有的普通目录', 409)
   return dir
 }
-export function reportFilePath(dataRoot: string, id: string): string {
+export function reportFilePath(
+  dataRoot: string,
+  id: string,
+  format: ReportFormat = 'html'
+): string {
   if (!reportId(id)) throw new ApiError('REPORT_INVALID_INPUT', '报告标识无效', 400)
-  return join(resolve(dataRoot), 'reports', id + '.html')
+  if (!['html', 'json'].includes(format))
+    throw new ApiError('REPORT_INVALID_INPUT', '报告格式无效', 400)
+  return join(resolve(dataRoot), 'reports', id + '.' + format)
 }
-export async function publishReport(dataRoot: string, id: string, html: string): Promise<string> {
+export async function publishReport(
+  dataRoot: string,
+  id: string,
+  html: string,
+  format: ReportFormat = 'html'
+): Promise<string> {
   if (Buffer.byteLength(html) > 20 * 1024 * 1024)
     throw new ApiError('REPORT_LIMIT', 'HTML 报告超过 20MiB，未静默截断', 413)
   await mkdir(join(dataRoot, 'reports'), { recursive: true })
   await ownedDirectory(dataRoot)
-  const file = reportFilePath(dataRoot, id)
+  const file = reportFilePath(dataRoot, id, format)
   const temporary = file + '.' + randomUUID() + '.tmp'
   try {
     await writeFile(temporary, html, { encoding: 'utf8', flag: 'wx', mode: 0o600 })
@@ -38,7 +49,11 @@ export async function publishReport(dataRoot: string, id: string, html: string):
   return createHash('sha256').update(html).digest('hex')
 }
 export async function verifyReportFile(dataRoot: string, file: ReportFile): Promise<void> {
-  if (!same(resolve(file.filePath), reportFilePath(dataRoot, file.reportId)))
+  await readVerifiedReport(dataRoot, file)
+}
+export async function readVerifiedReport(dataRoot: string, file: ReportFile): Promise<Buffer> {
+  const format = file.format ?? 'html'
+  if (!same(resolve(file.filePath), reportFilePath(dataRoot, file.reportId, format)))
     throw new ApiError('REPORT_UNSAFE_FILE', '报告文件不属于当前应用报告目录', 409)
   try {
     const dir = await ownedDirectory(dataRoot)
@@ -47,7 +62,7 @@ export async function verifyReportFile(dataRoot: string, file: ReportFile): Prom
       info.isSymbolicLink() ||
       !info.isFile() ||
       info.size > 20 * 1024 * 1024 ||
-      !same(await realpath(file.filePath), join(await realpath(dir), file.reportId + '.html'))
+      !same(await realpath(file.filePath), join(await realpath(dir), file.reportId + '.' + format))
     )
       throw new ApiError('REPORT_UNSAFE_FILE', '报告文件类型或归属无效', 409)
     const bytes = await readFile(file.filePath)
@@ -57,6 +72,7 @@ export async function verifyReportFile(dataRoot: string, file: ReportFile): Prom
         '报告文件已被修改，拒绝作为原报告打开；请重新生成',
         409
       )
+    return bytes
   } catch (error) {
     if (error instanceof ApiError) throw error
     throw new ApiError('REPORT_FILE_MISSING', '报告文件不存在或无法读取，请重新生成', 404)

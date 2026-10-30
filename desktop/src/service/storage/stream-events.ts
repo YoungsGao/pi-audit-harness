@@ -130,6 +130,8 @@ export function mirrorStreamEvent(
       const failed = event.status === 'failed' || event.status === 'interrupted'
       const timed = failed && /TIMEOUT|TIMED_OUT/.test(code)
       const stopped =
+        code === 'RUN_USER_STOP' ||
+        event.status === 'stopped' ||
         /AGENT_(?:NO_PROGRESS|ROUND_LIMIT|TOOL_LIMIT|REQUEST_LIMIT|EVIDENCE_LIMIT)/.test(code)
       insert(
         tx,

@@ -5,6 +5,10 @@ import { callChainMigration } from './call-chain-migration.ts'
 import { scanMigration } from './scan-migration.ts'
 import { analysisMigration } from './analysis-migration.ts'
 import { streamMigration } from './stream-migration.ts'
+import { inputEnhancementsMigration } from './input-enhancements-migration.ts'
+import { templateMigration } from './template-migration.ts'
+import { reviewExportMigration } from './review-export-migration.ts'
+import { runRecoveryMigration } from './run-recovery-migration.ts'
 
 // 十六进制 ASCII「PIAU」，用来避免把别的 SQLite 文件当成本应用数据库。
 const APPLICATION_ID = 0x50494155
@@ -154,6 +158,26 @@ CREATE INDEX idx_source_import_key ON source_imports(source_key,registered_at);
     version: 8,
     name: 'taint-review-and-session-scoped-stream-events',
     sql: streamMigration
+  },
+  {
+    version: 9,
+    name: 'immutable-source-disclosure-and-manual-risks',
+    sql: inputEnhancementsMigration
+  },
+  {
+    version: 10,
+    name: 'audit-knowledge-templates-and-project-review',
+    sql: templateMigration
+  },
+  {
+    version: 11,
+    name: 'human-review-versions-and-report-export',
+    sql: reviewExportMigration
+  },
+  {
+    version: 12,
+    name: 'run-stop-and-evidence-verified-session-recovery',
+    sql: runRecoveryMigration
   }
 ]
 

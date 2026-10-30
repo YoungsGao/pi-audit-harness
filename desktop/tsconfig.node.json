@@ -24,7 +24,13 @@
     "electron.chains-test.config.ts",
     "tests/chains-electron-main.ts",
     "electron.scan-test.config.ts",
-    "tests/scan-electron-main.ts"
+    "tests/scan-electron-main.ts",
+    "electron.templates-test.config.ts",
+    "tests/templates-electron-main.ts",
+    "electron.review-test.config.ts",
+    "tests/review-electron-main.ts",
+    "electron.run-test.config.ts",
+    "tests/run-electron-main.ts"
   ],
   "compilerOptions": {
     "allowImportingTsExtensions": true,

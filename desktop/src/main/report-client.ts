@@ -25,7 +25,7 @@ export async function reportRequest(
       headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
       body: JSON.stringify(input),
       redirect: 'error',
-      signal: AbortSignal.timeout(action === 'generate' ? 45000 : 10000)
+      signal: AbortSignal.timeout(['generate', 'export'].includes(action) ? 45000 : 10000)
     })
     const raw = await response.text()
     if (raw.length > 1000000) return failed()
@@ -53,7 +53,13 @@ export async function reportRequest(
       !isReportData(action, body.data) ||
       body.data.projectId !== scope.projectId ||
       body.data.runId !== scope.runId ||
-      (action === 'file' && (!('reportId' in body.data) || body.data.reportId !== scope.reportId))
+      (action === 'file' &&
+        (!('reportId' in body.data) || body.data.reportId !== scope.reportId)) ||
+      (['preview', 'export'].includes(action) &&
+        'filter' in body.data &&
+        (['verdict', 'pathStatus', 'reviewStatus'] as const).some(
+          (key) => body.data.filter[key] !== scope.filter?.[key]
+        ))
     )
       return failed()
     return { ok: true, requestId: body.requestId, data: body.data }

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { app, BrowserWindow, ipcMain, utilityProcess } from 'electron'
-import { mkdirSync, writeFileSync } from 'node:fs'
+import { mkdirSync, writeFileSync, readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { ServiceManager } from '../src/main/service-manager'
@@ -94,6 +94,15 @@ async function until(check: () => Promise<boolean>): Promise<void> {
 async function selectDetailTab(name: string): Promise<void> {
   await js(`document.querySelector('[data-testid="detail-tab-${name}"]').click()`)
 }
+async function confirmDisclosure(): Promise<void> {
+  await until(() =>
+    js(
+      '!!document.querySelector("[data-testid=confirm-source-disclosure]") || !!document.querySelector("[data-testid=disclosure-authorized]")'
+    )
+  )
+  await js('document.querySelector("[data-testid=confirm-source-disclosure]")?.click()')
+  await until(() => js('!!document.querySelector("[data-testid=disclosure-authorized]")'))
+}
 async function verifyWorkspaceLayout(): Promise<void> {
   const results: unknown[] = []
   for (const [width, height] of [
@@ -175,7 +184,7 @@ async function captureWorkspace(name: string): Promise<void> {
       `${name} horizontal overflow at ${width}`
     )
     assert.equal(await js('document.querySelector("main").scrollTop'), 0)
-    assert.equal(await js('document.querySelectorAll("nav button[title]").length'), 4)
+    assert.equal(await js('document.querySelectorAll("nav button[title]").length'), 5)
     writeFileSync(
       join(root, `${name}-${width}.png`),
       (
@@ -208,8 +217,15 @@ void app.whenReady().then(async () => {
     ipcMain.handle('sources:list', () => service.source('list'))
     ipcMain.handle('models:get-catalog', () => service.modelSettings())
     ipcMain.handle('model:test', (_e, id: string) => service.testModel(id))
-    ipcMain.handle('reports:action', (_e, action: 'generate' | 'list', input: unknown) =>
-      service.report(action, input)
+    ipcMain.handle(
+      'reports:action',
+      (_e, action: import('../src/shared/report-contracts').ReportAction, input: unknown) =>
+        service.report(action, input)
+    )
+    ipcMain.handle(
+      'reviews:action',
+      (_e, action: import('../src/shared/review-contracts').ReviewAction, input: unknown) =>
+        service.review(action, input)
     )
     ipcMain.handle('reports:open', (_e, input: unknown) => service.openReport(input))
     ipcMain.handle('sources:tools', () => service.source('tools'))
@@ -217,6 +233,11 @@ void app.whenReady().then(async () => {
     ipcMain.handle('sources:local', (_e, input: unknown) => service.source('local', input))
     ipcMain.handle('audit:action', (_e, action: AuditAction, input: unknown) =>
       service.audit(action, input)
+    )
+    ipcMain.handle(
+      'templates:action',
+      (_e, action: import('../src/shared/template-contracts').TemplateAction, input: unknown) =>
+        service.templates(action, input)
     )
     await service.start()
     fixture = await createScanModelFixture()
@@ -400,6 +421,11 @@ void app.whenReady().then(async () => {
     await js(
       `(()=>{const select=document.querySelector('select[aria-label="审计项目"]');select.value=${JSON.stringify(localProject.projectId)};select.dispatchEvent(new Event('change',{bubbles:true}))})()`
     )
+    await until(() =>
+      js(
+        'Array.from(document.querySelectorAll("button")).some(b=>b.textContent==="预处理并生成调用链"&&!b.disabled)'
+      )
+    )
     await js(
       "Array.from(document.querySelectorAll('button')).find(b=>b.textContent==='预处理并生成调用链').click()"
     )
@@ -472,6 +498,23 @@ void app.whenReady().then(async () => {
       selectedBeforeTabs
     )
     assert.equal(modelRequests(), 0)
+    assert.equal(
+      await js('document.querySelector("[data-testid=start-path-analysis]").disabled'),
+      true
+    )
+    await until(() => js('!!document.querySelector("[data-testid=confirm-source-disclosure]")'))
+    await js(
+      'Array.from(document.querySelectorAll("button")).find(b=>b.textContent==="暂不发送").click()'
+    )
+    assert.equal(modelRequests(), 0)
+    assert.equal(
+      await js('document.querySelector("[data-testid=start-path-analysis]").disabled'),
+      true
+    )
+    await js(
+      'Array.from(document.querySelectorAll("button")).find(b=>b.textContent==="重新查看发送范围").click()'
+    )
+    await confirmDisclosure()
     await until(() =>
       js('document.querySelector(\'[data-testid="start-path-analysis"]\')?.disabled===false')
     )
@@ -818,14 +861,20 @@ void app.whenReady().then(async () => {
     await js(
       `(()=>{const s=document.querySelector('select[aria-label="路径分析模型"]');s.value=${JSON.stringify(failedModel.data.model.configId)};s.dispatchEvent(new Event('change',{bubbles:true}))})()`
     )
+    await until(() =>
+      js(
+        'Array.from(document.querySelectorAll("button")).some(b=>b.textContent==="预处理并生成调用链"&&!b.disabled)'
+      )
+    )
     await js(
       "Array.from(document.querySelectorAll('button')).find(b=>b.textContent==='预处理并生成调用链').click()"
     )
     await until(() =>
       js(
-        `document.querySelector('select[aria-label="审计任务"]')?.value!==${JSON.stringify(runId)} && document.querySelector('[data-testid="start-path-analysis"]')?.disabled===false`
+        `document.querySelector('select[aria-label="审计任务"]')?.value!==${JSON.stringify(runId)} && !!document.querySelector('[data-testid="confirm-source-disclosure"]')`
       )
     )
+    await confirmDisclosure()
     await js('document.querySelector(\'[data-testid="start-path-analysis"]\').click()')
     await until(() =>
       js(
@@ -838,6 +887,7 @@ void app.whenReady().then(async () => {
       )
     )
     assert.equal(failingFixture.requests.length, 1)
+
     await until(() =>
       js(
         "document.querySelector('select[aria-label=\"分析历史会话\"]')?.selectedOptions[0]?.textContent.includes('尝试 1')"
@@ -897,6 +947,57 @@ void app.whenReady().then(async () => {
     )
     assert.equal(modelRequests(), 8)
     assert.equal(failingFixture.requests.length, 1)
+    // 在原任务补充真实调用位置：表单 -> 快照校验 -> pending -> 同一 SSE/Agent/报告流程。
+    await js(
+      `(()=>{const s=document.querySelector('[aria-label="审计任务"]');s.value=${JSON.stringify(runId)};s.dispatchEvent(new Event('change',{bubbles:true}))})()`
+    )
+    await until(() =>
+      js(
+        `JSON.parse(localStorage.getItem('audit.detail.selection.v1'))?.runId===${JSON.stringify(runId)} && !!document.querySelector('[data-testid=save-manual-risk]')`
+      )
+    )
+    assert.equal(await js('document.querySelectorAll("[aria-label=手工风险文件]").length'), 1)
+    assert.equal(await js('document.querySelectorAll("[data-testid=run-control-panel]").length'), 1)
+    await js(
+      `(()=>{const s=document.querySelector('[aria-label="路径分析模型"]');s.value=${JSON.stringify(saved.data.model.configId)};s.dispatchEvent(new Event('change',{bubbles:true}));const f=document.querySelector('[aria-label="手工风险文件"]');f.value='UserRepository.java';f.dispatchEvent(new Event('change',{bubbles:true}));})()`
+    )
+    await js(
+      `(()=>{for(const [label,value] of [['手工风险行号','9'],['手工风险列号','9'],['手工风险说明','联调：补充查询位置']]){const f=document.querySelector('[aria-label="'+label+'"]');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(f,value);f.dispatchEvent(new Event('input',{bubbles:true}));}})()`
+    )
+    await js('document.querySelector("[aria-label=手工风险说明]").form.requestSubmit()')
+    await until(() =>
+      js(
+        'document.querySelector("[data-testid=manual-risk-provenance]")?.textContent.includes("联调：补充查询位置")'
+      )
+    )
+    await selectDetailTab('process')
+    await confirmDisclosure()
+    const beforeManual = modelRequests()
+    await until(() =>
+      js('document.querySelector("[data-testid=start-path-analysis]")?.disabled===false')
+    )
+    await js('document.querySelector("[data-testid=start-path-analysis]").click()')
+    await until(() =>
+      js(
+        'document.querySelector("[data-testid=analysis-result]")?.textContent.includes("completed / completed")'
+      )
+    )
+    assert.ok(modelRequests() > beforeManual)
+    const manualReport = await service.report('generate', {
+      projectId: localProject.projectId,
+      runId
+    })
+    assert.equal(manualReport.ok, true)
+    const manualHtml = readFileSync((manualReport.data as ReportRecord).filePath!, 'utf8')
+    for (const item of [
+      '联调：补充查询位置',
+      '固定源码快照与实际发送记录',
+      saved.data.model.modelId
+    ])
+      assert.ok(manualHtml.includes(item), item)
+    console.info(
+      'PASS MOD-04/SRC-03/SCAN-02: cancel blocks source, explicit consent reuses fixed snapshot, manual form enters real Pi SSE and report workflow.'
+    )
     console.info(
       'PASS SCAN/UI: real Java parsing -> utilityProcess SQLite -> main DTO -> preload -> React -> actual Pi SDK tool loop/local fixture -> committed events/results -> different-PID persistence -> pending queue. Double click started one loop; text escaped.'
     )
@@ -1008,6 +1109,15 @@ void app.whenReady().then(async () => {
     app.exit(0)
   } catch (error) {
     console.error(error)
+    if (window) {
+      console.error(
+        'SCAN_FAILURE_UI=',
+        await js(
+          'JSON.stringify({alerts:Array.from(document.querySelectorAll("[role=alert]")).map(e=>e.textContent),manual:Array.from(document.querySelectorAll("[aria-label^=手工风险]")).map(e=>({label:e.getAttribute("aria-label"),value:e.value,disabled:e.matches(":disabled")}))})'
+        ).catch(() => '')
+      )
+      writeFileSync(join(root, 'failure.png'), (await window.webContents.capturePage()).toPNG())
+    }
     await service.stop().catch(() => {})
     await cleanup().catch(() => {})
     await fixture?.close()

@@ -9,11 +9,18 @@ import type {
   ReportCatalog,
   ReportRecord,
   ReportScope,
-  ReportStatistics
+  ReportStatistics,
+  ReportFormat,
+  ReportFilter,
+  ReviewCounts
 } from '../../shared/report-contracts'
-import { isReportStatistics } from '../../shared/report-contracts.ts'
+import { isReportStatistics, defaultReportFilter } from '../../shared/report-contracts.ts'
 
 export interface ReportCommit {
+  snapshotKey?: string
+  stageReasons?: string[]
+  reviewCounts?: ReviewCounts
+  totalPaths?: number
   statistics: ReportStatistics
   stageReport: boolean
   sha256: string
@@ -26,21 +33,30 @@ export class ReportRepository {
   constructor(db: LocalDatabase) {
     this.db = db
   }
-  begin(projectId: string, runId: string, filePath: string, id = randomUUID()): string {
+  begin(
+    projectId: string,
+    runId: string,
+    filePath: string,
+    id = randomUUID(),
+    format: ReportFormat = 'html',
+    filter: ReportFilter = defaultReportFilter
+  ): string {
     if (!isAbsolute(filePath))
       throw new ApiError('REPORT_INVALID_PATH', '报告路径必须为绝对路径', 400)
     const now = new Date().toISOString()
     this.db.transaction((tx) => {
       const stats = new ScanRepository(this.db).statistics(projectId, runId)
       tx.run(
-        `INSERT INTO reports (id,run_id,project_id,file_path,status,summary,created_at,summary_json)
-        VALUES (?,?,?,?,'pending','等待报告生成',?,?)`,
+        `INSERT INTO reports (id,run_id,project_id,file_path,status,summary,created_at,summary_json,format,filter_json)
+        VALUES (?,?,?,?,'pending','等待报告生成',?,?,?,?)`,
         id,
         runId,
         projectId,
         filePath,
         now,
-        JSON.stringify(stats)
+        JSON.stringify(stats),
+        format,
+        JSON.stringify(filter)
       )
       appendEvent(tx, projectId, runId, null, {
         type: 'process',
@@ -109,7 +125,14 @@ export class ReportRepository {
       riskPoints: (parsed.statistics as Record<string, unknown> | undefined)?.riskPoints ?? null
     }
     return {
-      ...scope,
+      format: row.format as ReportFormat,
+      filter: JSON.parse(String(row.filter_json)),
+      snapshotKey: typeof parsed.snapshotKey === 'string' ? parsed.snapshotKey : null,
+      stageReasons: Array.isArray(parsed.stageReasons) ? (parsed.stageReasons as string[]) : [],
+      reviewCounts: (parsed.reviewCounts as ReviewCounts) ?? null,
+      totalPaths: typeof parsed.totalPaths === 'number' ? parsed.totalPaths : null,
+      projectId: scope.projectId,
+      runId: scope.runId,
       reportId: id,
       filePath: String(row.file_path),
       status: row.status as ReportRecord['status'],

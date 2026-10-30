@@ -11,6 +11,7 @@ import { CallChainRepository } from '../src/service/storage/call-chain-repositor
 import { CallChainService } from '../src/service/chains/service.ts'
 import { PathAnalysisService } from '../src/service/chains/path-analysis.ts'
 import { isAuditData } from '../src/shared/audit-validation.ts'
+const inputScope = ({ projectId, runId, modelConfigId }) => ({ projectId, runId, modelConfigId })
 
 export async function fixture(t, sources) {
   const root = await mkdtemp(join(tmpdir(), 'pi-scan-')),
@@ -128,6 +129,8 @@ test('real background start, exclusive claim and per-path result do not overwrit
     pathId: prepared.pathIds[0],
     modelConfigId: 'model'
   }
+  const disclosure = await chains.action('disclosure', inputScope(input))
+  await chains.action('authorize', { ...inputScope(input), scopeKey: disclosure.scopeKey })
   assert.equal((await chains.action('analyze', input)).status, 'analyzing')
   await assert.rejects(chains.action('analyze', input), { code: 'ANALYSIS_BUSY' })
   assert.equal(repo.scans.statistics(project.projectId, prepared.runId).analyzing, 1)
@@ -261,6 +264,8 @@ test('model quotes outside actual evidence fail explicitly instead of producing 
     pathId: prepared.pathIds[0],
     modelConfigId: 'model'
   }
+  const disclosure = await chains.action('disclosure', inputScope(input))
+  await chains.action('authorize', { ...inputScope(input), scopeKey: disclosure.scopeKey })
   await chains.action('analyze', input)
   for (
     let i = 0;

@@ -1,6 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
-import type { ReportCatalog, ReportRecord, ReportScope } from '../../../shared/report-contracts'
-import { reportInput } from '../../../shared/report-contracts'
+import type {
+  ReportCatalog,
+  ReportRecord,
+  ReportScope,
+  ReportFilter,
+  ReportPreview,
+  ReportFormat
+} from '../../../shared/report-contracts'
+import { reportInput, defaultReportFilter } from '../../../shared/report-contracts'
+import { reviewStates, reviewLabels } from '../../../shared/review-contracts'
 import type { ScanCatalog } from '../../../shared/scan-contracts'
 import type { SourceProject } from '../../../shared/source-contracts'
 import {
@@ -17,6 +25,9 @@ function unwrap<T>(result: ApiResult<T>): T {
   return result.data
 }
 export function ReportsPage(): React.JSX.Element {
+  const [filter, setFilter] = useState<ReportFilter>({ ...defaultReportFilter })
+  const [preview, setPreview] = useState<ReportPreview | null>(null),
+    [previewError, setPreviewError] = useState('')
   const [saved] = useState<ReportScope | null>(() => {
     try {
       const own = localStorage.getItem(selectionKey)
@@ -115,6 +126,36 @@ export function ReportsPage(): React.JSX.Element {
       clearInterval(timer)
     }
   }, [projectId, runId, revision])
+  useEffect(() => {
+    let alive = true,
+      reading = false
+    const read = async (): Promise<void> => {
+      if (!projectId || !runId || reading) return
+      reading = true
+      try {
+        const data = unwrap(
+          await window.audit.reports('preview', { projectId, runId, filter })
+        ) as ReportPreview
+        if (alive) {
+          setPreview(data)
+          setPreviewError('')
+        }
+      } catch (e) {
+        if (alive) {
+          setPreview(null)
+          setPreviewError(e instanceof Error ? e.message : '导出预览读取失败')
+        }
+      } finally {
+        reading = false
+      }
+    }
+    void read()
+    const timer = setInterval(() => void read(), 2000)
+    return () => {
+      alive = false
+      clearInterval(timer)
+    }
+  }, [projectId, runId, filter, revision])
   async function act(work: () => Promise<string>): Promise<void> {
     if (locked.current) return
     locked.current = true
@@ -133,12 +174,39 @@ export function ReportsPage(): React.JSX.Element {
       }
     }
   }
+  async function createReport(format: ReportFormat, save: boolean): Promise<string> {
+    if (!preview) throw new Error('请先读取导出预览')
+    const report = unwrap(
+      await window.audit.reports('export', {
+        projectId,
+        runId,
+        format,
+        filter,
+        expectedSnapshotKey: preview.snapshotKey
+      })
+    ) as ReportRecord
+    if (report.status !== 'ready')
+      throw new Error(
+        report.errorCode === 'REPORT_SNAPSHOT_CHANGED'
+          ? '保存结果或人工复核已变化，请刷新预览后重新生成'
+          : `报告生成失败：${report.errorCode ?? '未确认'} · ${report.reportId}`
+      )
+    if (save) {
+      const copied = unwrap(
+        await window.audit.saveReport({ projectId, runId, reportId: report.reportId })
+      )
+      return copied.cancelled
+        ? '已登记JSON结果；另存已取消，可在列表中再次另存'
+        : 'JSON结果已另存：' + copied.savedPath
+    }
+    return `${report.stageReport ? '阶段报告' : '审计结果报告'}已登记：${report.reportId}`
+  }
   return (
     <section className="card audit-page reports-page" aria-label="已登记审计报告">
-      <h2>HTML 报告</h2>
+      <h2>审计报告与结果导出</h2>
       <p>
-        按项目与任务从 SQLite 读取已保存结果，由 Pi /report 扩展生成独立
-        HTML；不额外调用模型。存在待办、未知、失败或部分覆盖时标记为阶段报告。
+        按项目与任务导出已保存结果，不额外调用模型。HTML 与 JSON
+        同时保留机器判断、独立人工复核和覆盖缺口；未完成内容明确标为阶段结果。
       </p>
       <div className="audit-controls">
         <label>
@@ -152,6 +220,7 @@ export function ReportsPage(): React.JSX.Element {
               setRunId('')
               setRuns([])
               setCatalog(null)
+              setPreview(null)
               setReadError('')
               setError('')
             }}
@@ -173,6 +242,7 @@ export function ReportsPage(): React.JSX.Element {
             onChange={(e) => {
               setRunId(e.target.value)
               setCatalog(null)
+              setPreview(null)
               setError('')
               setReadError('')
             }}
@@ -186,24 +256,135 @@ export function ReportsPage(): React.JSX.Element {
           </select>
         </label>
       </div>
+      <fieldset className="report-filters" disabled={busy || !runId}>
+        <legend>导出范围</legend>
+        <label>
+          机器结论
+          <select
+            aria-label="导出机器结论"
+            value={filter.verdict}
+            onChange={(event) => {
+              setPreview(null)
+              setFilter({ ...filter, verdict: event.target.value as ReportFilter['verdict'] })
+            }}
+          >
+            {[
+              ['all', '全部机器结论'],
+              ['dangerous', '静态证据支持风险'],
+              ['safe', '当前路径已阻断'],
+              ['unknown', '风险未知']
+            ].map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          调查状态
+          <select
+            aria-label="导出调查状态"
+            value={filter.pathStatus}
+            onChange={(event) => {
+              setPreview(null)
+              setFilter({ ...filter, pathStatus: event.target.value as ReportFilter['pathStatus'] })
+            }}
+          >
+            {[
+              ['all', '全部调查状态'],
+              ['pending', '待分析'],
+              ['analyzing', '分析中'],
+              ['completed', '已完成'],
+              ['failed', '失败'],
+              ['unresolved', '证据不足'],
+              ['invalid', '无效调用链']
+            ].map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          人工复核
+          <select
+            aria-label="导出人工状态"
+            value={filter.reviewStatus}
+            onChange={(event) => {
+              setPreview(null)
+              setFilter({
+                ...filter,
+                reviewStatus: event.target.value as ReportFilter['reviewStatus']
+              })
+            }}
+          >
+            <option value="all">全部人工状态</option>
+            {reviewStates.map((value) => (
+              <option value={value} key={value}>
+                {reviewLabels[value]}
+              </option>
+            ))}
+          </select>
+        </label>
+      </fieldset>
+      <div className="report-preview" data-testid="report-preview" aria-live="polite">
+        {preview ? (
+          <>
+            <h3>{preview.stageReport ? '阶段结果预览' : '已保存结果预览'}</h3>
+            <p>
+              当前范围 {preview.statistics.paths} / 任务共 {preview.allStatistics.paths} 条路径
+            </p>
+            <div className="report-preview-counts">
+              <span>
+                机器风险 <strong>{preview.statistics.dangerous}</strong>
+              </span>
+              <span>
+                机器阻断 <strong>{preview.statistics.safe}</strong>
+              </span>
+              <span>
+                风险未知 <strong>{preview.statistics.unknown}</strong>
+              </span>
+              <span>
+                人工确认 <strong>{preview.reviewCounts.confirmed}</strong>
+              </span>
+              <span>
+                人工误报 <strong>{preview.reviewCounts.false_positive}</strong>
+              </span>
+            </div>
+            {preview.stageReasons.length > 0 && (
+              <details open>
+                <summary>阶段与范围说明</summary>
+                <ul>
+                  {preview.stageReasons.map((reason) => (
+                    <li key={reason}>{publicAnalysisText(reason)}</li>
+                  ))}
+                </ul>
+              </details>
+            )}
+            <p className="muted">
+              机器和人工统计相互独立。筛选无结果不表示安全；生成前会再次核对预览版本。
+            </p>
+          </>
+        ) : (
+          <p>{runId ? '正在读取保存结果预览…' : '选择一个任务后查看导出范围。'}</p>
+        )}
+        {previewError && <p role="alert">{publicAnalysisText(previewError)}</p>}
+      </div>
       <button
         className="button-primary"
         data-testid="generate-report"
-        disabled={busy || !projectId || !runId || !!readError}
-        onClick={() =>
-          void act(async () => {
-            const report = unwrap(
-              await window.audit.reports('generate', { projectId, runId })
-            ) as ReportRecord
-            if (report.status !== 'ready')
-              throw new Error(
-                `报告生成失败：${report.errorCode ?? '状态未确认'} · reportId=${report.reportId}`
-              )
-            return `${report.stageReport ? '阶段报告' : '审计结果报告'}已登记：${report.reportId}`
-          })
-        }
+        disabled={busy || !projectId || !runId || !!readError || !preview}
+        onClick={() => void act(() => createReport('html', false))}
       >
         {busy ? '报告操作进行中…' : '生成 HTML 报告'}
+      </button>
+      <button
+        className="button-primary"
+        data-testid="export-json"
+        disabled={busy || !preview || !!readError}
+        onClick={() => void act(() => createReport('json', true))}
+      >
+        导出 JSON 文件
       </button>
       <button disabled={busy || !runId} onClick={() => refresh((n) => n + 1)}>
         刷新已登记报告
@@ -233,6 +414,7 @@ export function ReportsPage(): React.JSX.Element {
         {catalog?.reports.map((report) => (
           <article className="report-record" key={report.reportId} data-report-id={report.reportId}>
             <h3>
+              {report.format === 'json' ? 'JSON · ' : 'HTML · '}
               {report.stageReport === true
                 ? '阶段报告'
                 : report.stageReport === false
@@ -245,6 +427,21 @@ export function ReportsPage(): React.JSX.Element {
                   ? '生成中'
                   : '失败'}
             </h3>
+            <p>
+              本次范围 {report.statistics?.paths ?? '未记录'} / {report.totalPaths ?? '历史未记录'}{' '}
+              条路径；人工确认 {report.reviewCounts?.confirmed ?? '未记录'}，人工误报{' '}
+              {report.reviewCounts?.false_positive ?? '未记录'}
+            </p>
+            {report.stageReasons.length > 0 && (
+              <details>
+                <summary>阶段与结束原因</summary>
+                <ul>
+                  {report.stageReasons.map((reason) => (
+                    <li key={reason}>{publicAnalysisText(reason)}</li>
+                  ))}
+                </ul>
+              </details>
+            )}
             <p className="audit-id">
               reportId={report.reportId}
               <br />
@@ -265,23 +462,43 @@ export function ReportsPage(): React.JSX.Element {
               <p>统计快照尚未保存。</p>
             )}
             {report.errorCode && <p role="alert">报告生成失败：{report.errorCode}</p>}
+            {report.format === 'html' && (
+              <button
+                data-testid="open-report"
+                disabled={busy || report.status !== 'ready' || !report.sha256}
+                onClick={() =>
+                  void act(async () => {
+                    unwrap(
+                      await window.audit.openReport({
+                        projectId: report.projectId,
+                        runId: report.runId,
+                        reportId: report.reportId
+                      })
+                    )
+                    return '已请求系统打开报告：' + report.reportId
+                  })
+                }
+              >
+                打开已登记 HTML
+              </button>
+            )}
             <button
-              data-testid="open-report"
+              data-testid="save-report"
               disabled={busy || report.status !== 'ready' || !report.sha256}
               onClick={() =>
                 void act(async () => {
-                  unwrap(
-                    await window.audit.openReport({
+                  const saved = unwrap(
+                    await window.audit.saveReport({
                       projectId: report.projectId,
                       runId: report.runId,
                       reportId: report.reportId
                     })
                   )
-                  return '已请求系统打开报告：' + report.reportId
+                  return saved.cancelled ? '另存已取消' : '已另存：' + saved.savedPath
                 })
               }
             >
-              打开已登记 HTML
+              另存 {report.format.toUpperCase()}
             </button>
           </article>
         ))}

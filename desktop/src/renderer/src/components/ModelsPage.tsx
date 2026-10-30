@@ -1,4 +1,5 @@
 import { ModelTestPanel } from './ModelTestPanel'
+import { OpenRouterGuide } from './OpenRouterGuide'
 import { modelTestController } from '../model-test-controller'
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import type { FormEvent } from 'react'
@@ -152,6 +153,10 @@ export function ModelsPage(): React.JSX.Element {
   return (
     <section className="card models-page" aria-label="手动模型配置">
       <h2>手动模型配置</h2>
+      <OpenRouterGuide
+        key={catalog?.total === 0 ? 'first' : 'settings'}
+        firstConfiguration={catalog?.total === 0}
+      />
       <p role="status" aria-live="polite">
         {message}
       </p>
@@ -169,164 +174,168 @@ export function ModelsPage(): React.JSX.Element {
       >
         刷新模型配置
       </button>
-      <fieldset disabled={locked || !catalog}>
-        <legend>当前选择</legend>
-        <label>
-          使用的配置
-          <select
-            aria-label="当前模型配置"
-            value={chosenId}
-            onChange={(event) => setChosenId(event.target.value)}
-          >
-            <option value="">未选择配置</option>
-            {options.map((item) => (
-              <option key={item.configId} value={item.configId}>
-                {item.name} / {item.modelId} / {item.configId}
-              </option>
-            ))}
-          </select>
-        </label>
-        <button
-          type="button"
-          className="button-primary"
-          onClick={() => void select()}
-          disabled={chosenId === (catalog?.selection.configId ?? '')}
-        >
-          应用选择
-        </button>
-        <p data-testid="selected-summary">
-          已保存的当前选择：
-          {catalog?.selection.model
-            ? `${catalog.selection.model.name} / ${catalog.selection.model.modelId} / ${catalog.selection.configId}`
-            : '未选择配置'}
-        </p>
-        <p className="muted">
-          保存配置不会自动切换当前选择。当前选择与下方正在编辑的配置可以不同。
-        </p>
-        {catalog?.selection.model && (
-          <button type="button" onClick={() => requestEditor(catalog.selection.model)}>
-            编辑当前选择
-          </button>
-        )}
-      </fieldset>
-      <ModelTestPanel
-        model={catalog?.selection.model ?? null}
-        disabled={busy}
-        pendingSelection={chosenId !== (catalog?.selection.configId ?? '')}
-      />
-      <fieldset disabled={locked}>
-        <legend>{draft.configId ? '编辑已保存配置' : '新建模型配置'}</legend>
-        <button type="button" onClick={() => requestEditor(null)}>
-          新建配置
-        </button>
-        {pendingEditor && (
-          <div role="alert">
-            <p>有未保存的修改，是否放弃后切换编辑对象？</p>
-            <button type="button" onClick={() => activateEditor(pendingEditor.record)}>
-              放弃修改并切换
+      <div className="model-config-layout">
+        <div className="model-selection-pane">
+          <fieldset disabled={locked || !catalog}>
+            <legend>当前选择</legend>
+            <label>
+              使用的配置
+              <select
+                aria-label="当前模型配置"
+                value={chosenId}
+                onChange={(event) => setChosenId(event.target.value)}
+              >
+                <option value="">未选择配置</option>
+                {options.map((item) => (
+                  <option key={item.configId} value={item.configId}>
+                    {item.name} / {item.modelId} / {item.configId}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button
+              type="button"
+              className="button-primary"
+              onClick={() => void select()}
+              disabled={chosenId === (catalog?.selection.configId ?? '')}
+            >
+              应用选择
             </button>
-            <button type="button" onClick={() => setPendingEditor(null)}>
-              继续编辑
-            </button>
-          </div>
-        )}
-        <form noValidate onSubmit={save}>
-          <p>
-            正在编辑 ID：{draft.configId ?? '保存后生成'} / revision：
-            {draft.expectedRevision ?? '新建'}
-          </p>
-          <label>
-            配置名称
-            <input
-              aria-label="配置名称"
-              value={draft.name}
-              maxLength={200}
-              aria-invalid={!!errors.name}
-              aria-describedby="model-name-error"
-              onChange={(event) => setDraft({ ...draft, name: event.target.value })}
-            />
-          </label>
-          {errors.name && (
-            <p id="model-name-error" role="alert">
-              {errors.name}
+            <p data-testid="selected-summary">
+              已保存的当前选择：
+              {catalog?.selection.model
+                ? `${catalog.selection.model.name} / ${catalog.selection.model.modelId} / ${catalog.selection.configId}`
+                : '未选择配置'}
             </p>
-          )}
-          <label>
-            Base URL
-            <input
-              aria-label="Base URL"
-              value={draft.baseUrl}
-              maxLength={2048}
-              aria-invalid={!!errors.baseUrl}
-              aria-describedby="model-url-error"
-              placeholder="https://服务地址/v1"
-              onChange={(event) => setDraft({ ...draft, baseUrl: event.target.value })}
-            />
-          </label>
-          {errors.baseUrl && (
-            <p id="model-url-error" role="alert">
-              {errors.baseUrl}
+            <p className="muted">
+              保存配置不会自动切换当前选择。当前选择与编辑区中的配置可以不同。
             </p>
-          )}
-          <label>
-            模型 ID
-            <input
-              aria-label="模型 ID"
-              value={draft.modelId}
-              maxLength={200}
-              aria-invalid={!!errors.modelId}
-              aria-describedby="model-id-error"
-              onChange={(event) => setDraft({ ...draft, modelId: event.target.value })}
-            />
-          </label>
-          {errors.modelId && (
-            <p id="model-id-error" role="alert">
-              {errors.modelId}
-            </p>
-          )}
-          <label>
-            API Key
-            <input
-              aria-label="API Key"
-              type="password"
-              autoComplete="off"
-              value={key}
-              aria-invalid={!!errors.apiKey}
-              aria-describedby="model-key-help model-key-error"
-              placeholder={
-                editingCredential ? '已保存，留空保留已有密钥' : '可稍后填写，未设置时无法调用'
-              }
-              onChange={(event) => setKey(event.target.value)}
-            />
-          </label>
-          <p id="model-key-help">
-            {editingCredential ? (
-              <>
-                <span aria-label="已保存密钥掩码">••••••••</span> 已关联系统凭据；不读取或回填原
-                Key。
-              </>
-            ) : (
-              '尚未设置密钥。'
-            )}{' '}
-            修改服务地址时需重新填写对应密钥。
-          </p>
-          {errors.apiKey && (
-            <p id="model-key-error" role="alert">
-              {errors.apiKey}
-            </p>
-          )}
-          <button type="submit" className="button-primary">
-            {busy ? '处理中…' : '保存模型配置'}
+            {catalog?.selection.model && (
+              <button type="button" onClick={() => requestEditor(catalog.selection.model)}>
+                编辑当前选择
+              </button>
+            )}
+          </fieldset>
+          <ModelTestPanel
+            model={catalog?.selection.model ?? null}
+            disabled={busy}
+            pendingSelection={chosenId !== (catalog?.selection.configId ?? '')}
+          />
+        </div>
+        <fieldset className="model-editor-pane" disabled={locked}>
+          <legend>{draft.configId ? '编辑已保存配置' : '新建模型配置'}</legend>
+          <button type="button" onClick={() => requestEditor(null)}>
+            新建配置
           </button>
-          <p className="muted">离开此页面会丢弃未保存的草稿和密钥输入；已保存配置不受影响。</p>
-        </form>
-      </fieldset>
+          {pendingEditor && (
+            <div role="alert">
+              <p>有未保存的修改，是否放弃后切换编辑对象？</p>
+              <button type="button" onClick={() => activateEditor(pendingEditor.record)}>
+                放弃修改并切换
+              </button>
+              <button type="button" onClick={() => setPendingEditor(null)}>
+                继续编辑
+              </button>
+            </div>
+          )}
+          <form noValidate onSubmit={save}>
+            <p>
+              正在编辑 ID：{draft.configId ?? '保存后生成'} / revision：
+              {draft.expectedRevision ?? '新建'}
+            </p>
+            <label>
+              配置名称
+              <input
+                aria-label="配置名称"
+                value={draft.name}
+                maxLength={200}
+                aria-invalid={!!errors.name}
+                aria-describedby="model-name-error"
+                onChange={(event) => setDraft({ ...draft, name: event.target.value })}
+              />
+            </label>
+            {errors.name && (
+              <p id="model-name-error" role="alert">
+                {errors.name}
+              </p>
+            )}
+            <label>
+              Base URL
+              <input
+                aria-label="Base URL"
+                value={draft.baseUrl}
+                maxLength={2048}
+                aria-invalid={!!errors.baseUrl}
+                aria-describedby="model-url-error"
+                placeholder="https://服务地址/v1"
+                onChange={(event) => setDraft({ ...draft, baseUrl: event.target.value })}
+              />
+            </label>
+            {errors.baseUrl && (
+              <p id="model-url-error" role="alert">
+                {errors.baseUrl}
+              </p>
+            )}
+            <label>
+              模型 ID
+              <input
+                aria-label="模型 ID"
+                value={draft.modelId}
+                maxLength={200}
+                aria-invalid={!!errors.modelId}
+                aria-describedby="model-id-error"
+                onChange={(event) => setDraft({ ...draft, modelId: event.target.value })}
+              />
+            </label>
+            {errors.modelId && (
+              <p id="model-id-error" role="alert">
+                {errors.modelId}
+              </p>
+            )}
+            <label>
+              API Key
+              <input
+                aria-label="API Key"
+                type="password"
+                autoComplete="off"
+                value={key}
+                aria-invalid={!!errors.apiKey}
+                aria-describedby="model-key-help model-key-error"
+                placeholder={
+                  editingCredential ? '已保存，留空保留已有密钥' : '可稍后填写，未设置时无法调用'
+                }
+                onChange={(event) => setKey(event.target.value)}
+              />
+            </label>
+            <p id="model-key-help">
+              {editingCredential ? (
+                <>
+                  <span aria-label="已保存密钥掩码">••••••••</span> 已关联系统凭据；不读取或回填原
+                  Key。
+                </>
+              ) : (
+                '尚未设置密钥。'
+              )}{' '}
+              修改服务地址时需重新填写对应密钥。
+            </p>
+            {errors.apiKey && (
+              <p id="model-key-error" role="alert">
+                {errors.apiKey}
+              </p>
+            )}
+            <button type="submit" className="button-primary">
+              {busy ? '处理中…' : '保存模型配置'}
+            </button>
+            <p className="muted">离开此页面会丢弃未保存的草稿和密钥输入；已保存配置不受影响。</p>
+          </form>
+        </fieldset>
+      </div>
       <h3>已保存配置</h3>
       <p>
         共 {catalog?.total ?? 0} 条，显示最近 {catalog?.models.length ?? 0} 条（最多 100 条）。
       </p>
       {catalog?.models.length === 0 && <p>尚无配置，请先新建并保存。</p>}
-      <ul>
+      <ul className="model-saved-list">
         {catalog?.models.map((item) => (
           <li key={item.configId}>
             <strong>{item.name}</strong> / {item.modelId} / {item.configId} / revision{' '}

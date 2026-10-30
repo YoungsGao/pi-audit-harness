@@ -16,6 +16,7 @@ export interface JavaMethod {
   bindings: { name: string; type: string; start: number; end: number }[]
 }
 export interface JavaCall {
+  semantic?: boolean
   caller: JavaMethod
   target: JavaMethod | null
   name: string

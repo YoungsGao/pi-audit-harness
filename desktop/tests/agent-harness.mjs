@@ -60,6 +60,13 @@ export async function createAgentHarness(t, mode = 'continue', budgets = {}, mod
   )
   const prepared = await chains.action('prepare', { projectId: project.projectId })
   const scope = { projectId: project.projectId, runId: prepared.runId }
+  // 此 fixture 明确模拟用户确认；未确认拒绝行为由 input-enhancements.test 覆盖。
+  const disclosure = await chains.action('disclosure', { ...scope, modelConfigId: 'model' })
+  await chains.action('authorize', {
+    ...scope,
+    modelConfigId: 'model',
+    scopeKey: disclosure.scopeKey
+  })
   t.after(async () => {
     await chains.close()
     await runtime.close()

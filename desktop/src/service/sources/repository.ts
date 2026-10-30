@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import type { SourceCatalog, SourceProject } from '../../shared/source-contracts'
 import type { LocalDatabase, Row } from '../storage/database'
 import type { SourceScan } from './scan'
+import { SnapshotRepository } from '../storage/snapshot-repository.ts'
 const select = `SELECT p.*,s.source_stamp,s.file_count,s.total_bytes,s.registered_at FROM projects p JOIN source_imports s ON s.project_id=p.id`
 function project(row: Row): SourceProject {
   return {
@@ -19,9 +20,11 @@ function project(row: Row): SourceProject {
   }
 }
 export class SourceRepository {
+  readonly snapshots: SnapshotRepository
   private db: LocalDatabase
   constructor(db: LocalDatabase) {
     this.db = db
+    this.snapshots = new SnapshotRepository(db)
   }
   catalog(): SourceCatalog {
     return {

@@ -1126,7 +1126,7 @@
               "text": "event 驱动 Harness 状态迁移；data.type 区分 thinking/process/result。id 只用于事件排序、去重与补发，不与 Pi 会话检查点或 ZSet score 强绑定。"
             },
             {
-              "title": "会话管理待确认",
+              "title": "会话恢复已验证",
               "text": "优先验证 Pi SessionManager 的持久化与恢复能力；不将 LevelDB / ZSet 作为必选实现。"
             },
             {
@@ -1792,7 +1792,7 @@
       "title": "任务控制与恢复",
       "priority": "P1",
       "module": "M03",
-      "description": "提供任务停止与状态恢复；会话管理方案待确认，优先验证 Pi 原生持久化和继续会话能力。",
+      "description": "提供任务停止与证据驱动的可验证恢复；采用Pi原生上下文与SQLite业务检查点，恢复前核对原材料、进度和预算。",
       "acceptance": [
         "停止与任务状态持久化：停止请求得到明确确认",
         "风险点边界检查点恢复：已提交风险点不丢失、不重复计数"
@@ -1833,7 +1833,7 @@
           "id": "RUN-02",
           "module": "M10",
           "title": "风险点边界检查点恢复",
-          "description": "支持风险点边界的任务恢复；会话上下文恢复优先验证 Pi 原生能力，具体方案待确认。",
+          "description": "支持路径提交边界与安全轮次恢复；Pi原生会话、宿主进度和取证回执共同核验，已提交结果不重复。",
           "acceptance": [
             "已提交风险点不丢失、不重复计数",
             "未提交风险点可重跑，并说明用量影响",
@@ -1855,27 +1855,27 @@
           "ref": "FR-12 / A10",
           "design": [
             {
-              "title": "会话管理（待确认）",
-              "text": "优先验证 Pi SessionManager，LevelDB / ZSet 仅为发现能力缺口后的备选，不作为当前验收必选技术。"
+              "title": "已采用：可验证会话恢复",
+              "text": "已验证Pi 1.2.0 SessionManager重开与真实续跑；Harness校验证据、原条件和累计预算，不引入LevelDB / ZSet。"
             }
           ]
         }
       ],
       "design": [
         {
-          "title": "会话管理（待确认）",
-          "text": "验证 Pi SessionManager 的会话持久化、打开与继续能力；SQLite 记录 chainId 与 Pi sessionId / sessionFile 的关联。"
+          "title": "已采用：可验证会话恢复",
+          "text": "采用Pi原生格式安全会话副本及SessionManager.open；SQLite记录路径、Pi会话/leaf/文件、宿主进度与恢复来源。"
         },
         {
-          "title": "会话管理（待确认）",
-          "text": "中断后的上下文恢复、工具执行边界、业务结果幂等，以及源码或配置变更后的处理。恢复会话不保证恢复执行中的精确位置。"
+          "title": "已采用：可验证会话恢复",
+          "text": "已验证上下文重开、工具回执、原快照/配置绑定、提交幂等和跨PID强制中断；不承诺恢复任意在途请求的精确位置。"
         },
         {
-          "title": "会话管理（待确认）",
-          "text": "只有 Pi 原生能力存在明确缺口时，再评估 LevelDB / ZSet 会话快照；具体存储与检查点协议尚未确定。"
+          "title": "已采用：可验证会话恢复",
+          "text": "使用安全轮次检查点，文件同步发布后登记；会话不可用则明确按已核验证据重建或重跑当前未提交路径。"
         },
         {
-          "title": "会话管理（待确认）",
+          "title": "已采用：可验证会话恢复",
           "text": "Pi 管理会话上下文，Harness / SQLite 管理调用链任务；SSE id 用作事件游标，不与会话 checkpoint 或 ZSet score 强绑定。"
         }
       ]
@@ -2343,9 +2343,9 @@
     "grouping": "列表仅展示 15 个父需求，原 59 项细节完整保留为子需求。子需求继承所属父需求优先级。"
   },
   "designBoard": {
-    "updated": "2026-10-18",
+    "updated": "2026-10-29",
     "title": "关键设计",
-    "status": "状态机 · SSE 协议 · 会话管理（待确认）",
+    "status": "状态机 · SSE协议 · 已采用可验证会话恢复",
     "states": [
       [
         "init",
@@ -2420,30 +2420,30 @@
         "sections": [
           {
             "title": "协议",
-            "text": "event 驱动状态；id = checkpoint = score；data 是一个 JSON 对象，使用 type 区分思考、过程、结果。"
+            "text": "event驱动传输状态；id为会话内事件游标，与Agent检查点分离；data为JSON对象。"
           }
         ]
       },
       {
         "id": "DESIGN-02",
         "title": "会话管理",
-        "label": "待确认 · 优先验证 Pi 原生能力",
+        "label": "已采用 · Pi原生上下文＋证据检查点",
         "related": [
           "ANALYZE-01",
           "RECOVERY-01"
         ],
         "sections": [
           {
-            "title": "优先方案",
-            "text": "验证 Pi SessionManager 的会话持久化、打开与继续能力；SQLite 记录 chainId 与 Pi sessionId / sessionFile 的关联。"
+            "title": "采用方案",
+            "text": "采用Pi原生格式安全会话副本及SessionManager.open；SQLite记录路径、Pi会话/leaf/文件、宿主进度与恢复来源。"
           },
           {
-            "title": "待验证",
-            "text": "中断后的上下文恢复、工具执行边界、业务结果幂等，以及源码或配置变更后的处理。恢复会话不保证恢复执行中的精确位置。"
+            "title": "已验证边界",
+            "text": "已验证上下文重开、工具回执、原快照/配置绑定、提交幂等和跨PID强制中断；不承诺恢复任意在途请求的精确位置。"
           },
           {
-            "title": "备选方案",
-            "text": "只有 Pi 原生能力存在明确缺口时，再评估 LevelDB / ZSet 会话快照；具体存储与检查点协议尚未确定。"
+            "title": "损坏回退",
+            "text": "使用安全轮次检查点，文件同步发布后登记；会话不可用则明确按已核验证据重建或重跑当前未提交路径。"
           },
           {
             "title": "职责分开",

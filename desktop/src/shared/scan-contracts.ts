@@ -57,6 +57,7 @@ export interface PathSummary {
   updatedAt: string
 }
 export interface PathDetail extends PathSummary {
+  manualPoint?: import('./input-enhancements').ManualRiskPoint
   steps: {
     stepIndex: number
     edge: CallEdgeInput & { uid: string }
@@ -90,6 +91,13 @@ export interface ScanOutput {
   summary: ScanSummary
 }
 export type AuditAction =
+  | 'stop'
+  | 'recovery'
+  | 'resume'
+  | 'snapshot'
+  | 'disclosure'
+  | 'authorize'
+  | 'manualRisk'
   | 'prepare'
   | 'runs'
   | 'list'
@@ -107,6 +115,10 @@ export interface AnalysisAccepted {
   status: 'analyzing'
 }
 export type AuditData =
+  | import('./run-contracts').RunRecoveryView
+  | import('./input-enhancements').SnapshotInfo
+  | import('./input-enhancements').DisclosureScope
+  | (GraphSaved & { snapshotId: string })
   | PreparedScan
   | ScanCatalog
   | PathList

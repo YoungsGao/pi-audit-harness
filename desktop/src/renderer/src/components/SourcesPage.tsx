@@ -78,7 +78,7 @@ export function SourcesPage(): React.JSX.Element {
         重新检测 Git 与 rg
       </button>
       {tools && (
-        <div className="source-tools">
+        <div className="source-tools" role="group" aria-label="工具状态">
           <p>
             Git：{tools.git.state} {tools.git.version}
           </p>
@@ -92,7 +92,7 @@ export function SourcesPage(): React.JSX.Element {
             </p>
           )}
           {tools.rg.state !== 'available' && (
-            <p>rg 尚不可用，本次源码登记不依赖 rg；后续基础查询能力另行接入。</p>
+            <p>rg 尚不可用，源码登记与固定快照查询仍可进行；已登记目录的文本搜索需要修复 rg。</p>
           )}
         </div>
       )}

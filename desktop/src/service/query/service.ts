@@ -13,6 +13,9 @@ import type { SourceScan } from '../sources/scan.ts'
 import { command } from '../sources/process.ts'
 import { builtinRules, findRiskCandidates } from '../rules/builtin.ts'
 import { indexJavaFile } from '../scanning/java-index.ts'
+import { UnifiedQueryService } from './unified-service.ts'
+import type { RuntimeOptions } from './java-runtime.ts'
+type QueryScan = SourceScan & { snapshotScope?: { projectId: string; runId: string } }
 
 export function queryInput(value: unknown, keys: string[]): Record<string, unknown> {
   if (
@@ -45,11 +48,18 @@ function check(signal: AbortSignal): void {
 }
 
 export class CodeQueryService {
+  readonly unified: UnifiedQueryService
+  readonly semanticPathsEnabled: boolean
+  get snapshots(): SourceRepository['snapshots'] {
+    return this.repo.snapshots
+  }
   private readonly repo: SourceRepository
   private readonly closing = new AbortController()
   private readonly tasks = new Set<Promise<unknown>>()
-  constructor(repo: SourceRepository) {
+  constructor(repo: SourceRepository, options: RuntimeOptions = {}) {
     this.repo = repo
+    this.unified = new UnifiedQueryService(repo, options)
+    this.semanticPathsEnabled = !!options.dataRoot
   }
   project(projectId: string): import('../../shared/source-contracts').SourceProject {
     const project = this.repo.get(queryText(projectId, 80))
@@ -60,7 +70,8 @@ export class CodeQueryService {
     projectId: string,
     filePath: string,
     methodKey: string,
-    signal: AbortSignal
+    signal: AbortSignal,
+    runId?: string
   ): Promise<{
     filePath: string
     startLine: number
@@ -68,7 +79,7 @@ export class CodeQueryService {
     text: string
     complete: boolean
   } | null> {
-    const { scan } = await this.scope(projectId, signal)
+    const { scan } = await this.scope(projectId, signal, runId)
     const source = await this.readSource(scan, filePath, signal)
     if (Buffer.byteLength(source) > 256 * 1024) return null
     let method
@@ -109,29 +120,53 @@ export class CodeQueryService {
   async close(): Promise<void> {
     this.closing.abort()
     await Promise.allSettled(this.tasks)
+    await this.unified.close()
   }
 
   async sourceSnapshot(
     projectId: string,
     signal: AbortSignal
-  ): Promise<{ sourceStamp: string; files: { filePath: string; source: string }[] }> {
+  ): Promise<{
+    sourceStamp: string
+    files: { filePath: string; source: string; bytes: Uint8Array }[]
+  }> {
     const { scan } = await this.scope(projectId, signal)
-    const files: { filePath: string; source: string }[] = []
-    for (const file of scan.files)
+    const files: { filePath: string; source: string; bytes: Uint8Array }[] = []
+    for (const file of scan.files) {
+      const bytes = await this.readBytes(scan, file.filePath, signal)
       files.push({
         filePath: file.filePath,
-        source: await this.readSource(scan, file.filePath, signal)
+        source: bytes.toString('utf8'),
+        bytes
       })
+    }
     return { sourceStamp: scan.stamp, files }
   }
 
   private async scope(
     projectId: unknown,
-    signal: AbortSignal
-  ): Promise<{ projectId: string; scan: SourceScan }> {
+    signal: AbortSignal,
+    runId?: unknown
+  ): Promise<{ projectId: string; scan: QueryScan }> {
     const id = queryText(projectId, 80),
       project = this.repo.get(id)
     if (!project) throw new ApiError('SOURCE_NOT_FOUND', '未找到已登记源码项目', 404)
+    if (runId !== undefined) {
+      const run = queryText(runId, 80),
+        info = this.snapshots.info(id, run)
+      check(signal)
+      return {
+        projectId: id,
+        scan: {
+          path: '',
+          stamp: info.sourceStamp,
+          files: info.files,
+          fileCount: info.files.length,
+          totalBytes: info.files.reduce((n, f) => n + f.size, 0),
+          snapshotScope: { projectId: id, runId: run }
+        }
+      }
+    }
     const scan = await scanJava(project.path, signal)
     check(signal)
     if (scan.stamp !== project.sourceStamp)
@@ -144,10 +179,20 @@ export class CodeQueryService {
   }
 
   private async readSource(
-    scan: SourceScan,
+    scan: QueryScan,
     filePath: string,
     signal: AbortSignal
   ): Promise<string> {
+    check(signal)
+    if (scan.snapshotScope)
+      return this.snapshots.read(scan.snapshotScope.projectId, scan.snapshotScope.runId, filePath)
+    return (await this.readBytes(scan, filePath, signal)).toString('utf8')
+  }
+  private async readBytes(
+    scan: SourceScan,
+    filePath: string,
+    signal: AbortSignal
+  ): Promise<Buffer> {
     check(signal)
     const file = scan.files.find((item) => item.filePath === filePath)
     if (!file) throw new ApiError('QUERY_FILE_OUT_OF_SCOPE', '文件不在当前 Java 查询范围', 403)
@@ -169,7 +214,7 @@ export class CodeQueryService {
     check(signal)
     if (createHash('sha256').update(bytes).digest('hex') !== file.sha256)
       throw new ApiError('QUERY_SOURCE_CHANGED', '读取期间源码发生变化，请重试', 409)
-    return bytes.toString('utf8')
+    return bytes
   }
 
   private async execute(
@@ -178,15 +223,16 @@ export class CodeQueryService {
     signal: AbortSignal
   ): Promise<unknown> {
     try {
+      if (action === 'query') return await this.unified.execute(value, signal)
       const row = queryInput(
         value,
         action === 'search'
           ? ['projectId', 'text', 'maxResults']
           : action === 'read'
-            ? ['projectId', 'filePath', 'startLine', 'endLine']
+            ? ['projectId', 'runId', 'filePath', 'startLine', 'endLine']
             : ['projectId', 'maxResults']
       )
-      const { projectId, scan } = await this.scope(row.projectId, signal)
+      const { projectId, scan } = await this.scope(row.projectId, signal, row.runId)
       if (action === 'read') {
         const filePath = queryText(row.filePath, 1000)
         if (

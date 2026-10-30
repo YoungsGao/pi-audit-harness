@@ -10,6 +10,8 @@ import type { PathAnalysisService } from './path-analysis.ts'
 import { validateAnalyze } from '../../shared/sse-contracts.ts'
 import type { AnalyzeRequest, StreamFrame } from '../../shared/sse-contracts.ts'
 import { retryWrite } from '../storage/retry-write.ts'
+import { addManualRisk } from '../scanning/manual-risk.ts'
+import { runControlInput } from '../../shared/run-contracts.ts'
 
 export type ChainAction = AuditAction
 export class CallChainService {
@@ -57,6 +59,67 @@ export class CallChainService {
   async action(action: ChainAction, value: unknown, signal?: AbortSignal): Promise<unknown> {
     const combined = AbortSignal.any([this.closing.signal, ...(signal ? [signal] : [])])
     if (combined.aborted) throw new ApiError('QUERY_CANCELLED', '调用链操作已取消', 499)
+    if (action === 'stop' || action === 'recovery' || action === 'resume') {
+      let input: ReturnType<typeof runControlInput>
+      try {
+        input = runControlInput(action, value)
+      } catch {
+        throw new ApiError('RUN_INVALID_INPUT', '任务控制参数无效', 400)
+      }
+      if (!this.analysis) throw new ApiError('ANALYSIS_NOT_READY', '分析服务尚未就绪', 503)
+      return action === 'stop'
+        ? this.analysis.stop(input.projectId, input.runId)
+        : action === 'resume'
+          ? this.analysis.resume(
+              input.projectId,
+              input.runId,
+              input.expectedRecoveryKey!,
+              input.maxPaths!
+            )
+          : this.analysis.recovery(input.projectId, input.runId)
+    }
+    if (action === 'snapshot') {
+      const row = queryInput(value, ['projectId', 'runId'])
+      return this.query.snapshots.info(queryText(row.projectId, 80), queryText(row.runId, 80))
+    }
+    if (action === 'disclosure' || action === 'authorize') {
+      const row = queryInput(
+        value,
+        action === 'authorize'
+          ? ['projectId', 'runId', 'modelConfigId', 'scopeKey']
+          : ['projectId', 'runId', 'modelConfigId']
+      )
+      const projectId = queryText(row.projectId, 80),
+        runId = queryText(row.runId, 80),
+        modelId = queryText(row.modelConfigId, 80)
+      return action === 'authorize'
+        ? this.repo.scans.disclosure.confirm(projectId, runId, modelId, queryText(row.scopeKey, 64))
+        : this.repo.scans.disclosure.preview(projectId, runId, modelId)
+    }
+    if (action === 'manualRisk') {
+      const row = queryInput(value, [
+        'projectId',
+        'runId',
+        'filePath',
+        'line',
+        'column',
+        'functionKey',
+        'ruleId',
+        'note'
+      ])
+      const projectId = queryText(row.projectId, 80)
+      if (this.scanning.has(projectId))
+        throw new ApiError('SCAN_BUSY', '项目正在预处理，请稍后登记', 409)
+      this.scanning.add(projectId)
+      const task = addManualRisk(this.repo, this.query.snapshots, row, combined)
+      this.tasks.add(task)
+      try {
+        return await task
+      } finally {
+        this.scanning.delete(projectId)
+        this.tasks.delete(task)
+      }
+    }
     if (action === 'analyzePending') {
       const row = queryInput(value, ['projectId', 'runId', 'modelConfigId', 'maxPaths'])
       if (!this.analysis) throw new ApiError('ANALYSIS_NOT_READY', '分析服务尚未接入', 503)
@@ -106,7 +169,15 @@ export class CallChainService {
     }
     const allowed =
       action === 'prepare'
-        ? ['projectId', 'maxResults', 'maxDepth', 'maxNodes', 'maxPaths']
+        ? [
+            'projectId',
+            'maxResults',
+            'maxDepth',
+            'maxNodes',
+            'maxPaths',
+            'templateRefs',
+            'projectReviewRevision'
+          ]
         : action === 'runs'
           ? ['projectId']
           : action === 'list'
@@ -159,18 +230,31 @@ export class CallChainService {
     }
     const project = this.query.project(projectId),
       runId = randomUUID()
-    this.repo.scans.begin(projectId, runId, project.sourceStamp, builtinRules.version)
+    this.repo.scans.begin(
+      projectId,
+      runId,
+      project.sourceStamp,
+      builtinRules.version,
+      row.templateRefs,
+      row.projectReviewRevision
+    )
     this.scanning.add(projectId)
     const task = (async (): Promise<PreparedScan> => {
       try {
         const snapshot = await this.query.sourceSnapshot(projectId, combined)
+        this.query.snapshots.save(projectId, runId, snapshot.sourceStamp, snapshot.files)
         const output = await preprocessJava(
           projectId,
           runId,
           snapshot.sourceStamp,
           snapshot.files,
           combined,
-          limits
+          limits,
+          undefined,
+          this.query.semanticPathsEnabled
+            ? (methods, calls) =>
+                this.query.unified.resolveCalls(projectId, runId, methods, calls, combined)
+            : undefined
         )
         if (combined.aborted) throw new ApiError('QUERY_CANCELLED', '预处理已取消', 499)
         const saved = this.repo.saveGraph(output.graph, output.summary)

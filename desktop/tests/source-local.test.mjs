@@ -72,18 +72,18 @@ test('migration 4 preserves version 3 rows and rolls back failed next migration'
     'now'
   )
   migrate(db)
-  assert.equal(db.get('PRAGMA user_version').user_version, 8)
+  assert.equal(db.get('PRAGMA user_version').user_version, 12)
   assert.equal(db.get("SELECT name FROM projects WHERE id='legacy'").name, 'kept')
   assert.throws(() =>
     migrate(db, [
       ...migrations,
       {
-        version: 9,
+        version: 13,
         name: 'broken-test',
         sql: 'CREATE TABLE should_rollback(id TEXT); INSERT INTO absent VALUES(1);'
       }
     ])
   )
-  assert.equal(db.get('PRAGMA user_version').user_version, 8)
+  assert.equal(db.get('PRAGMA user_version').user_version, 12)
   assert.equal(db.get("SELECT name FROM sqlite_schema WHERE name='should_rollback'"), undefined)
 })

@@ -22,3 +22,9 @@ out-chains-test/
 out-scan-test/
 .scan-test-data/
 .agent-learning/
+out-templates-test/
+.templates-test-data/
+.review-test-data/
+out-review-test/
+.run-test-data/
+out-run-test/

@@ -8,10 +8,12 @@ import type { ModelCatalog } from '../src/shared/model-settings'
 import type { ApiResult } from '../src/shared/service-protocol'
 import { createMod01Fixture } from './mod01-fixture.mjs'
 import cleanupPath from './db02-cleanup-worker.ts?modulePath'
+import { helpLinks } from '../src/shared/help-links'
 const root = mkdtempSync(join(tmpdir(), 'pi-mod01-electron-'))
 app.setPath('userData', join(root, 'profile'))
 let window: BrowserWindow | undefined
 let logs = ''
+const helpOpened: string[] = []
 const service = new ServiceManager(
   (status) => {
     if (window && !window.isDestroyed()) window.webContents.send('service:status-changed', status)
@@ -93,6 +95,10 @@ void app.whenReady().then(async () => {
   const a = await createMod01Fixture({ modelId: 'model-a-explicit', key: keyA }),
     b = await createMod01Fixture({ modelId: 'model-b-explicit', key: keyB })
   try {
+    ipcMain.handle('help:open', (_event, id: keyof typeof helpLinks) => {
+      assert.ok(Object.hasOwn(helpLinks, id))
+      helpOpened.push(helpLinks[id])
+    })
     ipcMain.handle('app:get-info', () => ({
       name: 'MOD01 fixture',
       version: '1',
@@ -122,6 +128,28 @@ void app.whenReady().then(async () => {
     const firstPid = watchLogs()
     await click('模型配置', true)
     await idle()
+    await until(
+      () => evalJs('!!document.querySelector("[data-testid=openrouter-guide]")'),
+      'first configuration guide missing'
+    )
+    const tutorial = await evalJs<string>(
+      'document.querySelector("[data-testid=openrouter-guide]").textContent'
+    )
+    for (const word of [
+      '账号',
+      'API Keys',
+      'provider/model-name',
+      'https://openrouter.ai/api/v1',
+      '额度'
+    ])
+      assert.ok(tutorial.includes(word), word)
+    await evalJs(
+      'Array.from(document.querySelectorAll("a")).find(a=>a.textContent==="API Keys").click()'
+    )
+    assert.deepEqual(helpOpened, [helpLinks.keys])
+    await click('收起 OpenRouter 配置教程')
+    await click('打开 OpenRouter 配置教程')
+    assert.equal(a.requests.length + b.requests.length, 0)
     assert.equal((await state()).selection.configId, null)
     await submit()
     await until(async () => (await text()).includes('请先修正表单'), 'inline validation missing')
@@ -148,6 +176,12 @@ void app.whenReady().then(async () => {
       idA = initial.models.find((x) => x.name === '配置 A')!.configId,
       idB = initial.models.find((x) => x.name === '配置 B')!.configId
     assert.equal(initial.selection.configId, null)
+    await click('打开 OpenRouter 配置教程')
+    assert.equal(await evalJs('!!document.querySelector("[data-testid=openrouter-guide]")'), true)
+    await click('收起 OpenRouter 配置教程')
+    console.info(
+      'PASS MOD-02: first-configuration guide, settings entry, placeholder model, fixed official links and zero provider requests.'
+    )
     assert.equal(a.requests.length + b.requests.length, 0)
     await fill('当前模型配置', idA, true)
     await click('应用选择')
