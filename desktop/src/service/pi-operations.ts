@@ -18,6 +18,7 @@ import { createAuditExtension } from './pi/extensions/audit.ts'
 import { createReportExtension } from './pi/extensions/report.ts'
 import { normalizePiFailure } from './pi-errors.ts'
 import { runAgentLoop } from './chains/agent-loop.ts'
+import { publicAnalysisValue } from '../shared/path-detail-view.ts'
 
 type Session = CreateAgentSessionResult['session']
 
@@ -118,7 +119,7 @@ export class PiOperations {
           const data = await execute(session, collector, signal)
           collector.assertHealthy()
           return {
-            ...data,
+            ...(publicAnalysisValue(data, 0, [selected.apiKey]) as T),
             ...context,
             model: {
               configId: selected.config.id,

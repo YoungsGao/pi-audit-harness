@@ -247,6 +247,12 @@ void app.whenReady().then(async () => {
     assert.equal(report.status, 'ready')
     const reportText = readFileSync(report.filePath, 'utf8'),
       document = JSON.parse(reportText)
+    assert.equal(document.queryGraph.backend, 'codegraph')
+    assert.ok(
+      document.queryGraph.facts.some(
+        (f: { verification: string }) => f.verification === 'verified-structural'
+      )
+    )
     assert.equal(document.recovery.uncertainRequests, 1)
     assert.equal(
       document.recovery.paths.find((p: { pathId: string }) => p.pathId === pathId).lastRecovery
@@ -263,6 +269,7 @@ void app.whenReady().then(async () => {
           requestsBeforeResume: requests,
           totalRequests: model.requests.length,
           recovery: document.recovery,
+          queryGraph: document.queryGraph,
           source: 'actual Electron React utilityProcess Pi SDK and CRLF snapshot'
         },
         null,

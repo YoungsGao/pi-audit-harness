@@ -16,7 +16,7 @@ export async function preprocessJava(
   signal: AbortSignal,
   limits: { maxResults?: number; maxDepth?: number; maxNodes?: number; maxPaths?: number } = {},
   manual?: import('../../shared/code-query-contracts').RiskCandidate,
-  semanticResolver?: (methods: JavaMethod[], calls: JavaCall[]) => Promise<ScanWarning[]>
+  callResolver?: (methods: JavaMethod[], calls: JavaCall[]) => Promise<ScanWarning[]>
 ): Promise<ScanOutput> {
   const maxResults = limits.maxResults ?? 100,
     methods: JavaMethod[] = [],
@@ -72,8 +72,8 @@ export async function preprocessJava(
       failed: false
     })
   resolveCallTargets(methods, calls)
-  if (semanticResolver)
-    warnings.push(...(await semanticResolver(methods, calls)).slice(0, 50 - warnings.length))
+  if (callResolver)
+    warnings.push(...(await callResolver(methods, calls)).slice(0, 50 - warnings.length))
   const edgeMap = new Map<string, CallEdge>(),
     sinkUids: string[] = [],
     entryByKey = new Map(methods.map((m) => [m.key, m.entry]))

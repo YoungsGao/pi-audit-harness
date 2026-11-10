@@ -4,7 +4,6 @@ import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { spawn } from 'node:child_process'
-import { pathToFileURL } from 'node:url'
 import { openStorage } from '../src/service/storage/schema.ts'
 import { SourceRepository } from '../src/service/sources/repository.ts'
 import { importLocal } from '../src/service/sources/local.ts'
@@ -15,11 +14,8 @@ import { startHttpServer } from '../src/service/http-server.ts'
 import { queryOnce } from '../scripts/query-cli.mjs'
 import { validateQuery } from '../src/service/query/unified-service.ts'
 import { LanguageRegistry } from '../src/service/query/language-registry.ts'
-import { fromLspPosition, toLspPosition } from '../src/service/query/positions.ts'
-import { LspRpc } from '../src/service/query/lsp-rpc.ts'
-import { semanticJava } from '../src/service/query/semantic-java.ts'
+import { decodePosition, encodePosition } from '../src/service/query/positions.ts'
 import { ApiError } from '../src/shared/api-error.ts'
-import { JavaRuntimePool, waitFor } from '../src/service/query/java-runtime.ts'
 
 async function fixture(t) {
   const root = await mkdtemp(join(tmpdir(), 'pi-query-enhanced-')),
@@ -74,8 +70,8 @@ test('QRY-02/05 strict contract: per-operation fields, UTF positions and languag
   const registry = new LanguageRegistry(),
     adapter = {
       language: 'java',
-      backend: 'java-jdtls',
-      backendLabel: 'jdtls',
+      backend: 'java-codegraph',
+      backendLabel: 'codegraph',
       query: async () => ({ items: [], gaps: [] }),
       extensions: ['.java'],
       encodings: ['utf-16'],
@@ -99,7 +95,13 @@ test('QRY-02/05 strict contract: per-operation fields, UTF positions and languag
   })
   const runtimeState = { ...catalog.runtime, state: 'ready', capabilities: ['definition'] }
   h.query.unified.backends.set('fixture-provider', {
-    get: () => ({ status: () => runtimeState, use: async (fn) => fn({ state: runtimeState }) }),
+    backend: 'fixture-semantic',
+    semantic: false,
+    status: () => runtimeState,
+    query: async () => {
+      dispatched++
+      return { items: [], gaps: [] }
+    },
     close: async () => {}
   })
   const routed = await h.query.action('query', { ...input, language: 'fixture-language' })
@@ -116,14 +118,14 @@ test('QRY-02/05 strict contract: per-operation fields, UTF positions and languag
   const source = 'a中😀z\r\nnext'
   for (const encoding of ['utf-8', 'utf-16', 'utf-32']) {
     const position = { line: 1, column: 5 },
-      lsp = toLspPosition(source, position, encoding)
-    assert.deepEqual(fromLspPosition(source, lsp, encoding), position)
+      encoded = encodePosition(source, position, encoding)
+    assert.deepEqual(decodePosition(source, encoded, encoding), position)
   }
-  assert.equal(toLspPosition(source, { line: 1, column: 5 }, 'utf-8').character, 8)
-  assert.throws(() => toLspPosition(source, { line: 1, column: 4 }, 'utf-16'), {
+  assert.equal(encodePosition(source, { line: 1, column: 5 }, 'utf-8').character, 8)
+  assert.throws(() => encodePosition(source, { line: 1, column: 4 }, 'utf-16'), {
     code: 'QUERY_INVALID_POSITION'
   })
-  assert.throws(() => fromLspPosition(source, { line: 0, character: 5 }, 'utf-8'), {
+  assert.throws(() => decodePosition(source, { line: 0, character: 5 }, 'utf-8'), {
     code: 'QUERY_BACKEND_OUTPUT'
   })
 })
@@ -179,41 +181,25 @@ test('QRY-02 reads/searches are snapshot-bound; no-match, truncation, cancelled 
   )
   assert.equal(cancelled.status, 'cancelled')
 })
-test('QRY-04 missing runtime falls back to candidates with coverage gaps; original failure remains observable', async (t) => {
+test('QRY-04 removed backend is rejected and explicit basic mode stays candidate-only', async (t) => {
   const h = await fixture(t)
-  const query = new CodeQueryService(h.repo, {
-    dataRoot: join(h.root, 'missing-runtime'),
-    javaHome: join(h.root, 'no-java'),
-    jdtlsHome: join(h.root, 'no-jdt')
+  assert.throws(() => new CodeQueryService(h.repo, { backend: 'jdtls' }), {
+    code: 'QUERY_BACKEND_INVALID'
   })
-  t.after(() => query.close())
-  const request = {
+  const q = new CodeQueryService(h.repo, { backend: 'basic' })
+  t.after(() => q.close())
+  const output = await q.action('query', {
     ...h.scope,
     operation: 'definition',
     filePath: 'Demo.java',
     line: 1,
     column: h.source.indexOf('to(q)') + 1
-  }
-  const missing = await query.action('query', { ...request, fallback: false })
-  assert.equal(missing.status, 'not-ready')
-  assert.equal(missing.errorCode, 'QUERY_RUNTIME_MISSING')
-  const fallback = await query.action('query', request)
-  assert.equal(fallback.status, 'partial')
-  assert.equal(fallback.backend, 'basic')
-  assert.ok(fallback.gaps.includes('BASIC_CANDIDATES_NOT_SEMANTIC'))
-  assert.ok(fallback.items.every((i) => i.resolution === 'candidate'))
-  assert.ok(fallback.items[0].symbol.signature.includes('String'))
-  const outgoing = await query.action('query', {
-    ...request,
-    operation: 'outgoingCalls',
-    column: h.source.indexOf('void to') + 6
   })
-  assert.equal(outgoing.items.length, 0) // 同一行上的第二个方法不能误选第一个方法。
-  assert.ok(outgoing.gaps.includes('CALL_TARGET_UNRESOLVED'))
-  const status = await query.action('query', { ...h.scope, operation: 'status' })
-  assert.equal(status.runtime.starts, 0)
-  assert.equal(status.runtime.state, 'failed')
+  assert.equal(output.backend, 'basic')
+  assert.equal(output.status, 'partial')
+  assert.ok(output.items.every((i) => i.resolution === 'candidate'))
 })
+
 test('QRY-02 real authenticated HTTP and separate CLI process share the same contract and reject arbitrary routing', async (t) => {
   const h = await fixture(t),
     token = 'query-test-token-'.repeat(3)
@@ -254,80 +240,9 @@ test('QRY-02 real authenticated HTTP and separate CLI process share the same con
     /QUERY_CLI_CONNECTION/
   )
 })
-function rpcFixture(t) {
-  const rpc = new LspRpc(
-    process.execPath,
-    [join(import.meta.dirname, 'fixtures', 'query-lsp-fixture.mjs')],
-    tmpdir(),
-    process.env
-  )
-  t.after(() => rpc.close())
-  return rpc
-}
-test('QRY-04 stdio framing handles fragmented UTF-8 and client requests; unsupported, timeout and cancellation do not poison later requests', async (t) => {
-  const rpc = rpcFixture(t)
-  rpc.onServerRequest = (method) =>
-    method === 'workspace/applyEdit' ? { applied: false } : undefined
-  assert.equal(await rpc.request('client-request', {}, 1000), '问😀')
-  await assert.rejects(rpc.request('unsupported', {}, 1000), { code: 'QUERY_UNSUPPORTED' })
-  await assert.rejects(rpc.request('slow', {}, 20), { code: 'QUERY_TIMEOUT' })
-  const controller = new AbortController(),
-    pending = rpc.request('slow', {}, 1000, controller.signal)
-  controller.abort()
-  await assert.rejects(pending, { code: 'QUERY_CANCELLED' })
-  await new Promise((r) => setTimeout(r, 160))
-  assert.deepEqual(await rpc.request('echo', { newRequest: true }, 1000), { newRequest: true })
-  assert.equal(rpc.pendingCount, 0)
-})
-test('QRY-04 crashed and malformed peers settle all requests and stop accepting work', async (t) => {
-  const crash = rpcFixture(t)
-  await assert.rejects(crash.request('crash', {}, 1000), { code: 'QUERY_RUNTIME_EXITED' })
-  const malformed = rpcFixture(t)
-  await assert.rejects(malformed.request('malformed', {}, 1000), { code: 'QUERY_PROTOCOL_ERROR' })
-  assert.equal(crash.pendingCount, 0)
-  assert.equal(malformed.pendingCount, 0)
-})
-test('QRY-03/05 semantic location adapters preserve signatures, filter external URIs and negotiate hierarchy without guessing', async () => {
-  const source = 'package demo; class A { void x() {} }',
-    filePath = 'demo/A.java',
-    root = join(tmpdir(), 'query-adapter-root'),
-    uri = pathToFileURL(join(root, filePath)).href
-  const range = { start: { line: 0, character: 23 }, end: { line: 0, character: 34 } },
-    selectionRange = { start: { line: 0, character: 28 }, end: { line: 0, character: 29 } }
-  const responses = {
-    'textDocument/definition': [
-      { targetUri: uri, targetSelectionRange: selectionRange },
-      { uri: 'jdt://external/Library.class', range }
-    ],
-    'textDocument/documentSymbol': [
-      {
-        name: 'A',
-        kind: 5,
-        range: { start: { line: 0, character: 14 }, end: { line: 0, character: 36 } },
-        selectionRange: { start: { line: 0, character: 20 }, end: { line: 0, character: 21 } },
-        children: [{ name: 'x()', detail: ' : void', kind: 6, range, selectionRange }]
-      }
-    ]
-  }
-  const runtime = {
-    root,
-    sourceGaps: [],
-    snapshot: { files: [{ filePath, source }] },
-    state: { positionEncoding: 'utf-16', capabilities: ['symbols', 'definition'] },
-    request: async (method) => responses[method]
-  }
-  const result = await semanticJava(
-    runtime,
-    { operation: 'definition', filePath, line: 1, column: 29 },
-    new AbortController().signal
-  )
-  assert.equal(result.items.length, 1)
-  assert.equal(result.items[0].symbol.qualifiedName, 'demo.A.x()')
-  assert.equal(result.items[0].symbol.signature, 'x() : void')
-  assert.ok(result.gaps.includes('EXTERNAL_LOCATION_OMITTED'))
-})
-test('QRY-04 timeout/unsupported are preserved when fallback is disabled and become partial candidates when enabled', async (t) => {
-  const h = await fixture(t)
+test('QRY-04 neutral engine timeout/unsupported/cancellation preserve statuses and explicit fallback', async (t) => {
+  const h = await fixture(t),
+    engine = h.query.unified.backends.get('java-codegraph')
   const request = {
     ...h.scope,
     operation: 'definition',
@@ -335,55 +250,38 @@ test('QRY-04 timeout/unsupported are preserved when fallback is disabled and bec
     line: 1,
     column: h.source.indexOf('to(q)') + 1
   }
-  const original = h.query.unified.pool.get.bind(h.query.unified.pool)
-  h.query.unified.pool.get = () => ({
-    status: () => ({ state: 'ready', starts: 1, capabilities: ['definition'] }),
-    use: async () => {
-      throw new ApiError('QUERY_TIMEOUT', 'timeout', 504)
-    }
-  })
-  assert.equal((await h.query.action('query', { ...request, fallback: false })).status, 'timeout')
-  assert.equal((await h.query.action('query', request)).status, 'partial')
-  h.query.unified.pool.get = () => ({
-    status: () => ({ state: 'ready', starts: 1, capabilities: [] }),
-    use: async (fn) => fn({ state: { capabilities: [] } })
-  })
-  assert.equal(
-    (await h.query.action('query', { ...request, fallback: false })).status,
-    'unsupported'
-  )
-  h.query.unified.pool.get = original
-})
-test('QRY-04 project/language/snapshot pool is bounded, reuses run-equivalent content, and cancellation only detaches its waiter', async (t) => {
-  const pool = new JavaRuntimePool({ idleMs: 25 })
-  t.after(() => pool.close())
-  const snapshot = {
-    projectId: 'p1',
-    runId: 'r1',
-    sourceStamp: 's1',
-    snapshotId: 'snap1',
-    files: []
+  const status = {
+    state: 'ready',
+    index: 'unknown',
+    starts: 0,
+    pending: 0,
+    errorCode: null,
+    positionEncoding: 'utf-16',
+    wholeWorkspaceIndexed: false,
+    capabilities: ['definition']
   }
-  const one = pool.get(snapshot)
-  assert.equal(pool.get({ ...snapshot, runId: 'r2' }), one)
-  assert.notEqual(pool.get({ ...snapshot, projectId: 'p2' }), one)
-  assert.throws(() => pool.get({ ...snapshot, sourceStamp: 's2' }), { code: 'QUERY_RUNTIME_BUSY' })
-  let resolve
-  const shared = new Promise((r) => (resolve = r)),
-    controller = new AbortController()
-  const cancelled = waitFor(shared, controller.signal),
-    other = waitFor(shared, new AbortController().signal)
-  controller.abort()
-  await assert.rejects(cancelled, { code: 'QUERY_CANCELLED' })
-  resolve('ready')
-  assert.equal(await other, 'ready')
-  const deadline = Date.now() + 1000
-  while (pool.sessions.size && Date.now() < deadline) await new Promise((r) => setTimeout(r, 20))
-  assert.equal(pool.sessions.size, 0)
-  assert.notEqual(pool.get(snapshot), one)
-  await pool.close()
-  assert.throws(() => pool.get(snapshot), { code: 'QUERY_CANCELLED' })
+  for (const [code, expected] of [
+    ['QUERY_TIMEOUT', 'timeout'],
+    ['QUERY_CANCELLED', 'cancelled'],
+    ['QUERY_UNSUPPORTED', 'unsupported']
+  ]) {
+    h.query.unified.backends.set('java-codegraph', {
+      backend: 'codegraph',
+      semantic: false,
+      status: () => status,
+      close: async () => {},
+      query: async () => {
+        throw new ApiError(code, 'fixture', 503)
+      }
+    })
+    const failed = await h.query.action('query', { ...request, fallback: false })
+    assert.equal(failed.status, expected)
+    if (code !== 'QUERY_CANCELLED')
+      assert.equal((await h.query.action('query', request)).backend, 'basic')
+  }
+  h.query.unified.backends.set('java-codegraph', engine)
 })
+
 test('QRY-02 standalone CLI supervisor opens existing snapshots, serves multiple clients, and exits gracefully', async (t) => {
   const h = await fixture(t),
     token = 'standalone-supervisor-token-'.repeat(2)

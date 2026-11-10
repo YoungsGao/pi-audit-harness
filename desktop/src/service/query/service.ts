@@ -14,7 +14,7 @@ import { command } from '../sources/process.ts'
 import { builtinRules, findRiskCandidates } from '../rules/builtin.ts'
 import { indexJavaFile } from '../scanning/java-index.ts'
 import { UnifiedQueryService } from './unified-service.ts'
-import type { RuntimeOptions } from './java-runtime.ts'
+import type { RuntimeOptions } from './query-runtime.ts'
 type QueryScan = SourceScan & { snapshotScope?: { projectId: string; runId: string } }
 
 export function queryInput(value: unknown, keys: string[]): Record<string, unknown> {
@@ -49,7 +49,7 @@ function check(signal: AbortSignal): void {
 
 export class CodeQueryService {
   readonly unified: UnifiedQueryService
-  readonly semanticPathsEnabled: boolean
+  readonly graphPathsEnabled: boolean
   get snapshots(): SourceRepository['snapshots'] {
     return this.repo.snapshots
   }
@@ -59,7 +59,7 @@ export class CodeQueryService {
   constructor(repo: SourceRepository, options: RuntimeOptions = {}) {
     this.repo = repo
     this.unified = new UnifiedQueryService(repo, options)
-    this.semanticPathsEnabled = !!options.dataRoot
+    this.graphPathsEnabled = !!options.dataRoot
   }
   project(projectId: string): import('../../shared/source-contracts').SourceProject {
     const project = this.repo.get(queryText(projectId, 80))

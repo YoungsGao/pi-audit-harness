@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { ApiError } from '../../shared/api-error.ts'
+import { MAX_PATH_EDGES } from '../../shared/path-limits.ts'
 import type { CodeQueryService } from '../query/service.ts'
 import { queryInput, queryText, queryInteger } from '../query/service.ts'
 import { CallChainRepository } from '../storage/call-chain-repository.ts'
@@ -107,11 +108,21 @@ export class CallChainService {
         'ruleId',
         'note'
       ])
-      const projectId = queryText(row.projectId, 80)
+      const projectId = queryText(row.projectId, 80),
+        runId = queryText(row.runId, 80)
       if (this.scanning.has(projectId))
         throw new ApiError('SCAN_BUSY', '项目正在预处理，请稍后登记', 409)
       this.scanning.add(projectId)
-      const task = addManualRisk(this.repo, this.query.snapshots, row, combined)
+      const task = addManualRisk(
+        this.repo,
+        this.query.snapshots,
+        row,
+        combined,
+        async (methods, calls) => {
+          this.query.unified.restoreCalls(projectId, runId, methods, calls)
+          return []
+        }
+      )
       this.tasks.add(task)
       try {
         return await task
@@ -224,7 +235,7 @@ export class CallChainService {
       throw new ApiError('SCAN_BUSY', '该项目正在预处理，请等待并刷新任务', 409, true)
     const limits = {
       maxResults: queryInteger(row.maxResults, 100, 100),
-      maxDepth: queryInteger(row.maxDepth, 16, 32),
+      maxDepth: queryInteger(row.maxDepth, 16, MAX_PATH_EDGES),
       maxNodes: queryInteger(row.maxNodes, 512, 2000),
       maxPaths: queryInteger(row.maxPaths, 100, 100)
     }
@@ -251,7 +262,7 @@ export class CallChainService {
           combined,
           limits,
           undefined,
-          this.query.semanticPathsEnabled
+          this.query.graphPathsEnabled
             ? (methods, calls) =>
                 this.query.unified.resolveCalls(projectId, runId, methods, calls, combined)
             : undefined

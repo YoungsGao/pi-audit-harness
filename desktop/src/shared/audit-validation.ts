@@ -1,6 +1,7 @@
 import type { AuditAction } from './scan-contracts'
 import { AnalyzeSseParser } from './sse-parser.ts'
 import { isRunRecoveryView } from './run-contracts.ts'
+import { MAX_PATH_EDGES } from './path-limits.ts'
 export const auditActions: AuditAction[] = [
   'stop',
   'recovery',
@@ -443,7 +444,7 @@ export function isAuditData(action: AuditAction, data: unknown): boolean {
           Number(manualPoint.column) > 0)) &&
       path(base) &&
       Array.isArray(steps) &&
-      steps.length <= 32 &&
+      steps.length <= MAX_PATH_EDGES &&
       steps.every(
         (s, index) =>
           exact(s, [

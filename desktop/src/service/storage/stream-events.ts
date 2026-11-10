@@ -121,7 +121,11 @@ export function mirrorStreamEvent(
   if (event.status === 'analyzing' && session.state === 'queue')
     insert(tx, session, 'analyzing', 'analyze', 'process', summary, details)
   else if (session.state === 'analyze') {
-    if (event.type === 'tool')
+    if (event.type === 'process' && event.status === 'request_retry')
+      insert(tx, session, 'request_info', 'analyze', 'process', summary, details)
+    else if (event.type === 'process' && event.status.startsWith('validation_'))
+      insert(tx, session, 'validation_info', 'analyze', 'process', summary, details)
+    else if (event.type === 'tool')
       insert(tx, session, 'tool_call_info', 'analyze', 'process', summary, details)
     else if (event.type === 'model')
       insert(tx, session, 'thoughts_execute', 'analyze', 'thinking', summary, details)

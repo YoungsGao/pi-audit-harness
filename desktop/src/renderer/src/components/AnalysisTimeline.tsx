@@ -21,6 +21,7 @@ export function AnalysisTimeline({ frames }: { frames: StreamFrame[] }): React.J
           const payload = asRecord(info.payload)
           const isTool = typeof info.toolName === 'string'
           const code = typeof payload.errorCode === 'string' ? payload.errorCode : ''
+          const validation = asRecord(payload.validation)
           const phase = isTool
             ? code
               ? '失败'
@@ -33,7 +34,12 @@ export function AnalysisTimeline({ frames }: { frames: StreamFrame[] }): React.J
           return (
             <li key={frame.data.sessionId + ':' + frame.id} data-event-id={frame.id}>
               <strong>
-                #{frame.id} · {frame.event}
+                #{frame.id} ·{' '}
+                {frame.event === 'validation_info'
+                  ? '结论校验与纠错'
+                  : frame.event === 'request_info'
+                    ? '模型请求重试'
+                    : frame.event}
                 {phase && ' · 工具' + phase}
               </strong>
               <p>
@@ -57,9 +63,30 @@ export function AnalysisTimeline({ frames }: { frames: StreamFrame[] }): React.J
                 </p>
               )}
               {code && (
-                <p role="alert">
-                  {code}：{analysisErrorHelp(code)}
+                <p
+                  role={
+                    payload.canRetry === true || frame.event === 'request_info' ? 'status' : 'alert'
+                  }
+                >
+                  {payload.canRetry === true
+                    ? '系统已安排一次预算内纠错，后续结果请查看本会话终态。'
+                    : frame.event === 'request_info'
+                      ? '供应商请求暂未完成，系统已安排一次预算内重试；未确认用量会保留。'
+                      : `${code}：${analysisErrorHelp(code)}`}
                 </p>
+              )}
+              {typeof validation.field === 'string' && (
+                <div data-testid="validation-feedback">
+                  <p>
+                    校验位置：{validation.field} · 规则：{String(validation.rule ?? '')}
+                  </p>
+                  <p>{String(validation.message ?? '')}</p>
+                  <p>
+                    {payload.canRetry === true
+                      ? '本轮已安排一次纠错，无需重新启动整条路径；后续校验和终态保留在本会话。'
+                      : '请结合本条反馈和已保存源码核对；风险保持未知。'}
+                  </p>
+                </div>
               )}
               {info.truncated === true && <p>此事件保存时已截断，输入输出可能不完整。</p>}
               <details>

@@ -1,0 +1,175 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'">
+    <title>阶段报告 · sql-positive-1</title>
+    <style>body{max-width:1100px;margin:36px auto;padding:0 24px;font:16px/1.7 system-ui,sans-serif;color:#172536}h1,h2,h3{line-height:1.4}article{border-top:2px solid #bbcbd9;margin-top:28px;padding-top:16px}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#eef3f7;padding:16px;border-radius:8px}p,li{overflow-wrap:anywhere}.notice{padding:12px;border-left:4px solid #b46d19;background:#fff4df}table{border-collapse:collapse}td,th{padding:10px;border:1px solid #b5c5d2;text-align:left}</style></head><body>
+    <h1>阶段报告</h1><p class="notice">仅汇总生成时 SQLite 已保存的静态结果。存在待办、未知、失败或未覆盖内容，不是完成全部审计的证明。</p>
+    <h2>阶段、结束原因与导出范围</h2><ul><li>预处理覆盖不完整：partial</li></ul><p>本次筛选 1 / 1 条路径；筛选条件：{&quot;verdict&quot;:&quot;all&quot;,&quot;pathStatus&quot;:&quot;all&quot;,&quot;reviewStatus&quot;:&quot;all&quot;}</p><p>结果摘要：f7504c896a1d330c6bee9a7cf1b65ee6414ceb56dd0dc12ba3a083759c42b574</p>
+    <h2>项目与任务</h2><p>sql-positive-1；项目 c8598b12-2025-4f74-9aa9-fbda7228ed7b；来源 local</p>
+    <p>仓库：未记录；提交：未记录</p><p>runId：0642099a-5de6-4c8a-a6f1-60418af39ded；生成时间：2026-11-09T13:43:31.986Z</p>
+    <p>源码指纹：java-sha256:0e36cd33b5a678d1508da8ddabcb2b4ea5d4119a7b6031b257e2492595e4142b；规则版本：java-basic-2026.10.23.1</p><p>任务状态：completed / completed</p>
+    <p>任务结束时间：2026-11-09T13:43:31.982Z；结束原因：未记录错误码</p>
+    <h2>停止、恢复来源与用量边界</h2><p>控制状态：completed；本次范围记录模型请求 2 次，其中完成用量未确认 0 次。已发送请求可能收费；恢复可能重做未完成工作，记录次数不等于供应商账单。</p><pre>[
+  {
+    &quot;pathId&quot;: &quot;path-4359c7052877adf891fae00574c22b52256623c04f60860701838d5084afe237&quot;,
+    &quot;epoch&quot;: 1,
+    &quot;state&quot;: &quot;completed&quot;,
+    &quot;lastRecovery&quot;: null
+  }
+]</pre>
+    <h2>固定查询图与定位来源</h2><p>结构核验不等于Java类型绑定，也不直接证明漏洞。无图绑定的历史任务保留原证据。</p><pre>{
+  &quot;version&quot;: 1,
+  &quot;backend&quot;: &quot;codegraph&quot;,
+  &quot;engine&quot;: &quot;codegraph/1.6.2;git/6560052a6f856855d3f71eee838fd66ccfa4285d&quot;,
+  &quot;adapter&quot;: &quot;snapshot-graph/1&quot;,
+  &quot;graphKey&quot;: &quot;a91ef9f1b140dde2b466957c9ee38b21132b602e68aee9c477599519419cdb5c&quot;,
+  &quot;graphDigest&quot;: &quot;de9dc3ddf18ab48d6a69b5687164594e63aaf61fd5a5b04c22d27fd841271e37&quot;,
+  &quot;gaps&quot;: [
+    &quot;GRAPH_STRUCTURAL_NOT_SEMANTIC&quot;
+  ],
+  &quot;facts&quot;: [
+    {
+      &quot;filePath&quot;: &quot;Acceptance01.java&quot;,
+      &quot;line&quot;: 7,
+      &quot;column&quot;: 86,
+      &quot;targets&quot;: [],
+      &quot;verification&quot;: &quot;candidate&quot;,
+      &quot;provenance&quot;: &quot;unspecified&quot;,
+      &quot;resolvedBy&quot;: &quot;unresolved&quot;,
+      &quot;confidence&quot;: 0
+    }
+  ]
+}</pre>
+    <h2>固定源码快照与实际发送记录</h2><p>快照 ID：e2293ca8-a61a-48b1-a418-0855c523be81；文件数：1</p><details><summary>文件摘要与忽略范围</summary><pre>{
+  &quot;files&quot;: [
+    {
+      &quot;filePath&quot;: &quot;Acceptance01.java&quot;,
+      &quot;sha256&quot;: &quot;4c0c6b81cdeaa71ddd218781edc17971338729511228d3500d442561c19f935d&quot;,
+      &quot;size&quot;: 300
+    }
+  ],
+  &quot;ignored&quot;: [
+    &quot;仅纳入 .java 文件；非 Java 文件、配置、资源与二进制均不纳入&quot;,
+    &quot;不跟随符号链接和目录联接&quot;,
+    &quot;忽略目录：.git、.svn、node_modules、target、build、dist、.idea、.gradle、vendor&quot;,
+    &quot;最多 2000 个文件、单文件 2MiB、总计 20MiB；超限整次失败&quot;
+  ]
+}</pre></details>
+    <p>以下为请求前保存的实际配置及 SDK 返回的模型标识；请求失败可能未真正送达，未返回时不补造上游模型。</p><pre>[
+  {
+    &quot;configId&quot;: &quot;qa-offline-reference&quot;,
+    &quot;revision&quot;: 1,
+    &quot;baseUrl&quot;: &quot;http://127.0.0.1:54104/v1&quot;,
+    &quot;modelId&quot;: &quot;fixture&quot;,
+    &quot;observedModelId&quot;: &quot;fixture&quot;,
+    &quot;pathId&quot;: &quot;path-4359c7052877adf891fae00574c22b52256623c04f60860701838d5084afe237&quot;,
+    &quot;attempt&quot;: 1,
+    &quot;startedAt&quot;: &quot;2026-11-09T13:43:31.844Z&quot;
+  },
+  {
+    &quot;configId&quot;: &quot;qa-offline-reference&quot;,
+    &quot;revision&quot;: 1,
+    &quot;baseUrl&quot;: &quot;http://127.0.0.1:54104/v1&quot;,
+    &quot;modelId&quot;: &quot;fixture&quot;,
+    &quot;observedModelId&quot;: &quot;fixture&quot;,
+    &quot;pathId&quot;: &quot;path-4359c7052877adf891fae00574c22b52256623c04f60860701838d5084afe237&quot;,
+    &quot;attempt&quot;: 1,
+    &quot;startedAt&quot;: &quot;2026-11-09T13:43:31.952Z&quot;
+  }
+]</pre>
+    <h2>任务审计知识与项目补充要求</h2><p>保存状态：saved；材料摘要：61a960fe3a9f3c7706534399f5f3444aca9c20df65d4fdaac00d5c9615ce8d05</p><p>自定义知识未经验证；补充提示不代表新增全部漏洞发现能力。</p><pre>{
+  &quot;projectId&quot;: &quot;c8598b12-2025-4f74-9aa9-fbda7228ed7b&quot;,
+  &quot;runId&quot;: &quot;0642099a-5de6-4c8a-a6f1-60418af39ded&quot;,
+  &quot;state&quot;: &quot;saved&quot;,
+  &quot;templates&quot;: [],
+  &quot;projectReview&quot;: {
+    &quot;projectId&quot;: &quot;c8598b12-2025-4f74-9aa9-fbda7228ed7b&quot;,
+    &quot;revision&quot;: 0,
+    &quot;businessWrappers&quot;: &quot;&quot;,
+    &quot;inputSources&quot;: &quot;&quot;,
+    &quot;defenseConventions&quot;: &quot;&quot;,
+    &quot;focus&quot;: &quot;&quot;,
+    &quot;updatedAt&quot;: null
+  },
+  &quot;contextHash&quot;: &quot;61a960fe3a9f3c7706534399f5f3444aca9c20df65d4fdaac00d5c9615ce8d05&quot;,
+  &quot;createdAt&quot;: &quot;2026-11-09T13:43:30.480Z&quot;
+}</pre>
+    <h2>分析摘要与统计快照</h2><p>已登记 1 条路径；危险路径 1 条，按 Sink/规则去重后的风险点 1 个。</p>
+    <table><thead><tr><th>口径</th><th>数量</th></tr></thead><tbody><tr><td>危险路径（不同 pathId）</td><td>1</td></tr><tr><td>风险点（Sink/规则）</td><td>1</td></tr><tr><td>已阻断路径</td><td>0</td></tr><tr><td>风险未知路径（含未分析等）</td><td>0</td></tr><tr><td>待分析</td><td>0</td></tr><tr><td>分析中</td><td>0</td></tr><tr><td>证据不足</td><td>0</td></tr><tr><td>失败</td><td>0</td></tr><tr><td>无效链</td><td>0</td></tr><tr><td>候选 Sink（不是漏洞数）</td><td>1</td></tr></tbody></table>
+    <p>未知是风险维度；待分析、分析中、证据不足、失败是调查状态，不能将这些重叠口径相加。危险步骤和危险 API 数不作为漏洞数。</p>
+    <h2>人工复核统计（独立口径）</h2><p>未复核 1；人工确认 0；人工判为误报 0；待补充 0；其中基线已更新 0。人工状态不覆盖以上机器统计。</p>
+    <h2>预处理覆盖范围</h2><p>状态：partial；截断：否</p>
+    <pre>[
+  {
+    &quot;code&quot;: &quot;GRAPH_STRUCTURAL_NOT_SEMANTIC&quot;,
+    &quot;filePath&quot;: null,
+    &quot;message&quot;: &quot;CodeGraph结构关系与快照核验；结构推断不等于Java类型绑定或漏洞证明。&quot;
+  }
+]</pre>
+    <h2>调用路径、风险判断与已保存证据</h2><article><h2>风险：静态证据支持</h2>
+    <p>pathId：path-4359c7052877adf891fae00574c22b52256623c04f60860701838d5084afe237；规则：JAVA-SQL-STATEMENT</p><p>来源：http-entry-candidate:acceptance.Acceptance01#lookup(String)@Acceptance01.java:7</p>
+    
+    <p>调查状态：completed；verdict：dangerous；dangerous：1</p>
+    <p>机器结论：本机受控传播核查：dangerous</p><h3>独立人工复核</h3><p>未复核；没有人工结论，不改变机器结论。</p>
+    
+    <ol><li><h3>第 1 步：acceptance.Acceptance01.lookup(String) → Statement.executeQuery</h3>
+      <p>Acceptance01.java:7:86；candidate；候选 Sink</p>
+      <h4>源码证据</h4><p>取证范围 Acceptance01.java:7–7</p><pre>Statement stmt; @GetMapping(&quot;/lookup&quot;) void lookup(String q) throws Exception { stmt.executeQuery(&quot;SELECT name FROM clients WHERE id=&quot; + q); }</pre>
+      <h4>污染输入 / 输出</h4><pre>{
+  &quot;taintIn&quot;: [
+    {
+      &quot;name&quot;: &quot;q&quot;,
+      &quot;origin&quot;: &quot;当前路径输入&quot;,
+      &quot;quotes&quot;: [
+        &quot;Statement stmt; @GetMapping(\&quot;/lookup\&quot;) void lookup(String q) throws Exception { stmt.executeQuery(\&quot;SELECT name FROM clients WHERE id=\&quot; + q); }&quot;
+      ]
+    }
+  ],
+  &quot;taintOut&quot;: [
+    {
+      &quot;name&quot;: &quot;q&quot;,
+      &quot;origin&quot;: &quot;当前调用输出&quot;,
+      &quot;quotes&quot;: [
+        &quot;Statement stmt; @GetMapping(\&quot;/lookup\&quot;) void lookup(String q) throws Exception { stmt.executeQuery(\&quot;SELECT name FROM clients WHERE id=\&quot; + q); }&quot;
+      ]
+    }
+  ]
+}</pre>
+      <h4>传播核查与防护</h4><pre>{
+  &quot;source&quot;: {
+    &quot;status&quot;: &quot;supported&quot;,
+    &quot;reason&quot;: &quot;本机夹具逐项核对 source&quot;,
+    &quot;quotes&quot;: [
+      &quot;Statement stmt; @GetMapping(\&quot;/lookup\&quot;) void lookup(String q) throws Exception { stmt.executeQuery(\&quot;SELECT name FROM clients WHERE id=\&quot; + q); }&quot;
+    ]
+  },
+  &quot;argumentMapping&quot;: {
+    &quot;status&quot;: &quot;supported&quot;,
+    &quot;reason&quot;: &quot;本机夹具逐项核对 argumentMapping&quot;,
+    &quot;quotes&quot;: [
+      &quot;Statement stmt; @GetMapping(\&quot;/lookup\&quot;) void lookup(String q) throws Exception { stmt.executeQuery(\&quot;SELECT name FROM clients WHERE id=\&quot; + q); }&quot;
+    ]
+  },
+  &quot;assignment&quot;: {
+    &quot;status&quot;: &quot;not_applicable&quot;,
+    &quot;reason&quot;: &quot;本机夹具逐项核对 assignment&quot;,
+    &quot;quotes&quot;: []
+  },
+  &quot;returnValue&quot;: {
+    &quot;status&quot;: &quot;not_applicable&quot;,
+    &quot;reason&quot;: &quot;本机夹具逐项核对 returnValue&quot;,
+    &quot;quotes&quot;: []
+  },
+  &quot;field&quot;: {
+    &quot;status&quot;: &quot;not_applicable&quot;,
+    &quot;reason&quot;: &quot;本机夹具逐项核对 field&quot;,
+    &quot;quotes&quot;: []
+  },
+  &quot;defense&quot;: {
+    &quot;status&quot;: &quot;not_applicable&quot;,
+    &quot;reason&quot;: &quot;本机夹具逐项核对 defense&quot;,
+    &quot;quotes&quot;: []
+  }
+}</pre><p>没有已保存的防护说明；不能据此判断已阻断。</p>
+      </li></ol></article>
+    <h2>未知项与后续建议</h2><ul><li>待分析 0 条、分析中 0 条、失败 0 条、证据不足 0 条；优先核对这些未确认内容。</li><li>对已成立风险检查输入来源、实参与形参映射和 Sink 的原文引用，再进行人工复核。</li><li>已阻断结论只针对所列路径与保存的源码版本，不能推广为项目整体安全。</li><li>源码或规则变化后创建新任务；新报告不会改写本报告及其统计快照。</li></ul>
+    <p>由 Pi /report 扩展读取指定任务并按固定模板生成；未额外请求模型、未加载外部资源，也未包含未保存的模型过程。</p></body></html>

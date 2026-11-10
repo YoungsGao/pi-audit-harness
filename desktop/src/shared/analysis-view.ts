@@ -20,10 +20,12 @@ export function mergeAnalysisFrames(
   return [...unique.values()].sort((a, b) => a.id - b.id).slice(-200)
 }
 export function analysisErrorHelp(code: string): string {
+  if (/MODEL_SECRET_EXPOSED/.test(code))
+    return '模型回复包含当前配置的凭据，应用已拒绝保存回复，风险保持未知。请检查所用服务；不要把密钥粘贴进审计材料。'
   if (code === 'AGENT_DECISION_INVALID')
     return '模型回复未符合约定的 JSON 决策格式或字段要求；取证成功不代表结论有效。重连只重放旧记录，需排查输出格式后明确重试。'
   if (/ANALYSIS_(?:EVIDENCE|TAINT|RESULT)_INVALID/.test(code))
-    return '模型结论、证据引用或传播核查未通过校验，风险保持未知；查看已保存工具输入输出，不能将读取源码成功当作审计完成。'
+    return '结论校验未通过，风险保持未知。请查看“结论校验与纠错”中的具体字段、规则与本次源码引用；自动纠错受原有预算约束。'
   if (/PERSISTENCE|^DB_/.test(code))
     return '写库未确认。检查磁盘空间、目录权限和数据库锁，再重启服务恢复；不要把运行中记录当作成功。'
   if (/SOURCE_CHANGED|SOURCE_STAMP|RULES_CHANGED/.test(code))

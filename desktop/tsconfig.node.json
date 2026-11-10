@@ -30,7 +30,13 @@
     "electron.review-test.config.ts",
     "tests/review-electron-main.ts",
     "electron.run-test.config.ts",
-    "tests/run-electron-main.ts"
+    "tests/run-electron-main.ts",
+    "electron.security-test.config.ts",
+    "tests/security-electron-main.ts",
+    "electron.qa-test.config.ts",
+    "tests/qa-electron-main.ts",
+    "electron.reliability-test.config.ts",
+    "tests/reliability-electron-main.ts"
   ],
   "compilerOptions": {
     "allowImportingTsExtensions": true,

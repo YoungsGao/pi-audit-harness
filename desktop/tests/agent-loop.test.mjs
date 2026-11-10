@@ -239,7 +239,7 @@ test('v6 upgrade preserves checksums and historical graph; failed v11 migration 
       { version: 13, name: 'broken', sql: 'CREATE TABLE rollback_me(id); SELECT * FROM absent;' }
     ])
   )
-  assert.equal(db.get('PRAGMA user_version').user_version, 12)
+  assert.equal(db.get('PRAGMA user_version').user_version, 13)
   assert.equal(db.get("SELECT name FROM sqlite_schema WHERE name='rollback_me'"), undefined)
 })
 

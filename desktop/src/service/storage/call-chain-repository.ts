@@ -2,6 +2,7 @@ import { createHash, randomUUID } from 'node:crypto'
 import { isDeepStrictEqual } from 'node:util'
 import { basename, isAbsolute } from 'node:path'
 import { ApiError } from '../../shared/api-error.ts'
+import { MAX_PATH_EDGES } from '../../shared/path-limits.ts'
 import type {
   CallEdgeInput,
   CandidateGraph,
@@ -162,7 +163,7 @@ export class CallChainRepository {
         !path ||
         !Array.isArray(path.edgeUids) ||
         !path.edgeUids.length ||
-        path.edgeUids.length > 32 ||
+        path.edgeUids.length > MAX_PATH_EDGES ||
         typeof path.truncated !== 'boolean' ||
         ![
           '',

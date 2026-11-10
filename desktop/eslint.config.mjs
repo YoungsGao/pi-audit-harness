@@ -34,12 +34,31 @@ export default defineConfig(
       '**/.review-test-data',
       '**/out-review-test',
       '**/out-run-test',
-      '**/.run-test-data'
+      '**/.run-test-data',
+      '**/out-security-test',
+      '**/.security-test-data',
+      '**/out-qa-test',
+      '**/.qa-test-data',
+      '**/.reliability-test-data',
+      '**/out-reliability-test',
+      '**/resources/delivery/**'
     ]
   },
   tseslint.configs.recommended,
   {
-    files: ['tests/**/*.mjs', 'scripts/query-*.mjs', 'scripts/manual-lab*.mjs'],
+    files: ['resources/codegraph-worker.cjs'],
+    rules: { '@typescript-eslint/no-require-imports': 'off' }
+  },
+  {
+    files: [
+      'tests/**/*.mjs',
+      'scripts/query-*.mjs',
+      'scripts/manual-lab*.mjs',
+      'scripts/security-lab.mjs',
+      'scripts/qa-*.mjs',
+      'scripts/reliability-lab.mjs',
+      'qa/**/*.mjs'
+    ],
     rules: { '@typescript-eslint/explicit-function-return-type': 'off' }
   },
   eslintPluginReact.configs.flat.recommended,

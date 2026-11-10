@@ -4,7 +4,7 @@ import type {
   QuerySymbol,
   QueryLocation
 } from '../../shared/query-contracts.ts'
-import type { QuerySnapshot } from './java-runtime.ts'
+import type { QuerySnapshot } from './query-runtime.ts'
 import { indexJavaFile, resolveCallTargets } from '../scanning/java-index.ts'
 import type { JavaMethod } from '../scanning/java-index.ts'
 

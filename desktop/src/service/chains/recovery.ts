@@ -8,8 +8,7 @@ import {
   openSync,
   fsyncSync,
   closeSync,
-  renameSync,
-  copyFileSync
+  renameSync
 } from 'node:fs'
 import { dirname, join } from 'node:path'
 import type { SessionManager } from '@earendil-works/pi-coding-agent'
@@ -24,10 +23,13 @@ import type { ModelConfig } from '../../shared/pi-contracts.ts'
 import type { LocalDatabase, Row } from '../storage/database.ts'
 import { SnapshotRepository } from '../storage/snapshot-repository.ts'
 import { TemplateRepository } from '../storage/template-repository.ts'
+import { GraphRepository } from '../storage/graph-repository.ts'
 import { builtinRules } from '../rules/builtin.ts'
 import type { ReviewInput } from './path-analysis.ts'
 import type { LoopLimits } from './agent-loop.ts'
 import { loadPiSdk } from '../pi-sdk.ts'
+import { containsKnownCredential, redactKnownCredentials } from '../../shared/redaction.ts'
+import { evidenceCards } from './evidence-citations.ts'
 
 export const recoveryProtocol = 'audit-recovery/1;tool/1;validator/1;pi/1.2.0'
 export const digest = (v: unknown): string =>
@@ -43,11 +45,14 @@ export interface LoopCheckpoint {
   next: string
   action: 'continue' | 'finish'
   result: unknown
+  repairs?: number
+  networkRetries?: number
 }
 interface CheckedCheckpoint {
   row: Row
   host: LoopCheckpoint
   file: string
+  entries: Parameters<typeof SessionManager.inMemory>[2]
 }
 const now = (): string => new Date().toISOString()
 const same = (a: string, b: string): boolean =>
@@ -145,7 +150,10 @@ export class RunRecoveryStore {
       reviewHash: new TemplateRepository(this.db).run(scope.projectId, scope.runId).contextHash,
       rulesHash: digest(builtinRules),
       model,
-      protocol: recoveryProtocol
+      protocol: recoveryProtocol,
+      ...(new GraphRepository(this.db).get(scope.projectId, scope.runId)
+        ? { queryGraph: new GraphRepository(this.db).get(scope.projectId, scope.runId) }
+        : {})
     }
   }
   begin(
@@ -360,7 +368,13 @@ export class RunRecoveryStore {
           !Number.isInteger(host.evidenceBytes) ||
           host.evidenceBytes < 0 ||
           typeof host.next !== 'string' ||
-          host.next.length > 2000
+          host.next.length > 2000 ||
+          (host.repairs !== undefined &&
+            (!Number.isInteger(host.repairs) || host.repairs < 0 || host.repairs > 1)) ||
+          (host.networkRetries !== undefined &&
+            (!Number.isInteger(host.networkRetries) ||
+              host.networkRetries < 0 ||
+              host.networkRetries > 1))
         )
           continue
         const seen = new Set<string>(),
@@ -430,7 +444,21 @@ export class RunRecoveryStore {
                 .join('')
             )
             const evidence = this.evidence(path, index)
-            if (stepIndex !== index || !evidence || digest(payload) !== digest(evidence))
+            const { citations, ...sourcePayload } = payload
+            if (
+              citations !== undefined &&
+              (!evidence ||
+                digest(citations) !==
+                  digest(
+                    evidenceCards(evidence, index, {
+                      projectId: String(path.project_id),
+                      runId: String(path.run_id),
+                      pathId: String(path.path_id)
+                    })
+                  ))
+            )
+              throw Error('tool citations differ from frozen source')
+            if (stepIndex !== index || !evidence || digest(sourcePayload) !== digest(evidence))
               throw Error('tool payload differs from receipt')
             attachedSteps.add(index)
           }
@@ -452,7 +480,7 @@ export class RunRecoveryStore {
           ) !== host.evidenceBytes
         )
           continue
-        return { row, host, file }
+        return { row, host, file, entries: [header, ...entries] }
       } catch {
         /* A damaged latest checkpoint can fall back to an older validated boundary. */
       }
@@ -736,6 +764,17 @@ export class RecoveryExecution {
       )
     this.requestId = null
   }
+  uncertain(): void {
+    this.assertLive()
+    if (this.requestId)
+      this.store.db.run(
+        "UPDATE recovery_requests SET state='uncertain',finished_at=? WHERE request_id=? AND epoch=? AND state='started'",
+        now(),
+        this.requestId,
+        this.epoch
+      )
+    this.requestId = null
+  }
   async read(index: number, work: () => Promise<Evidence>): Promise<Evidence> {
     const row = this.assertLive(),
       cached = this.store.evidence(row, index)
@@ -776,14 +815,9 @@ export class RecoveryExecution {
           evidence = this.store.evidence(row, index)
         if (evidence) reused.set(index, evidence)
       }
-    const filename = `active-${this.journeyId}-${this.epoch}.jsonl`,
-      file = join(this.store.directory(), filename)
-    // Open an owned copy: the immutable checkpoint must never receive SDK appends.
-    let manager: SessionManager
-    if (checkpoint) {
-      copyFileSync(checkpoint.file, file, 1)
-      manager = sdk.SessionManager.open(file, this.store.root)
-    } else manager = sdk.SessionManager.inMemory(this.store.root)
+    // Preserve Pi's native header/branch identity in memory. Raw provider output must not
+    // be journaled to an active file before credential and decision validation completes.
+    const manager = sdk.SessionManager.inMemory(this.store.root, undefined, checkpoint?.entries)
     this.assertLive()
     const receipt: RecoveryReceipt | null = this.resuming
       ? {
@@ -799,7 +833,7 @@ export class RecoveryExecution {
     this.store.db.run(
       'UPDATE path_recovery SET pi_session_id=?,session_file=?,receipt_json=?,updated_at=? WHERE path_id=? AND epoch=?',
       manager.getSessionId(),
-      checkpoint ? filename : null,
+      null,
       JSON.stringify(receipt),
       now(),
       this.pathId,
@@ -809,6 +843,8 @@ export class RecoveryExecution {
   }
   save(manager: SessionManager, host: LoopCheckpoint, secret: string): void {
     this.assertLive()
+    if (containsKnownCredential(host, [secret]))
+      throw new ApiError('MODEL_SECRET_EXPOSED', '检查点包含当前凭据，已拒绝发布', 502)
     manager.appendCustomEntry('audit-checkpoint', { bindingHash: this.bindingHash, host })
     const id = randomUUID(),
       filename = id + '.jsonl',
@@ -816,7 +852,7 @@ export class RecoveryExecution {
       temp = file + '.tmp'
     let text =
       [manager.getHeader(), ...manager.getBranch()].map((e) => JSON.stringify(e)).join('\n') + '\n'
-    if (secret) text = text.replaceAll(secret, '[REDACTED]')
+    text = redactKnownCredentials(text, [secret])
     if (Buffer.byteLength(text) > 4 * 1024 * 1024)
       throw new ApiError('RUN_CONTEXT_LIMIT', '安全会话超过4MiB，停止并保留已有检查点', 413)
     writeFileSync(temp, text, { flag: 'wx', mode: 0o600 })

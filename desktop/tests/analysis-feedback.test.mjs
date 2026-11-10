@@ -281,7 +281,7 @@ test('unwritable failure state yields explicit runtime persistence fault, no unh
   assert.equal(h.repo.scans.statistics(h.scope.projectId, h.scope.runId).pending, 1)
 })
 
-test('unreachable model ends failed unknown with correlated ids and no automatic model retry', async (t) => {
+test('unreachable model ends failed unknown after one bounded transient retry; scope and remaining pending paths survive', async (t) => {
   const h = await createAgentHarness(t, 'unavailable')
   h.chains.analysis.startPending(h.scope.projectId, h.scope.runId, 'model', 10)
   await h.chains.analysis.waitForIdle()
@@ -294,7 +294,8 @@ test('unreachable model ends failed unknown with correlated ids and no automatic
   assert.equal(final.data.runId, h.scope.runId)
   assert.equal(h.repo.detail({ ...h.scope, pathId }).verdict, 'unknown')
   assert.equal(h.repo.scans.statistics(h.scope.projectId, h.scope.runId).pending, 1)
-  assert.equal(h.model.requests.length, 1)
+  assert.equal(h.model.requests.length, 2)
+  assert.equal(history.frames.filter((f) => f.event === 'request_info').length, 1)
 })
 
 test('scan failure records a distinct run and correlated scope; unavailable failure storage is explicit until restart recovery', async (t) => {

@@ -1,7 +1,7 @@
 import { ApiError } from '../../shared/api-error.ts'
 import type { PositionEncoding, QueryPosition } from '../../shared/query-contracts.ts'
 
-export function toLspPosition(
+export function encodePosition(
   source: string,
   position: QueryPosition,
   encoding: PositionEncoding
@@ -25,7 +25,7 @@ export function toLspPosition(
           : offset
   }
 }
-export function fromLspPosition(
+export function decodePosition(
   source: string,
   position: { line: number; character: number },
   encoding: PositionEncoding
@@ -36,9 +36,9 @@ export function fromLspPosition(
     position.line < 0 ||
     position.character < 0
   )
-    throw new ApiError('QUERY_BACKEND_OUTPUT', '语言服务器位置无效', 502)
+    throw new ApiError('QUERY_BACKEND_OUTPUT', '查询引擎位置无效', 502)
   const line = source.split('\n')[position.line]?.replace(/\r$/, '')
-  if (line === undefined) throw new ApiError('QUERY_BACKEND_OUTPUT', '语言服务器位置越界', 502)
+  if (line === undefined) throw new ApiError('QUERY_BACKEND_OUTPUT', '查询引擎位置越界', 502)
   let units = 0,
     column = 0
   for (const char of line) {
@@ -48,6 +48,6 @@ export function fromLspPosition(
     column += char.length
   }
   if (units !== position.character)
-    throw new ApiError('QUERY_BACKEND_OUTPUT', '语言服务器位置拆开字符或越界', 502)
+    throw new ApiError('QUERY_BACKEND_OUTPUT', '查询引擎位置拆开字符或越界', 502)
   return { line: position.line + 1, column: column + 1 }
 }

@@ -428,7 +428,7 @@ test('RUN-02 v11 migration history remains unchanged and new checkpoint/tool rec
   migrate(db, migrations.slice(0, 11))
   const history = db.all('SELECT * FROM schema_migrations ORDER BY version')
   migrate(db)
-  assert.equal(db.get('PRAGMA user_version').user_version, 12)
+  assert.equal(db.get('PRAGMA user_version').user_version, 13)
   assert.deepEqual(
     db.all('SELECT * FROM schema_migrations WHERE version<=11 ORDER BY version'),
     history

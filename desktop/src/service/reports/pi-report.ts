@@ -9,6 +9,7 @@ import { ApiError } from '../../shared/api-error.ts'
 import type { ReportScope } from '../../shared/report-contracts'
 import type { ReportSnapshot } from './snapshot.ts'
 import { renderSavedReport } from './html.ts'
+import { assertManagedTools } from '../pi-session-factory.ts'
 
 // This is a real Pi command session, with no audit model credentials or provider requests.
 export async function executeSavedReport(
@@ -70,7 +71,7 @@ export async function executeSavedReport(
             modelRuntime,
             resourceLoader: resources,
             tools: [],
-            noTools: 'builtin',
+            noTools: 'all',
             thinkingLevel: 'off',
             sessionManager: sdk.SessionManager.inMemory(directory),
             settingsManager: sdk.SettingsManager.inMemory({
@@ -88,6 +89,11 @@ export async function executeSavedReport(
             extensionError = true
           }
         })
+        assertManagedTools(session, [])
+        // Extension event exceptions alone do not prevent the SDK transport from continuing.
+        session.agent.streamFunction = () => {
+          throw new ApiError('REPORT_MODEL_FORBIDDEN', '保存结果报告不允许发起模型请求', 409)
+        }
         await waitWithSignal(session.prompt(`/report ${scope.projectId} ${scope.runId}`), signal)
         if (commandError) throw commandError
         if (extensionError || !completed)

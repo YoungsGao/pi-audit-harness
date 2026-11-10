@@ -48,7 +48,7 @@ test('REP-01 schema v11 appends immutable review history and default HTML metada
   migrate(db, migrations.slice(0, 10))
   const history = db.all('SELECT * FROM schema_migrations ORDER BY version')
   migrate(db)
-  assert.equal(db.get('PRAGMA user_version').user_version, 12)
+  assert.equal(db.get('PRAGMA user_version').user_version, 13)
   assert.deepEqual(
     db.all('SELECT * FROM schema_migrations WHERE version<=10 ORDER BY version'),
     history

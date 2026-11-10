@@ -1,0 +1,117 @@
+{
+  "version": "java-basic-2026.10.23.1",
+  "language": "java",
+  "rules": [
+    {
+      "id": "JAVA-SQL-STATEMENT",
+      "category": "sql-injection",
+      "cwe": "CWE-89",
+      "apis": [
+        "Statement.executeQuery",
+        "Statement.executeUpdate",
+        "Statement.execute",
+        "Statement.addBatch"
+      ],
+      "argumentIndexes": [
+        0
+      ],
+      "review": {
+        "source": "HTTP 参数、请求体及其他外部可控文本。",
+        "propagation": "核实第 0 个 SQL 参数的拼接、赋值、返回值和实参到形参传播。",
+        "defenses": [
+          "核实 PreparedStatement / MyBatis 参数绑定是否覆盖当前危险参数。",
+          "区分 SQL 结构白名单与普通字符串转义。"
+        ],
+        "limitations": "Java 文本候选；不解析类型绑定、别名、重载、跨文件调用或运行时派发，必须结合源码核实。"
+      }
+    },
+    {
+      "id": "JAVA-CMD-RUNTIME",
+      "category": "command-injection",
+      "cwe": "CWE-78",
+      "apis": [
+        "Runtime.exec"
+      ],
+      "argumentIndexes": [
+        0
+      ],
+      "review": {
+        "source": "外部可控命令、程序名、参数或选项。",
+        "propagation": "核实第 0 个命令参数的构造、拼接和 shell 包装。",
+        "defenses": [
+          "固定程序与参数模板，检查可控命令选项。",
+          "核实业务白名单覆盖实际执行值。"
+        ],
+        "limitations": "Java 文本候选；不解析类型绑定、别名、重载、跨文件调用或运行时派发，必须结合源码核实。"
+      }
+    },
+    {
+      "id": "JAVA-CMD-PROCESS-BUILDER",
+      "category": "command-injection",
+      "cwe": "CWE-78",
+      "apis": [
+        "ProcessBuilder.<init>",
+        "ProcessBuilder.command"
+      ],
+      "argumentIndexes": "all",
+      "review": {
+        "source": "外部可控程序名、命令参数、参数列表。",
+        "propagation": "核实所有命令参数及后续 start()；构造命令不等于已经执行。",
+        "defenses": [
+          "检查程序名、参数白名单与选项注入。",
+          "参数数组本身不能证明输入安全。"
+        ],
+        "limitations": "Java 文本候选；不解析类型绑定、别名、重载、跨文件调用或运行时派发，必须结合源码核实。"
+      }
+    },
+    {
+      "id": "JAVA-PATH-FILES",
+      "category": "path-traversal",
+      "cwe": "CWE-22",
+      "apis": [
+        "Files.readAllBytes",
+        "Files.readString",
+        "Files.newInputStream",
+        "Files.newOutputStream",
+        "Files.write",
+        "Files.writeString",
+        "Files.delete"
+      ],
+      "argumentIndexes": [
+        0
+      ],
+      "review": {
+        "source": "外部提供的文件名、目录或路径片段。",
+        "propagation": "追踪第 0 个 Path 参数，包括 Paths.get / resolve / 字符串拼接。",
+        "defenses": [
+          "核实规范化后路径仍在允许根目录。",
+          "检查绝对路径、符号链接和业务文件授权。"
+        ],
+        "limitations": "Java 文本候选；不解析类型绑定、别名、重载、跨文件调用或运行时派发，必须结合源码核实。"
+      }
+    },
+    {
+      "id": "JAVA-PATH-STREAM",
+      "category": "path-traversal",
+      "cwe": "CWE-22",
+      "apis": [
+        "FileInputStream.<init>",
+        "FileOutputStream.<init>",
+        "FileReader.<init>",
+        "FileWriter.<init>"
+      ],
+      "argumentIndexes": [
+        0
+      ],
+      "review": {
+        "source": "外部提供的文件名或 File 对象。",
+        "propagation": "核实第 0 个路径参数；FileDescriptor 重载需另行排除。",
+        "defenses": [
+          "核实规范化路径与允许根目录。",
+          "检查文件访问权限与链接目标。"
+        ],
+        "limitations": "Java 文本候选；不解析类型绑定、别名、重载、跨文件调用或运行时派发，必须结合源码核实。"
+      }
+    }
+  ]
+}

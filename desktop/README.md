@@ -11,7 +11,7 @@ npm ci
 npm run dev
 ```
 
-构建：`npm run build`；解包：`npm run build:unpack`；生成 Windows 安装程序：`npm run build:win`。打包脚本存在不等于签名、多平台和发布专项验收已完成。
+构建：`npm run build`；解包：`npm run build:unpack`；Windows安装交付步骤见[技术15](../docs/technical/15.质量验收性能基线与交付.md)。先生成合规清单与离线材料，再生成未签名NSIS。当前验证Windows10 x64，签名、多平台和远端发布未验收。
 
 ## 使用
 
@@ -30,6 +30,8 @@ npm run dev
 
 ## 验证
 
+2026-11-10新增[真实模型可靠性](../docs/technical/16.真实模型输出可靠性与工程纠错.md)：证据编号还原原文、具体字段反馈、JSON受限结构修复、固定输入核验、一次纠错与一次瞬态重试，均受原预算约束。`npm run test:reliability`不调用付费模型；`node scripts/reliability-lab.mjs 18767`提供badonce/bad/normal本机实验服务器。更新后退出旧客户端并重启；旧失败会话只读，需明确新建尝试。
+
 ```powershell
 node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test tests/*.test.mjs
 npm run build
@@ -44,6 +46,7 @@ node tests/run-templates-electron.mjs
 node tests/run-review-electron.mjs
 .\node_modules\.bin\electron-vite.cmd build --config electron.run-test.config.ts
 node tests/run-run-electron.mjs
+npm run test:security
 npm run test:qa04
 ```
 
@@ -59,12 +62,31 @@ npm run test:qa04
 
 停止与恢复专项：`node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test tests/run-recovery.test.mjs`。14项测试包含真实Pi、跨进程强制中断、原生续跑、回退、累计预算与停止报告；不使用真实付费模型。
 
+安全专项：`npm run test:security`，包含12项边界、1项实验脚本与真实Electron渲染/IPC验证。无需真实Key；隔离材料与运行资源，检查只读工具/CodeGraph边界、凭据回显及HTML转义。详见[14 安全边界](../docs/technical/14.安全边界与不可信输入防护.md)。这是应用访问限制，不是业务后端的OS级沙箱。
+
+亲手实验（当前desktop目录）：
+
+```powershell
+$raw = node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/security-lab.mjs init | Out-String
+if ($LASTEXITCODE -ne 0) { throw '实验初始化失败，请查看上方错误' }
+$sec = $raw | ConvertFrom-Json -ErrorAction Stop
+$sec | Format-List source, skill, labFile
+node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/security-lab.mjs check $sec.labFile
+Test-Path -LiteralPath $sec.marker
+```
+
+检查预期ok=true、backend=codegraph、sourceUnchanged=true、projectScriptExecuted=false、modelRequests=0，最后False。每次独立目录位于根.local/security-lab，完整知识点与桌面逐步操作在本地学习43—46。
+
 ## 技术文档
+
+QA-01～03：[质量验收、性能基线与交付](../docs/technical/15.质量验收性能基线与交付.md)。`npm run test:qa`检查语料与4项基础回归，`npm run qa:acceptance`执行54次本机模型协议链路，`npm run qa:ui`运行真实Electron性能/停止/恢复，`npm run qa:soak`实际运行一小时；这些命令均不调用付费模型。真实模型校准需另行显式开启，共享预算账本不会自动归零。
+
+本地项目许可证：[MIT](../LICENSE)。运行依赖与内嵌CodeGraph组件的版本和原许可证见[第三方说明](../THIRD_PARTY_NOTICES.md)，安装包的resources/compliance保留完整清单；项目许可证不改变上游许可。
 
 交互调用图、原配色配置布局、人工复核及筛选导出见 [11 交互路径图、人工复核与结果导出](../docs/technical/11.交互路径图人工复核与结果导出.md)。新增9项确定性测试为tests/review-export.test.mjs；Electron联调覆盖节点/关系/防护/分支、键盘、备注恢复、筛选、另存取消/保存、HTML打开及1450/920/480布局。
 
-查询增强见 [统一代码查询与Java语义服务](../docs/technical/10.统一代码查询与Java语义服务.md)。启动前用 PI_AUDIT_JAVA_HOME、PI_AUDIT_JDTLS_HOME 指定兼容的本机安装；本次实测 Temurin25 + 固定 JDT-LS1.64 快照。缺失时保留基础候选与覆盖告警，不自动安装。
+查询后端已改为CodeGraph1.6.2，JDT-LS及Java进程管理已删除，无需JDK。见[统一查询](../docs/technical/10.统一代码查询与Java语义服务.md)和[图资源管理](../docs/technical/13.CodeGraph固定快照图与资源管理.md)。
 
-`npm run query:serve` 在已有任务数据库上启动常驻查询监督器；`npm run query` 从标准输入接收一个JSON查询。调用方安全注入PI_AUDIT_DATA_ROOT、PI_AUDIT_QUERY_TOKEN与返回端口PI_AUDIT_QUERY_PORT；用法见 [接口说明](query-skill/SKILL.md)。确定性测试为tests/query-enhancements.test.mjs；设置PI_AUDIT_TEST_JDTLS=1及两个运行时目录后，tests/query-jdtls.test.mjs才实际启动Java服务器。
+`npm run query:serve`在已有任务库上启动轻量监督器，CLI从stdin接收JSON；使用可信父进程注入连接token。接口见[说明](query-skill/SKILL.md)。真实SDK及统一查询验证：`node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test tests/query-codegraph.test.mjs tests/query-enhancements.test.mjs tests/query-lab.test.mjs`。亲手实验：`node scripts/query-lab.mjs init`，再用输出的labFile执行`node scripts/query-lab.mjs query <labFile>`。
 
 [架构与运行](../docs/technical/01.项目架构与运行.md) · [源码与预处理](../docs/technical/02.源码输入与预处理.md) · [数据模型](../docs/technical/03.数据模型与持久化.md) · [Agent 与 SSE](../docs/technical/04.Agent分析与事件协议.md) · [工作台](../docs/technical/05.审计工作台.md) · [报告](../docs/technical/06.报告生成与管理.md) · [进度与验收](../docs/technical/07.实现进度与验收.md) · [配置授权、快照与手工调查](../docs/technical/08.配置授权快照与手工调查.md)。

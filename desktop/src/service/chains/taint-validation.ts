@@ -1,4 +1,4 @@
-import { ApiError } from '../../shared/api-error.ts'
+import { invalidResult } from './result-validation.ts'
 import { propagationChecks } from '../../shared/taint-contracts.ts'
 import type { TaintReview } from '../../shared/taint-contracts.ts'
 import type { ReviewResult } from '../storage/scan-repository.ts'
@@ -7,9 +7,24 @@ const object = (v: unknown): v is Record<string, unknown> =>
 const short = (v: unknown): v is string =>
   typeof v === 'string' && v.trim().length > 0 && v.length <= 1000
 
-export function validateTaint(step: unknown, text: string | string[]): TaintReview {
-  const fail = (): never => {
-    throw new ApiError('ANALYSIS_TAINT_INVALID', '传播结果缺少逐项核查、污染值或真实原文引用', 502)
+export function validateTaint(
+  step: unknown,
+  text: string | string[],
+  constantArguments = false
+): TaintReview {
+  const index = object(step) && Number.isInteger(step.stepIndex) ? Number(step.stepIndex) : null
+  const fail = (
+    field = 'checks',
+    rule = 'shape',
+    message = '传播结果需要六项检查和污染值数组'
+  ): never => {
+    return invalidResult(
+      'ANALYSIS_TAINT_INVALID',
+      `steps[${index ?? '?'}].${field}`,
+      rule,
+      message,
+      index
+    )
   }
   if (!object(step) || !object(step.checks)) return fail()
   const quotes = (v: unknown, required: boolean): boolean =>
@@ -27,8 +42,13 @@ export function validateTaint(step: unknown, text: string | string[]): TaintRevi
       !short(check.reason) ||
       !quotes(check.quotes, check.status === 'supported' || check.status === 'blocked')
     )
-      return fail()
-    if (check.status === 'blocked' && key !== 'defense') return fail()
+      return fail(
+        `checks.${key}`,
+        'check-shape-and-quotes',
+        `${key}须含有效status、非空reason和quotes数组；supported/blocked必须引用本步骤原文`
+      )
+    if (check.status === 'blocked' && key !== 'defense')
+      return fail(`checks.${key}.status`, 'defense-only', 'blocked只能用于defense检查')
   }
   for (const key of ['taintIn', 'taintOut']) {
     const values = step[key]
@@ -45,7 +65,11 @@ export function validateTaint(step: unknown, text: string | string[]): TaintRevi
             (!Number.isInteger(v.fromStep) || Number(v.fromStep) < 0 || Number(v.fromStep) >= 16))
       )
     )
-      return fail()
+      return fail(
+        key,
+        'taint-values',
+        `${key}必须为数组；每个值包含name、origin、真实quotes，可选fromStep须为有效整数`
+      )
   }
   const review = step as unknown as TaintReview
   if (
@@ -53,8 +77,24 @@ export function validateTaint(step: unknown, text: string | string[]): TaintRevi
     Number(step.stepIndex) > 0 &&
     !review.taintIn.some((v) => v.fromStep === Number(step.stepIndex) - 1)
   )
-    return fail()
-  if ((step.dangerous === 0) !== (review.checks.defense.status === 'blocked')) return fail()
+    return fail(
+      'taintIn',
+      'previous-step',
+      '非首步骤的dangerous=1需要taintIn.fromStep指向上一编号步骤，并引用真实映射'
+    )
+  const fixedInput =
+    constantArguments &&
+    step.dangerous === 0 &&
+    review.checks.defense.status === 'not_applicable' &&
+    !review.taintIn.length &&
+    !review.taintOut.length &&
+    review.checks.argumentMapping.status !== 'unknown'
+  if (!fixedInput && (step.dangerous === 0) !== (review.checks.defense.status === 'blocked'))
+    return fail(
+      'checks.defense.status',
+      'defense-consistency',
+      'effective/blocked表示攻击被有效防护阻断，须dangerous=0；防护缺失请用absent，不能用blocked，也不能为了通过校验改成安全'
+    )
   if (
     step.dangerous === 1 &&
     (!review.taintIn.length ||
@@ -62,7 +102,11 @@ export function validateTaint(step: unknown, text: string | string[]): TaintRevi
       review.checks.argumentMapping.status !== 'supported' ||
       propagationChecks.some((k) => review.checks[k].status === 'unknown'))
   )
-    return fail()
+    return fail(
+      'dangerous',
+      'supported-propagation',
+      'dangerous=1须有污染输入输出、argumentMapping=supported且六项检查均不能unknown；证据不足用unknown/null'
+    )
   return review
 }
 

@@ -4,16 +4,29 @@ export async function createAgentModelFixture({
   mode = 'finish',
   delayMs = 0,
   supportPing = false,
-  beforeReply
+  beforeReply,
+  toolName = 'audit_read_step',
+  toolArguments,
+  summarySuffix = '',
+  pingText = 'pong from configured local fixture',
+  port = 0,
+  transformDecision
 } = {}) {
   const requests = []
   const server = createServer(async (request, response) => {
+    if (request.method !== 'POST') {
+      response.writeHead(request.url === '/health' ? 200 : 404, {
+        'Content-Type': 'application/json'
+      })
+      response.end(JSON.stringify({ fixture: true, paidRequests: 0 }))
+      return
+    }
     const parts = []
     for await (const part of request) parts.push(part)
     const body = JSON.parse(Buffer.concat(parts).toString('utf8'))
     requests.push(body)
     await beforeReply?.(body)
-    if (mode === 'unavailable') {
+    if (mode === 'unavailable' || (mode === 'transient-once' && requests.length === 1)) {
       response.writeHead(503, { 'Content-Type': 'application/json' })
       response.end(JSON.stringify({ error: { message: 'local fixture temporarily unavailable' } }))
       return
@@ -34,11 +47,7 @@ export async function createAgentModelFixture({
         choices: [{ index: 0, delta: content, finish_reason }]
       })
       response.write(
-        'data: ' +
-          JSON.stringify(
-            chunk({ role: 'assistant', content: 'pong from configured local fixture' }, null)
-          ) +
-          '\n\n'
+        'data: ' + JSON.stringify(chunk({ role: 'assistant', content: pingText }, null)) + '\n\n'
       )
       response.end('data: ' + JSON.stringify(chunk({}, 'stop')) + '\n\ndata: [DONE]\n\n')
       return
@@ -87,7 +96,7 @@ export async function createAgentModelFixture({
             index,
             id: 'read-' + requests.length + '-' + index,
             type: 'function',
-            function: { name: 'audit_read_step', arguments: JSON.stringify(arguments_) }
+            function: { name: toolName, arguments: JSON.stringify(toolArguments ?? arguments_) }
           }))
         },
         null
@@ -99,7 +108,8 @@ export async function createAgentModelFixture({
         verdict: 'unknown',
         summary:
           '本机受控模型：已读取路径原文，仍需完整污点证据。<script>fixture-only</script>' +
-          (mode === 'ui03' ? ' api_key="fixture-ui03-private"' : ''),
+          (mode === 'ui03' ? ' api_key="fixture-ui03-private"' : '') +
+          summarySuffix,
         steps: context.steps.map((s) => {
           const e = tools.find((e) => e.stepIndex === s.stepIndex)
           return {
@@ -160,17 +170,32 @@ export async function createAgentModelFixture({
       const decision = continuing
         ? { action: 'continue', summary: null, next: '核对已有引用是否充分' }
         : { action: 'finish', summary: '完成当前轮检查', result }
-      send({ role: 'assistant', content: JSON.stringify(decision) }, null)
+      const transformed = transformDecision
+        ? transformDecision(decision, { tools, users, requests })
+        : decision
+      send(
+        {
+          role: 'assistant',
+          content: typeof transformed === 'string' ? transformed : JSON.stringify(transformed)
+        },
+        null
+      )
       send({}, 'stop')
     }
     response.end('data: [DONE]\n\n')
   })
-  await new Promise((r) => server.listen(0, '127.0.0.1', r))
+  await new Promise((r, j) => {
+    server.once('error', j)
+    server.listen(port, '127.0.0.1', r)
+  })
   return {
     baseUrl: `http://127.0.0.1:${server.address().port}/v1`,
     requests,
     setMode(next) {
       mode = next
+    },
+    setSummarySuffix(next) {
+      summarySuffix = next
     },
     async close() {
       server.closeAllConnections()

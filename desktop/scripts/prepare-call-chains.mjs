@@ -20,7 +20,7 @@ if (process.argv.length !== 4) {
       path: resolve(process.argv[2]),
       duplicate: 'new'
     })
-    queries = new CodeQueryService(sources)
+    queries = new CodeQueryService(sources, { dataRoot: resolve(process.argv[3]) })
     const repo = new CallChainRepository(db)
     chains = new CallChainService(repo, queries)
     const prepared = await chains.action('prepare', {

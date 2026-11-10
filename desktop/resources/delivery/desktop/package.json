@@ -1,0 +1,74 @@
+{
+  "name": "desktop",
+  "version": "1.0.1",
+  "description": "Local Java source audit workbench with fixed evidence, controlled Pi tools and verifiable recovery",
+  "main": "./out/main/index.js",
+  "author": "pi-audit-harness contributors",
+  "license": "MIT",
+  "homepage": "https://github.com/YoungsGao/pi-audit-harness",
+  "scripts": {
+    "query": "node scripts/query-cli.mjs",
+    "query:serve": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/query-service.mjs",
+    "test:qa04": "electron-vite build --config electron.scan-test.config.ts && node tests/run-scan-electron.mjs --qa04",
+    "test:qa": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test tests/qa-acceptance.test.mjs && node scripts/qa-corpus.mjs verify",
+    "test:reliability": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test tests/agent-reliability.test.mjs && electron-vite build --config electron.reliability-test.config.ts && node tests/run-reliability-electron.mjs",
+    "qa:acceptance": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/qa-acceptance.mjs",
+    "qa:ui": "electron-vite build --config electron.qa-test.config.ts && node tests/run-qa-electron.mjs",
+    "qa:soak": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/qa-soak.mjs --duration-ms 3600000",
+    "test:security": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test tests/security-boundaries.test.mjs tests/security-lab.test.mjs && electron-vite build --config electron.security-test.config.ts && node tests/run-security-electron.mjs",
+    "format": "prettier --write .",
+    "lint": "eslint --cache .",
+    "typecheck:node": "tsc --noEmit -p tsconfig.node.json --composite false",
+    "typecheck:web": "tsc --noEmit -p tsconfig.web.json --composite false",
+    "typecheck": "npm run typecheck:node && npm run typecheck:web",
+    "start": "electron-vite preview",
+    "dev": "electron-vite dev",
+    "build": "npm run typecheck && electron-vite build",
+    "postinstall": "install-electron && electron-builder install-app-deps",
+    "build:unpack": "npm run build && electron-builder --dir",
+    "build:win": "npm run build && electron-builder --win",
+    "build:mac": "electron-vite build && electron-builder --mac",
+    "build:linux": "electron-vite build && electron-builder --linux"
+  },
+  "dependencies": {
+    "@colbymchenry/codegraph": "1.6.2",
+    "@earendil-works/pi-coding-agent": "1.2.0",
+    "@electron-toolkit/preload": "^3.0.2",
+    "@electron-toolkit/utils": "^4.0.0",
+    "electron-updater": "^6.8.9",
+    "java-parser": "3.0.1"
+  },
+  "overrides": {
+    "@earendil-works/pi-coding-agent": {
+      "minimatch": "11.0.1",
+      "undici": "8.12.2"
+    },
+    "java-parser": {
+      "lodash": "4.18.1"
+    },
+    "chevrotain": {
+      "lodash-es": "4.18.1"
+    }
+  },
+  "devDependencies": {
+    "@electron-toolkit/eslint-config-prettier": "^3.0.1",
+    "@electron-toolkit/eslint-config-ts": "^4.0.0",
+    "@electron-toolkit/tsconfig": "^2.0.0",
+    "@types/node": "^24.19.2",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.2",
+    "electron": "44.9.1",
+    "electron-builder": "^26.15.3",
+    "electron-vite": "^6.0.0",
+    "eslint": "^9.39.5",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-react-refresh": "^0.5.7",
+    "prettier": "^3.9.10",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "typescript": "^5.9.3",
+    "vite": "^8.3.4"
+  }
+}

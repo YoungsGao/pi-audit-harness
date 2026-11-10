@@ -246,6 +246,7 @@ test('SCAN-02 authenticates fixed routes, validates snapshot positions and idemp
   await writeFile(join(h.path, 'Demo.java'), 'changed')
   const saved = await send('manualRisk', h.manual)
   assert.equal(saved.ok, true)
+  assert.equal(h.db.get('SELECT count(*) AS n FROM run_graph_bindings').n, 0)
   assert.equal(saved.data.pathIds.length, 1)
   assert.deepEqual((await send('manualRisk', h.manual)).data, saved.data)
   const detail = await send('detail', { ...h.scope, pathId: saved.data.pathIds[0] })

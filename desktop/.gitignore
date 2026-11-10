@@ -28,3 +28,9 @@ out-templates-test/
 out-review-test/
 .run-test-data/
 out-run-test/
+.security-test-data/
+out-security-test/
+.qa-test-data/
+out-qa-test/
+.reliability-test-data/
+out-reliability-test/

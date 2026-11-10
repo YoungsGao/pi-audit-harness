@@ -31,7 +31,7 @@
 <main class="main" id="content"></main><aside class="detail-panel" id="detail" aria-labelledby="detail-title" hidden></aside>
 <script type="application/json" id="requirements-data">{
   "product": "pi-audit-harness",
-  "date": "2026-10-17",
+  "date": "2026-11-05",
   "source": {
     "path": "PRD 原文快照（已内嵌于需求页面）",
     "lineCount": 485,
@@ -482,7 +482,7 @@
       "id": "M03",
       "name": "增强能力",
       "goal": "增强能力",
-      "summary": "模板、LSP、交互、恢复、安全与发布",
+      "summary": "模板、图查询、交互、恢复、安全与发布",
       "label": "增强能力"
     },
     {
@@ -826,7 +826,7 @@
           "title": "预处理与取证的基础代码查询",
           "description": "提供默认 rg/grep 与源码读取能力，为风险点工具和 Pi Loop 取得函数、引用候选及源码片段。",
           "acceptance": [
-            "基础流程不依赖 LSP 或 CodeGraph",
+            "基础候选流程可显式使用 basic 并标明覆盖范围",
             "查询返回文件位置和原文范围",
             "同名文本只算调用候选，无法确认时保留未知",
             "有基本查询范围和输出限制，不无限读取"
@@ -912,7 +912,7 @@
           "design": [
             {
               "title": "预处理和漏洞确认分工",
-              "text": "工具阶段发现危险 API 并尽量补全候选调用路径，SQLite 保存调用图与待调查路径。工具命中不等于漏洞成立，后续 Pi Loop 核实输入影响、传播与防护。首版使用基础查询，Java LSP 与图后端作为 P1/P2 增强。"
+              "text": "工具阶段发现危险 API 并尽量补全候选调用路径，SQLite 保存调用图与待调查路径。工具命中不等于漏洞成立，后续 Pi Loop 核实输入影响、传播与防护。当前默认 CodeGraph 固定快照结构图，失败或显式选择时采用 basic，并固定降级原因。"
             },
             {
               "title": "扫描边界",
@@ -1602,12 +1602,12 @@
       "title": "代码查询工具增强",
       "priority": "P1",
       "module": "M03",
-      "description": "统一 CLI + Skill 查询入口，接入 Java LSP，并管理语言服务器和查询降级。",
+      "description": "统一 CLI + Skill 查询入口，默认 CodeGraph 固定快照结构图，管理投影、构建资源和 basic 降级。",
       "acceptance": [
-        "统一 CLI + Skill 查询接口：支持能力查询、读取、符号、定义、引用与调用适配",
-        "Java LSP 语义查询：至少一个跨文件真实样例参与风险路径分析",
-        "语言服务器生命周期与降级：显示准备与索引状态，避免每条 CLI 请求重复启动",
-        "多语言查询扩展边界：业务不依赖唯一全局 Java 服务器"
+        "统一 CLI/HTTP 查询契约支持文本、原文、符号、定义、引用与直接调用关系",
+        "真实 CodeGraph 跨文件样例参与候选路径分析，结构候选与 Java 类型绑定精度明确区分",
+        "同快照共享构建，完成后退出，热查询复用校验后的只读投影，并保留超时、取消和降级原因",
+        "中性语言/引擎注册接口支持能力协商及位置适配，首版交付 Java"
       ],
       "dependencies": [
         "SOURCE-01"
@@ -1617,7 +1617,7 @@
       "owner": "后端",
       "kind": "功能流程",
       "origin": "补充需求",
-      "ref": "2026-10-17 · 按功能流程归并",
+      "ref": "2026-11-05 · 用户确认 CodeGraph 替代及删除旧 JDT-LS",
       "children": [
         {
           "id": "QRY-02",
@@ -1638,17 +1638,17 @@
           "kind": "功能",
           "priority": "P1",
           "origin": "补充需求",
-          "ref": "FR-06 / FR-07"
+          "ref": "2026-11-05 · CodeGraph 查询替代 · QRY-02"
         },
         {
           "id": "QRY-03",
           "module": "M06",
-          "title": "Java LSP 语义查询",
-          "description": "在基础调用链工具与 Pi/SSE 主链路跑通后，以 Java JDT-LS 提升语义定位精度。",
+          "title": "Java 固定快照结构图查询",
+          "description": "以 CodeGraph 发现跨文件结构关系，结合 java-parser 核验声明、准确调用点和重载歧义，输出候选与覆盖缺口。",
           "acceptance": [
-            "至少一个跨文件真实样例参与风险路径分析",
-            "调用层次按服务器实际能力适配",
-            "不能用一次诊断通知证明全工作区索引完成"
+            "真实跨文件 CodeGraph 查询参与候选风险路径分析",
+            "同一行多个调用点分别保留，UTF-16/CRLF位置与固定原文一致",
+            "同参数数量重载保留多候选，输出candidate与semantic=false，并记录来源、解析策略和缺口"
           ],
           "dependencies": [
             "QRY-02",
@@ -1660,17 +1660,17 @@
           "kind": "功能",
           "priority": "P1",
           "origin": "补充需求",
-          "ref": "FR-07 / A04"
+          "ref": "2026-11-05 · CodeGraph 查询替代 · QRY-03"
         },
         {
           "id": "QRY-04",
           "module": "M06",
-          "title": "语言服务器生命周期与降级",
-          "description": "按项目根和语言管理运行时、导入、索引、复用、超时与退出。",
+          "title": "图索引生命周期与降级",
+          "description": "按项目与固定快照管理一次构建、只读投影、共享等待者、资源预算、取消和失败降级。",
           "acceptance": [
-            "显示准备与索引状态，避免每条 CLI 请求重复启动",
-            "失败可回退基础搜索并保留覆盖缺口",
-            "降级或超时不能推导出安全"
+            "同key并发共享构建，其他key明确繁忙，构建完成后进程退出",
+            "超时、内存超限、取消不发布半成品；basic降级身份和原因固定到任务",
+            "复用前校验原文与投影摘要；损坏及图身份变化明确报告，恢复沿固定材料进行"
           ],
           "dependencies": [
             "QRY-03"
@@ -1681,17 +1681,17 @@
           "kind": "功能",
           "priority": "P1",
           "origin": "补充需求",
-          "ref": "FR-07 / A12"
+          "ref": "2026-11-05 · CodeGraph 查询替代 · QRY-04"
         },
         {
           "id": "QRY-05",
           "module": "M06",
           "title": "多语言查询扩展边界",
-          "description": "建立语言注册、能力协商、位置编码和返回值适配接口。",
+          "description": "以中性 QueryEngine 和语言注册表隔离能力协商、位置编码、返回值与后端实现。",
           "acceptance": [
-            "业务不依赖唯一全局 Java 服务器",
-            "首版只交付 Java，其余明确未支持",
-            "多服务器注册不被宣称为已解决跨语言传播"
+            "业务层通过语言和后端注册查找引擎",
+            "首版只交付Java，其他语言明确未支持",
+            "增加配置注册需同时完成快照、规则、位置与传播验证后方可启用"
           ],
           "dependencies": [
             "QRY-02"
@@ -1702,7 +1702,13 @@
           "kind": "功能",
           "priority": "P1",
           "origin": "补充需求",
-          "ref": "FR-08 / A05"
+          "ref": "2026-11-05 · CodeGraph 查询替代 · QRY-05"
+        }
+      ],
+      "design": [
+        {
+          "title": "2026-11-05 当前查询方案",
+          "text": "固定 CodeGraph 1.6.2 发布制品，一次建图后导出应用 SQLite 投影，建图进程退出。CST核验调用点与重载候选，任务固定图身份并进入恢复和报告。原文出处保留历史方案，当前实现见技术文档10和13。"
         }
       ]
     },
@@ -1961,7 +1967,7 @@
           "description": "限定快照和缓存访问，约束通用写入、编辑与任意命令执行。",
           "acceptance": [
             "默认不改用户源码、不启动目标业务",
-            "校验路径与参数，并核实 JDT-LS 的构建执行行为",
+            "校验路径与参数，并核实 CodeGraph 仅处理固定快照及关闭项目脚本执行入口",
             "不将应用级限制宣传为 OS 沙箱"
           ],
           "dependencies": [
@@ -2568,8 +2574,7 @@
     },
     "presentation": "图与代码优先；详细实现约束见关联需求"
   }
-}
-</script>
+}</script>
 <script>
 'use strict';
 const DATA=JSON.parse(document.querySelector('#requirements-data').textContent),REQS=DATA.requirements,MODULES=DATA.modules;
@@ -2589,7 +2594,7 @@ function requirements(){const list=filtered();return `<div class="heading"><div>
 function design(){return "<div class=\"heading\"><div><div class=\"eyebrow\">HARNESS / KEY DESIGNS</div><h1>关键设计</h1><p class=\"sub\">状态机 / SSE 协议 / 会话管理（待确认）</p></div></div><div class=\"visual-designs\"><article class=\"design-card\"><div class=\"module-top\"><span class=\"module-id\">01 / STATE MACHINE</span><span class=\"tag\">Harness 管状态 · Agent 回调</span></div><h2>调用链状态机</h2><svg class=\"state-diagram\" viewBox=\"0 0 1000 410\" role=\"img\" aria-label=\"调用链状态机：init 到 queue 到 analyze 到 completed；可停止、取消、失败或超时，并受控重试\"><defs><marker id=\"state-arrow\" markerWidth=\"8\" markerHeight=\"8\" refX=\"7\" refY=\"4\" orient=\"auto\"><path d=\"M0 0L8 4L0 8\" fill=\"#6b9cc7\"/></marker></defs><g><rect x=\"35\" y=\"70\" width=\"160\" height=\"66\" rx=\"9\" fill=\"#10283f\" stroke=\"#89afd0\"/><text x=\"115.0\" y=\"97\" fill=\"#89afd0\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"16\">init</text><text x=\"115.0\" y=\"119\" fill=\"#8baece\" text-anchor=\"middle\" font-size=\"12\">调用链入库</text></g><g><rect x=\"285\" y=\"70\" width=\"160\" height=\"66\" rx=\"9\" fill=\"#10283f\" stroke=\"#89c8f7\"/><text x=\"365.0\" y=\"97\" fill=\"#89c8f7\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"16\">queue</text><text x=\"365.0\" y=\"119\" fill=\"#8baece\" text-anchor=\"middle\" font-size=\"12\">等待领取</text></g><g><rect x=\"535\" y=\"70\" width=\"160\" height=\"66\" rx=\"9\" fill=\"#10283f\" stroke=\"#65b9ff\"/><text x=\"615.0\" y=\"97\" fill=\"#65b9ff\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"16\">analyze</text><text x=\"615.0\" y=\"119\" fill=\"#8baece\" text-anchor=\"middle\" font-size=\"12\">Agent 分析</text></g><g><rect x=\"805\" y=\"70\" width=\"160\" height=\"66\" rx=\"9\" fill=\"#10283f\" stroke=\"#72c5b0\"/><text x=\"885.0\" y=\"97\" fill=\"#72c5b0\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"16\">completed</text><text x=\"885.0\" y=\"119\" fill=\"#8baece\" text-anchor=\"middle\" font-size=\"12\">结果落库</text></g><path d=\"M195 103H285\" fill=\"none\" stroke=\"#6b9cc7\" stroke-width=\"1.5\" marker-end=\"url(#state-arrow)\"/><path d=\"M445 103H535\" fill=\"none\" stroke=\"#6b9cc7\" stroke-width=\"1.5\" marker-end=\"url(#state-arrow)\"/><path d=\"M695 103H805\" fill=\"none\" stroke=\"#6b9cc7\" stroke-width=\"1.5\" marker-end=\"url(#state-arrow)\"/><text x=\"235\" y=\"89\" fill=\"#789abc\" text-anchor=\"middle\" font-size=\"11\">启动</text><text x=\"490\" y=\"89\" fill=\"#789abc\" text-anchor=\"middle\" font-size=\"11\">领取</text><text x=\"750\" y=\"89\" fill=\"#789abc\" text-anchor=\"middle\" font-size=\"11\">result 回调</text><g><rect x=\"35\" y=\"265\" width=\"160\" height=\"66\" rx=\"9\" fill=\"#10283f\" stroke=\"#c4b685\"/><text x=\"115.0\" y=\"292\" fill=\"#c4b685\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"16\">stop</text><text x=\"115.0\" y=\"314\" fill=\"#8baece\" text-anchor=\"middle\" font-size=\"12\">停止 · 可恢复</text></g><path d=\"M615 136V214H115V265\" fill=\"none\" stroke=\"#6b9cc7\" stroke-width=\"1.5\" marker-end=\"url(#state-arrow)\"/><g><rect x=\"285\" y=\"265\" width=\"160\" height=\"66\" rx=\"9\" fill=\"#10283f\" stroke=\"#d19c99\"/><text x=\"365.0\" y=\"292\" fill=\"#d19c99\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"16\">error</text><text x=\"365.0\" y=\"314\" fill=\"#8baece\" text-anchor=\"middle\" font-size=\"12\">执行失败</text></g><path d=\"M615 136V214H365V265\" fill=\"none\" stroke=\"#6b9cc7\" stroke-width=\"1.5\" marker-end=\"url(#state-arrow)\"/><g><rect x=\"535\" y=\"265\" width=\"160\" height=\"66\" rx=\"9\" fill=\"#10283f\" stroke=\"#c4b685\"/><text x=\"615.0\" y=\"292\" fill=\"#c4b685\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"16\">timeout</text><text x=\"615.0\" y=\"314\" fill=\"#8baece\" text-anchor=\"middle\" font-size=\"12\">超时</text></g><path d=\"M615 136V214H615V265\" fill=\"none\" stroke=\"#6b9cc7\" stroke-width=\"1.5\" marker-end=\"url(#state-arrow)\"/><g><rect x=\"805\" y=\"265\" width=\"160\" height=\"66\" rx=\"9\" fill=\"#10283f\" stroke=\"#a6a8c4\"/><text x=\"885.0\" y=\"292\" fill=\"#a6a8c4\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"16\">cancel</text><text x=\"885.0\" y=\"314\" fill=\"#8baece\" text-anchor=\"middle\" font-size=\"12\">取消</text></g><path d=\"M615 136V214H885V265\" fill=\"none\" stroke=\"#6b9cc7\" stroke-width=\"1.5\" marker-end=\"url(#state-arrow)\"/><path d=\"M115 331V374H245V30H365V70\" fill=\"none\" stroke=\"#6b9cc7\" stroke-width=\"1.5\" marker-end=\"url(#state-arrow)\" stroke-dasharray=\"5 5\"/><path d=\"M365 331V374H245\" fill=\"none\" stroke=\"#6b9cc7\" stroke-width=\"1.5\" marker-end=\"url(#state-arrow)\" stroke-dasharray=\"5 5\"/><path d=\"M615 331V374H365\" fill=\"none\" stroke=\"#6b9cc7\" stroke-width=\"1.5\" marker-end=\"url(#state-arrow)\" stroke-dasharray=\"5 5\"/><text x=\"485\" y=\"398\" fill=\"#8db9df\" text-anchor=\"middle\" font-size=\"12\">虚线：stop 继续 / error、timeout 受控重试 → queue（新 attemptId）</text></svg><div class=\"mini-notes\"><span>init / queue 也可取消；queue 可停止。</span><span>cancel / completed 结束本次 attempt。</span><span>思考、工具事件不改变 analyze。</span></div><div class=\"related\"><button data-related=\"SOURCE-01\">源码仓库输入</button><button data-related=\"ANALYZE-01\">Agent 分析流程</button></div></article><article class=\"design-card\"><div class=\"module-top\"><span class=\"module-id\">02 / SSE</span><span class=\"tag\">event + id + data</span></div><h2>事件驱动与三段帧</h2><div class=\"structure-flow\"><div><small>event</small><code>驱动状态流转</code></div><div><small>id</small><code>事件游标 eventId</code></div><div><small>data（JSON）</small><code>type + 上下文 + 内容</code></div></div><div class=\"code-caption\">text/event-stream · 空行分帧 · data 是 JSON</div><pre class=\"design-code\">event: queued\nid: 1\ndata: {&quot;sessionId&quot;:&quot;s1&quot;,&quot;runId&quot;:&quot;r1&quot;,&quot;chainId&quot;:&quot;c1&quot;,&quot;attemptId&quot;:1,&quot;type&quot;:&quot;process&quot;,&quot;status&quot;:&quot;queue&quot;,&quot;message&quot;:&quot;调用链进入队列&quot;}\n\nevent: analyzing\nid: 2\ndata: {&quot;sessionId&quot;:&quot;s1&quot;,&quot;runId&quot;:&quot;r1&quot;,&quot;chainId&quot;:&quot;c1&quot;,&quot;attemptId&quot;:1,&quot;type&quot;:&quot;process&quot;,&quot;status&quot;:&quot;analyze&quot;,&quot;message&quot;:&quot;开始分析&quot;}\n\nevent: thoughts_execute\nid: 3\ndata: {&quot;sessionId&quot;:&quot;s1&quot;,&quot;runId&quot;:&quot;r1&quot;,&quot;chainId&quot;:&quot;c1&quot;,&quot;attemptId&quot;:1,&quot;type&quot;:&quot;thinking&quot;,&quot;status&quot;:&quot;analyze&quot;,&quot;message&quot;:&quot;核查输入到危险参数的传播证据&quot;}\n\nevent: tool_call_info\nid: 4\ndata: {&quot;sessionId&quot;:&quot;s1&quot;,&quot;runId&quot;:&quot;r1&quot;,&quot;chainId&quot;:&quot;c1&quot;,&quot;attemptId&quot;:1,&quot;type&quot;:&quot;process&quot;,&quot;status&quot;:&quot;analyze&quot;,&quot;toolCallId&quot;:&quot;t1&quot;,&quot;details&quot;:{&quot;name&quot;:&quot;read_source&quot;,&quot;phase&quot;:&quot;completed&quot;,&quot;input&quot;:{&quot;file&quot;:&quot;UserService.java&quot;,&quot;line&quot;:42},&quot;output&quot;:{&quot;evidence&quot;:&quot;参数进入 SQL 拼接&quot;}}}\n\nevent: completed\nid: 5\ndata: {&quot;sessionId&quot;:&quot;s1&quot;,&quot;runId&quot;:&quot;r1&quot;,&quot;chainId&quot;:&quot;c1&quot;,&quot;attemptId&quot;:1,&quot;type&quot;:&quot;result&quot;,&quot;status&quot;:&quot;completed&quot;,&quot;details&quot;:{&quot;verdict&quot;:&quot;risk&quot;,&quot;dangerous&quot;:true}}\n\n</pre><details class=\"design-payload\"><summary>事件映射与恢复请求</summary><div class=\"code-caption\">event → status / type</div><pre class=\"design-code\">queued               → queue        | data.type = process\nanalyzing            → analyze      | data.type = process\nthoughts_execute     → 不变           | data.type = thinking\ntool_call_info       → 不变           | data.type = process\ncompleted            → completed    | data.type = result\nstopped              → stop         | data.type = result\ncancelled            → cancel       | data.type = result\nfailed               → error        | data.type = result\ntimed_out            → timeout      | data.type = result</pre><div class=\"code-caption\">重连与恢复</div><pre class=\"design-code\">POST /analyze\n{&quot;projectId&quot;:&quot;p1&quot;,&quot;modelConfigId&quot;:&quot;m1&quot;,&quot;chainId&quot;:&quot;c1&quot;,&quot;sessionId&quot;:&quot;s1&quot;,&quot;afterId&quot;:3}\n\n// SSE 补发：读取 eventId &gt; 3 的已持久化事件\n// Agent 恢复：优先验证 Pi SessionManager.open(sessionFile)\n// eventId 与会话检查点不强绑定</pre></details><div class=\"mini-notes\"><span>一个流绑定一个 session；不同 session 的 id 不混用。</span><span>业务帧：保存事件 / 状态 → 发布 SSE。</span><span>心跳用 : ping，不占 id。</span><span>思考 = 模型提供的分析摘要。</span></div><div class=\"related\"><button data-related=\"ANALYZE-01\">Agent 分析流程</button><button data-related=\"RESULT-01\">调用链详情与审计结果</button></div></article><article class=\"design-card\"><div class=\"module-top\"><span class=\"module-id\">03 / SESSION MANAGEMENT</span><span class=\"tag\">待确认</span></div><h2>会话管理</h2><div class=\"structure-flow\"><div><small>Pi SessionManager · 优先验证</small><code>会话持久化 / 打开 / 继续</code></div><i>↔</i><div><small>Harness + SQLite</small><code>调用链状态 / 会话关联</code></div></div><div class=\"code-caption\">待验证的集成方式</div><pre class=\"design-code\">// 优先验证 Pi 原生会话恢复\nconst { session } = await createAgentSession({\n  cwd: projectPath,\n  sessionManager: SessionManager.open(sessionFile),\n});\nawait session.prompt(&quot;继续分析当前调用链&quot;);\n\n// Harness 保存关联，不重复保存整份模型上下文\n{ chainId, piSessionId, sessionFile, status }\n\n// SSE id：事件补发游标 ≠ 会话检查点</pre><div class=\"mini-notes\"><span>验证：中断恢复、工具边界、结果幂等。</span><span>LevelDB / ZSet 仅为备选，暂不确定采用。</span><span>会话管理恢复仍为 P1。</span></div><div class=\"related\"><button data-related=\"RECOVERY-01\">任务控制与恢复</button><button data-related=\"ANALYZE-01\">Agent 分析流程</button></div><p class=\"sub\"><a href=\"https://github.com/earendil-works/pi/blob/main/packages/coding-agent/examples/sdk/11-sessions.ts\" target=\"_blank\" rel=\"noopener noreferrer\" style=\"color:#8ac9fb\">Pi 官方会话示例 ↗</a></p></article></div>"}
 function render(){navigation();document.querySelector('#content').innerHTML=({overview,requirements,design}[state.view])()+`<footer class="foot"><span>pi-audit-harness · 产品需求</span><span>P0 主链路 / P1 增强 / P2 后续 · 不代表研发进度</span></footer>`}
 function renderChildren(r){return `<section class="detail-section"><h3>子需求 · ${(r.children||[]).length} 项</h3><div class="subrequirements">${(r.children||[]).map((c,i)=>`<details class="subrequirement"><summary><span class="child-no">${String(i+1).padStart(2,'0')}</span><span>${escapeHtml(c.title)}</span></summary><div class="child-body"><p>${escapeHtml(c.description)}</p><h4>验收条件</h4><ul class="acceptance">${c.acceptance.map(a=>`<li>${icon('check')}<span>${escapeHtml(a)}</span></li>`).join('')}</ul>${(c.design||[]).length?`<details class="child-notes"><summary>实现备注</summary>${c.design.map(n=>`<section class="design-note"><h4>${escapeHtml(n.title)}</h4>${n.text?`<p>${escapeHtml(n.text)}</p>`:''}${n.code?`<pre>${escapeHtml(n.code)}</pre>`:''}</section>`).join('')}</details>`:''}<small class="child-source">原条目 ${escapeHtml(c.id)} · ${escapeHtml(c.owner)}</small></div></details>`).join('')}</div></section>`}
-function openDetail(id){const r=getReq(id);if(!r)return;activeReq=id;const m=getModule(r.module),s=DATA.source.sections.find(x=>x.id===r.section),phase=DATA.phases.find(x=>x.id===r.phase);const d=document.querySelector('#detail');d.innerHTML=`<div class="detail-head"><div class="detail-top"><span class="detail-id">${r.id}</span><button class="close" data-action="close" aria-label="关闭需求详情">${icon('close')}</button></div><h2 id="detail-title">${escapeHtml(r.title)}</h2><div class="detail-tags">${priorityHTML(r.priority)}<span class="tag">${m.name}</span></div></div><div class="detail-body"><section class="detail-section"><h3>需求说明</h3><p>${escapeHtml(r.description)}</p></section>${renderChildren(r)}<section class="detail-section"><h3>验收条件</h3><ul class="acceptance">${r.acceptance.map(a=>`<li>${icon('check')}<span>${escapeHtml(a)}</span></li>`).join('')}</ul></section><div class="detail-facts"><div class="fact"><small>参考职责</small><strong>${r.owner}</strong></div><div class="fact"><small>需求类型</small><strong>${r.kind}</strong></div></div><details class="technical"><summary>实现备注与原文出处</summary><p>参考阶段：${phase?phase.title+'（时间可协商）':'后续迭代'}<br>文档映射：${escapeHtml(r.ref||'§'+r.section)}</p>${(r.design||[]).map(n=>`<section class="design-note"><h4>${escapeHtml(n.title)}</h4>${n.text?`<p>${escapeHtml(n.text)}</p>`:""}${n.code?`<pre>${escapeHtml(n.code)}</pre>`:""}</section>`).join('')}${r.dependencies.length?`<h3 style="font-size:10px;color:#789ec6;margin-bottom:9px">前置需求</h3><div class="related">${r.dependencies.map(id=>`<button data-related="${id}" title="${escapeHtml(getReq(id).title)}">${id} · ${escapeHtml(getReq(id).title)}</button>`).join('')}</div>`:''}${r.origin==='补充需求'?`<p class="source-note">本项依据 2026-10-17 的 Agent 主流程调整。以下原文仅供背景参考，当前优先级和验收以本项为准。</p>`:''}<h3 style="font-size:10px;color:#789ec6">§${s.id} ${escapeHtml(s.title)} · L${s.line}–L${s.end}</h3><pre class="source-code">${escapeHtml(s.text)}</pre></details></div><div class="detail-bottom">需求定义已调整；这不代表后端或 Agent 功能已经实现。</div>`;d.hidden=false;document.querySelectorAll('[data-open]').forEach(el=>el.classList.toggle('active',el.dataset.open===id));d.querySelector('.detail-body').scrollTop=0}
+function openDetail(id){const r=getReq(id);if(!r)return;activeReq=id;const m=getModule(r.module),s=DATA.source.sections.find(x=>x.id===r.section),phase=DATA.phases.find(x=>x.id===r.phase);const d=document.querySelector('#detail');d.innerHTML=`<div class="detail-head"><div class="detail-top"><span class="detail-id">${r.id}</span><button class="close" data-action="close" aria-label="关闭需求详情">${icon('close')}</button></div><h2 id="detail-title">${escapeHtml(r.title)}</h2><div class="detail-tags">${priorityHTML(r.priority)}<span class="tag">${m.name}</span></div></div><div class="detail-body"><section class="detail-section"><h3>需求说明</h3><p>${escapeHtml(r.description)}</p></section>${renderChildren(r)}<section class="detail-section"><h3>验收条件</h3><ul class="acceptance">${r.acceptance.map(a=>`<li>${icon('check')}<span>${escapeHtml(a)}</span></li>`).join('')}</ul></section><div class="detail-facts"><div class="fact"><small>参考职责</small><strong>${r.owner}</strong></div><div class="fact"><small>需求类型</small><strong>${r.kind}</strong></div></div><details class="technical"><summary>实现备注与原文出处</summary><p>参考阶段：${phase?phase.title+'（时间可协商）':'后续迭代'}<br>文档映射：${escapeHtml(r.ref||'§'+r.section)}</p>${(r.design||[]).map(n=>`<section class="design-note"><h4>${escapeHtml(n.title)}</h4>${n.text?`<p>${escapeHtml(n.text)}</p>`:""}${n.code?`<pre>${escapeHtml(n.code)}</pre>`:""}</section>`).join('')}${r.dependencies.length?`<h3 style="font-size:10px;color:#789ec6;margin-bottom:9px">前置需求</h3><div class="related">${r.dependencies.map(id=>`<button data-related="${id}" title="${escapeHtml(getReq(id).title)}">${id} · ${escapeHtml(getReq(id).title)}</button>`).join('')}</div>`:''}${r.origin==='补充需求'?`<p class="source-note">以下原文保留历史方案背景。当前优先级、查询方案与验收以本项和最新技术文档为准。</p>`:''}<h3 style="font-size:10px;color:#789ec6">§${s.id} ${escapeHtml(s.title)} · L${s.line}–L${s.end}</h3><pre class="source-code">${escapeHtml(s.text)}</pre></details></div><div class="detail-bottom">需求定义已调整；这不代表后端或 Agent 功能已经实现。</div>`;d.hidden=false;document.querySelectorAll('[data-open]').forEach(el=>el.classList.toggle('active',el.dataset.open===id));d.querySelector('.detail-body').scrollTop=0}
 document.addEventListener('click',e=>{const row=e.target.closest('[data-open]');if(row){openDetail(row.dataset.open);return}const related=e.target.closest('[data-related]');if(related){openDetail(related.dataset.related);return}const view=e.target.closest('[data-view]');if(view){navigate(view.dataset.view);return}const module=e.target.closest('[data-module]');if(module){state.priority='all';state.query='';document.querySelector('#search').value='';navigate('requirements',module.dataset.module);return}const priority=e.target.closest('[data-priority]');if(priority){state.priority=priority.dataset.priority;render();return}const action=e.target.closest('[data-action]');if(!action)return;if(action.dataset.action==='close'){closeDetail();render()}else if(action.dataset.action==='all'||action.dataset.action==='reset'){state.module='all';state.priority='all';state.query='';document.querySelector('#search').value='';navigate('requirements')}});
 document.addEventListener('change',e=>{if(e.target.id==='modulefilter'){state.module=e.target.value;render()}});
 document.querySelector('#search').addEventListener('input',e=>{state.query=e.target.value.trim();if(state.view!=='requirements'){state.view='requirements';location.hash='#requirements'}render()});

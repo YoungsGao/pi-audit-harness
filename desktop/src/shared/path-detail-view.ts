@@ -1,4 +1,5 @@
 import type { PathSummary } from './scan-contracts'
+import { redactText } from './redaction.ts'
 
 export const detailTabs = [
   { id: 'path', label: '调用路径' },
@@ -48,29 +49,27 @@ export function pathOutcome(path: Pick<PathSummary, 'status' | 'verdict'>): stri
   return '证据不足，风险未知'
 }
 
-export function publicAnalysisText(text: string): string {
-  return text
-    .replace(/\bBearer\s+[^\s"',}]+/gi, 'Bearer [REDACTED]')
-    .replace(/(https?:\/\/)[^\s/@]+:[^\s/@]+@/gi, '$1[REDACTED]@')
-    .replace(/\bsk-[A-Za-z0-9_-]{8,}/g, '[REDACTED]')
-    .replace(
-      /((?:api[_-]?key|password|authorization|secret|(?:access[_-]?)?token)["']?\s*[:=]\s*["']?)[^\s"',;}]+/gi,
-      '$1[REDACTED]'
-    )
+export function publicAnalysisText(text: string, secrets: readonly string[] = []): string {
+  return redactText(text, secrets)
 }
 
 // Display-only defense in depth; service-side redaction remains the primary boundary.
-export function publicAnalysisValue(value: unknown, depth = 0): unknown {
+export function publicAnalysisValue(
+  value: unknown,
+  depth = 0,
+  secrets: readonly string[] = []
+): unknown {
   if (depth > 16) return '[记录过深，未展开]'
-  if (typeof value === 'string') return publicAnalysisText(value)
-  if (Array.isArray(value)) return value.map((item) => publicAnalysisValue(item, depth + 1))
+  if (typeof value === 'string') return publicAnalysisText(value, secrets)
+  if (Array.isArray(value))
+    return value.map((item) => publicAnalysisValue(item, depth + 1, secrets))
   if (value && typeof value === 'object')
     return Object.fromEntries(
       Object.entries(value).map(([key, item]) => [
         key,
         /api.?key|secret|password|authorization|(?:access|refresh).?token|^token$/i.test(key)
           ? '[REDACTED]'
-          : publicAnalysisValue(item, depth + 1)
+          : publicAnalysisValue(item, depth + 1, secrets)
       ])
     )
   return value

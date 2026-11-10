@@ -4,6 +4,7 @@ import { templateActions } from '../shared/template-contracts'
 import type { IpcMainInvokeEvent } from 'electron'
 import { join } from 'node:path'
 import { ServiceManager } from './service-manager'
+import { assertDesktopClient, secureWindow } from './window-security'
 import type { AppInfo } from '../shared/desktop-api'
 
 let mainWindow: BrowserWindow | null = null
@@ -20,12 +21,7 @@ const service = new ServiceManager(
 )
 
 function assertClient(event: IpcMainInvokeEvent): void {
-  if (
-    event.sender !== mainWindow?.webContents ||
-    event.senderFrame !== mainWindow.webContents.mainFrame
-  ) {
-    throw new Error('不允许的客户端通信来源')
-  }
+  assertDesktopClient(event, mainWindow)
 }
 
 function createWindow(): void {
@@ -47,8 +43,7 @@ function createWindow(): void {
   window.on('closed', () => {
     mainWindow = null
   })
-  window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
-  window.webContents.on('will-navigate', (event) => event.preventDefault())
+  secureWindow(window)
 
   const rendererUrl = process.env['ELECTRON_RENDERER_URL']
   const loading =

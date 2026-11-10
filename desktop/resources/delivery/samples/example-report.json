@@ -1,0 +1,310 @@
+{
+  "schema": "pi-audit-harness.report",
+  "version": 1,
+  "reportId": "qa-example",
+  "queryGraph": {
+    "version": 1,
+    "backend": "codegraph",
+    "engine": "codegraph/1.6.2;git/6560052a6f856855d3f71eee838fd66ccfa4285d",
+    "adapter": "snapshot-graph/1",
+    "graphKey": "a91ef9f1b140dde2b466957c9ee38b21132b602e68aee9c477599519419cdb5c",
+    "graphDigest": "de9dc3ddf18ab48d6a69b5687164594e63aaf61fd5a5b04c22d27fd841271e37",
+    "gaps": [
+      "GRAPH_STRUCTURAL_NOT_SEMANTIC"
+    ],
+    "facts": [
+      {
+        "filePath": "Acceptance01.java",
+        "line": 7,
+        "column": 86,
+        "targets": [],
+        "verification": "candidate",
+        "provenance": "unspecified",
+        "resolvedBy": "unresolved",
+        "confidence": 0
+      }
+    ]
+  },
+  "recovery": {
+    "controlState": "completed",
+    "recordedRequests": 2,
+    "uncertainRequests": 0,
+    "paths": [
+      {
+        "pathId": "path-4359c7052877adf891fae00574c22b52256623c04f60860701838d5084afe237",
+        "epoch": 1,
+        "state": "completed",
+        "lastRecovery": null
+      }
+    ]
+  },
+  "filter": {
+    "verdict": "all",
+    "pathStatus": "all",
+    "reviewStatus": "all"
+  },
+  "snapshotKey": "f7504c896a1d330c6bee9a7cf1b65ee6414ceb56dd0dc12ba3a083759c42b574",
+  "allStatistics": {
+    "paths": 1,
+    "sinks": 1,
+    "dangerous": 1,
+    "safe": 0,
+    "unknown": 0,
+    "pending": 0,
+    "analyzing": 0,
+    "completed": 1,
+    "failed": 0,
+    "unresolved": 0,
+    "invalid": 0,
+    "edges": 1,
+    "riskPoints": 1
+  },
+  "humanReviews": [
+    {
+      "projectId": "c8598b12-2025-4f74-9aa9-fbda7228ed7b",
+      "runId": "0642099a-5de6-4c8a-a6f1-60418af39ded",
+      "pathId": "path-4359c7052877adf891fae00574c22b52256623c04f60860701838d5084afe237",
+      "revision": 0,
+      "status": "unreviewed",
+      "note": "",
+      "savedAt": null,
+      "baseline": null,
+      "current": {
+        "version": "12102b9c02209f7e2f5c76c75cde059ce94305e49f1fb7bb199dcdf08aa6aa16",
+        "status": "completed",
+        "verdict": "dangerous",
+        "updatedAt": "2026-11-09T13:43:31.982Z",
+        "attempt": 1
+      },
+      "stale": false
+    }
+  ],
+  "reviewCounts": {
+    "unreviewed": 1,
+    "confirmed": 0,
+    "false_positive": 0,
+    "needs_more_info": 0,
+    "stale": 0
+  },
+  "stageReasons": [
+    "预处理覆盖不完整：partial"
+  ],
+  "reviewConfig": {
+    "projectId": "c8598b12-2025-4f74-9aa9-fbda7228ed7b",
+    "runId": "0642099a-5de6-4c8a-a6f1-60418af39ded",
+    "state": "saved",
+    "templates": [],
+    "projectReview": {
+      "projectId": "c8598b12-2025-4f74-9aa9-fbda7228ed7b",
+      "revision": 0,
+      "businessWrappers": "",
+      "inputSources": "",
+      "defenseConventions": "",
+      "focus": "",
+      "updatedAt": null
+    },
+    "contextHash": "61a960fe3a9f3c7706534399f5f3444aca9c20df65d4fdaac00d5c9615ce8d05",
+    "createdAt": "2026-11-09T13:43:30.480Z"
+  },
+  "sourceSnapshot": {
+    "projectId": "c8598b12-2025-4f74-9aa9-fbda7228ed7b",
+    "runId": "0642099a-5de6-4c8a-a6f1-60418af39ded",
+    "snapshotId": "e2293ca8-a61a-48b1-a418-0855c523be81",
+    "sourceStamp": "java-sha256:0e36cd33b5a678d1508da8ddabcb2b4ea5d4119a7b6031b257e2492595e4142b",
+    "commit": null,
+    "createdAt": "2026-11-09T13:43:30.482Z",
+    "ignored": [
+      "仅纳入 .java 文件；非 Java 文件、配置、资源与二进制均不纳入",
+      "不跟随符号链接和目录联接",
+      "忽略目录：.git、.svn、node_modules、target、build、dist、.idea、.gradle、vendor",
+      "最多 2000 个文件、单文件 2MiB、总计 20MiB；超限整次失败"
+    ],
+    "files": [
+      {
+        "filePath": "Acceptance01.java",
+        "sha256": "4c0c6b81cdeaa71ddd218781edc17971338729511228d3500d442561c19f935d",
+        "size": 300
+      }
+    ]
+  },
+  "transmissions": [
+    {
+      "configId": "qa-offline-reference",
+      "revision": 1,
+      "baseUrl": "http://127.0.0.1:54104/v1",
+      "modelId": "fixture",
+      "observedModelId": "fixture",
+      "pathId": "path-4359c7052877adf891fae00574c22b52256623c04f60860701838d5084afe237",
+      "attempt": 1,
+      "startedAt": "2026-11-09T13:43:31.844Z"
+    },
+    {
+      "configId": "qa-offline-reference",
+      "revision": 1,
+      "baseUrl": "http://127.0.0.1:54104/v1",
+      "modelId": "fixture",
+      "observedModelId": "fixture",
+      "pathId": "path-4359c7052877adf891fae00574c22b52256623c04f60860701838d5084afe237",
+      "attempt": 1,
+      "startedAt": "2026-11-09T13:43:31.952Z"
+    }
+  ],
+  "project": {
+    "projectId": "c8598b12-2025-4f74-9aa9-fbda7228ed7b",
+    "name": "sql-positive-1",
+    "sourceType": "local",
+    "gitUrl": null,
+    "commit": null
+  },
+  "run": {
+    "runId": "0642099a-5de6-4c8a-a6f1-60418af39ded",
+    "sourceStamp": "java-sha256:0e36cd33b5a678d1508da8ddabcb2b4ea5d4119a7b6031b257e2492595e4142b",
+    "rulesVersion": "java-basic-2026.10.23.1",
+    "status": "completed",
+    "stage": "completed",
+    "createdAt": "2026-11-09T13:43:30.480Z",
+    "finishedAt": "2026-11-09T13:43:31.982Z",
+    "errorCode": null
+  },
+  "generatedAt": "2026-11-09T13:43:31.986Z",
+  "stageReport": true,
+  "scan": {
+    "state": "partial",
+    "truncated": false,
+    "warnings": [
+      {
+        "code": "GRAPH_STRUCTURAL_NOT_SEMANTIC",
+        "filePath": null,
+        "message": "CodeGraph结构关系与快照核验；结构推断不等于Java类型绑定或漏洞证明。"
+      }
+    ]
+  },
+  "statistics": {
+    "paths": 1,
+    "sinks": 1,
+    "edges": 1,
+    "dangerous": 1,
+    "safe": 0,
+    "unknown": 0,
+    "pending": 0,
+    "analyzing": 0,
+    "completed": 1,
+    "failed": 0,
+    "unresolved": 0,
+    "invalid": 0,
+    "riskPoints": 1
+  },
+  "paths": [
+    {
+      "pathId": "path-4359c7052877adf891fae00574c22b52256623c04f60860701838d5084afe237",
+      "runId": "0642099a-5de6-4c8a-a6f1-60418af39ded",
+      "projectId": "c8598b12-2025-4f74-9aa9-fbda7228ed7b",
+      "pathHash": "4ff06e2f63e43c2c1045db38d83397dc6cd9034be2bddbcc65e50979043ed342",
+      "sourceRef": "http-entry-candidate:acceptance.Acceptance01#lookup(String)@Acceptance01.java:7",
+      "sinkEdgeUid": "edge-f309e43c6619840ad500c294a393e53db01e0b7d3f9278bef421e15771b74789",
+      "ruleId": "JAVA-SQL-STATEMENT",
+      "status": "completed",
+      "verdict": "dangerous",
+      "dangerous": 1,
+      "truncated": false,
+      "truncationReason": "",
+      "summary": "本机受控传播核查：dangerous",
+      "createdAt": "2026-11-09T13:43:31.255Z",
+      "updatedAt": "2026-11-09T13:43:31.982Z",
+      "steps": [
+        {
+          "stepIndex": 0,
+          "edge": {
+            "uid": "edge-f309e43c6619840ad500c294a393e53db01e0b7d3f9278bef421e15771b74789",
+            "filePath": "Acceptance01.java",
+            "callerKey": "acceptance.Acceptance01#lookup(String)@Acceptance01.java:7",
+            "calleeKey": "text-candidate:Statement.executeQuery",
+            "functionName": "acceptance.Acceptance01.lookup(String)",
+            "calledFunctionName": "Statement.executeQuery",
+            "calledFilePath": null,
+            "callLine": 7,
+            "callColumn": 86,
+            "isSink": true,
+            "ruleId": "JAVA-SQL-STATEMENT",
+            "resolutionStatus": "candidate",
+            "arguments": [
+              {
+                "filePath": "Acceptance01.java",
+                "startLine": 7,
+                "endLine": 7,
+                "startColumn": 99,
+                "endColumn": 139,
+                "text": "\"SELECT name FROM clients WHERE id=\" + q",
+                "index": 0
+              }
+            ]
+          },
+          "dangerous": 1,
+          "taintIn": [
+            {
+              "name": "q",
+              "origin": "当前路径输入",
+              "quotes": [
+                "Statement stmt; @GetMapping(\"/lookup\") void lookup(String q) throws Exception { stmt.executeQuery(\"SELECT name FROM clients WHERE id=\" + q); }"
+              ]
+            }
+          ],
+          "taintOut": [
+            {
+              "name": "q",
+              "origin": "当前调用输出",
+              "quotes": [
+                "Statement stmt; @GetMapping(\"/lookup\") void lookup(String q) throws Exception { stmt.executeQuery(\"SELECT name FROM clients WHERE id=\" + q); }"
+              ]
+            }
+          ],
+          "evidence": [
+            {
+              "filePath": "Acceptance01.java",
+              "startLine": 7,
+              "endLine": 7,
+              "quote": "Statement stmt; @GetMapping(\"/lookup\") void lookup(String q) throws Exception { stmt.executeQuery(\"SELECT name FROM clients WHERE id=\" + q); }"
+            }
+          ],
+          "defenseSummary": "",
+          "propagation": {
+            "source": {
+              "status": "supported",
+              "reason": "本机夹具逐项核对 source",
+              "quotes": [
+                "Statement stmt; @GetMapping(\"/lookup\") void lookup(String q) throws Exception { stmt.executeQuery(\"SELECT name FROM clients WHERE id=\" + q); }"
+              ]
+            },
+            "argumentMapping": {
+              "status": "supported",
+              "reason": "本机夹具逐项核对 argumentMapping",
+              "quotes": [
+                "Statement stmt; @GetMapping(\"/lookup\") void lookup(String q) throws Exception { stmt.executeQuery(\"SELECT name FROM clients WHERE id=\" + q); }"
+              ]
+            },
+            "assignment": {
+              "status": "not_applicable",
+              "reason": "本机夹具逐项核对 assignment",
+              "quotes": []
+            },
+            "returnValue": {
+              "status": "not_applicable",
+              "reason": "本机夹具逐项核对 returnValue",
+              "quotes": []
+            },
+            "field": {
+              "status": "not_applicable",
+              "reason": "本机夹具逐项核对 field",
+              "quotes": []
+            },
+            "defense": {
+              "status": "not_applicable",
+              "reason": "本机夹具逐项核对 defense",
+              "quotes": []
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

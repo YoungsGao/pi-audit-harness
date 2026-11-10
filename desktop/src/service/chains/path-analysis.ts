@@ -8,12 +8,17 @@ import type { EventInput, QueueAccepted } from '../../shared/agent-contracts'
 import { validateTaint, reconcileTaint } from './taint-validation.ts'
 import { retryWrite } from '../storage/retry-write.ts'
 import type { RecoveryExecution } from './recovery.ts'
+import { MAX_AGENT_STEPS } from '../../shared/path-limits.ts'
+import { invalidResult, ResultValidationError } from './result-validation.ts'
+import { constantRiskArguments } from './constant-arguments.ts'
 
 export interface ReviewInput {
   recovery?: RecoveryExecution
   reviewConfig?: import('../../shared/template-contracts').RunReviewConfig
   authorizeModel?: (model: Readonly<import('../../shared/pi-contracts').ModelConfig>) => void
   observedModel?: (modelId: string) => void
+  beforeModelRequest?: (estimate: { inputBytes: number; maxOutputTokens: number }) => void
+  observeDecision?: (text: string, stopReason: string) => void
   manualPoint?: unknown
   projectId: string
   runId: string
@@ -28,6 +33,7 @@ export interface ReviewInput {
     endLine: number
     text: string
     complete?: boolean
+    facts?: { constantRiskArguments: boolean }
     ranges?: { filePath: string; startLine: number; endLine: number; text: string }[]
   }[]
   readStep?: (stepIndex: number) => Promise<ReviewInput['evidence'][number]>
@@ -40,7 +46,7 @@ export function validateResult(
   requireTaint = false
 ): ReviewResult {
   if (!value || typeof value !== 'object')
-    throw new ApiError('ANALYSIS_RESULT_INVALID', '模型没有返回结构化结论', 502)
+    invalidResult('ANALYSIS_RESULT_INVALID', 'result', 'object', '模型必须返回结构化结论对象')
   const result = value as ReviewResult
   if (
     !['unknown', 'safe', 'dangerous', 'invalid'].includes(result.verdict) ||
@@ -50,42 +56,69 @@ export function validateResult(
     !Array.isArray(result.steps) ||
     result.steps.length !== input.path.steps.length
   )
-    throw new ApiError('ANALYSIS_RESULT_INVALID', '模型结论字段或步骤数量无效', 502)
+    invalidResult(
+      'ANALYSIS_RESULT_INVALID',
+      'result',
+      'shape',
+      `结论须有有效verdict、非空summary以及${input.path.steps.length}个步骤`
+    )
   const seen = new Set<number>()
   for (const step of result.steps) {
     if (!step || typeof step !== 'object')
-      throw new ApiError('ANALYSIS_RESULT_INVALID', '步骤结构无效', 502)
+      invalidResult('ANALYSIS_RESULT_INVALID', 'steps', 'object', '每个步骤必须是对象')
     const evidence = input.evidence[step.stepIndex]
-    if (
-      !Number.isInteger(step.stepIndex) ||
-      !evidence ||
-      seen.has(step.stepIndex) ||
-      ![null, 0, 1].includes(step.dangerous) ||
-      typeof step.reason !== 'string' ||
-      step.reason.length > 2000 ||
-      !Array.isArray(step.quotes) ||
-      !step.quotes.length ||
-      step.quotes.length > 5 ||
-      step.quotes.some(
-        (q) =>
-          typeof q !== 'string' ||
-          !q.trim() ||
-          q.length > 2000 ||
-          !(evidence.ranges ?? [evidence]).some((r) => r.text.includes(q))
-      )
-    )
-      throw new ApiError(
+    const fail = (field: string, rule: string, message: string): never =>
+      invalidResult(
         'ANALYSIS_EVIDENCE_INVALID',
-        '模型证据必须逐步骤引用本次实际读取的原文',
-        502
+        `steps[${Number.isInteger(step.stepIndex) ? step.stepIndex : '?'}].${field}`,
+        rule,
+        message,
+        Number.isInteger(step.stepIndex) ? step.stepIndex : null
       )
+    if (!Number.isInteger(step.stepIndex) || !evidence || seen.has(step.stepIndex))
+      fail('stepIndex', 'unique-read-step', '步骤编号必须有效、已经读取且不能重复')
+    if (![null, 0, 1].includes(step.dangerous))
+      fail('dangerous', 'tri-state', 'dangerous只能是null、0或1')
+    if (typeof step.reason !== 'string' || step.reason.length > 2000)
+      fail('reason', 'text-limit', 'reason必须是2000字符以内的字符串')
+    if (!Array.isArray(step.quotes) || !step.quotes.length || step.quotes.length > 5)
+      fail('quotes', 'count', '每步需要1至5条原文引用或有效证据编号')
+    for (let i = 0; i < step.quotes.length; i++) {
+      const q = step.quotes[i]
+      if (
+        typeof q !== 'string' ||
+        !q.trim() ||
+        q.length > 2000 ||
+        !(evidence.ranges ?? [evidence]).some((r) => r.text.includes(q))
+      )
+        fail(
+          `quotes[${i}]`,
+          'exact-source',
+          '引用必须逐字出现在本步骤实际读取的源码中；可改用工具返回的证据编号'
+        )
+    }
     seen.add(step.stepIndex)
-    if (requireTaint) validateTaint(step, evidence.ranges?.map((r) => r.text) ?? evidence.text)
+    if (requireTaint)
+      validateTaint(
+        step,
+        evidence.ranges?.map((r) => r.text) ?? evidence.text,
+        constantRiskArguments(input.path.steps[step.stepIndex].edge, evidence)
+      )
   }
   if (result.verdict === 'dangerous' && !result.steps.every((s) => s.dangerous === 1))
-    throw new ApiError('ANALYSIS_RESULT_INVALID', '风险结论缺少对应步骤证据', 502)
+    invalidResult(
+      'ANALYSIS_RESULT_INVALID',
+      'verdict',
+      'dangerous-path',
+      'dangerous要求每个步骤dangerous=1且证据完整'
+    )
   if (result.verdict === 'safe' && !result.steps.some((s) => s.dangerous === 0))
-    throw new ApiError('ANALYSIS_RESULT_INVALID', '阻断结论缺少防护步骤', 502)
+    invalidResult(
+      'ANALYSIS_RESULT_INVALID',
+      'verdict',
+      'safe-path',
+      'safe要求至少一个有证据的阻断步骤dangerous=0'
+    )
   return result
 }
 export class PathAnalysisService {
@@ -143,7 +176,7 @@ export class PathAnalysisService {
     if (this.active) throw new ApiError('ANALYSIS_BUSY', '已有路径正在分析，请等待结束', 409, true)
     this.repo.scans.recovery.assertStart({ projectId, runId })
     const path = this.repo.detail({ projectId, runId, pathId }) as unknown as PathDetail
-    if (path.steps.length > 16)
+    if (path.steps.length > MAX_AGENT_STEPS)
       throw new ApiError('ANALYSIS_LIMIT', '当前单路径分析最多读取 16 步，请缩小展开深度', 413)
     this.repo.scans.disclosure.require(projectId, runId, modelConfigId)
     if (this.agentMode)
@@ -342,6 +375,9 @@ export class PathAnalysisService {
           const ranges = [caller ?? item, ...(callee ? [callee] : [])]
           item = {
             ...item,
+            filePath: ranges[0].filePath,
+            startLine: ranges[0].startLine,
+            endLine: ranges[0].endLine,
             ranges,
             text: ranges
               .map((r) => `${r.filePath}:${r.startLine}-${r.endLine}\n${r.text}`)
@@ -349,6 +385,7 @@ export class PathAnalysisService {
             complete: !!caller?.complete && (!step.edge.calledFilePath || !!callee?.complete)
           }
         }
+        item.facts = { constantRiskArguments: constantRiskArguments(step.edge, item) }
         evidence[stepIndex] = item
         return item
       }
@@ -419,6 +456,14 @@ export class PathAnalysisService {
       })
     } catch (error) {
       try {
+        if (error instanceof ResultValidationError)
+          this.repo.scans.events.append(base.projectId, base.runId, base.pathId, {
+            type: 'process',
+            status: 'validation_failed',
+            attemptId: attempt,
+            summary: `第${error.issue.stepIndex === null ? '?' : error.issue.stepIndex + 1}步：${error.issue.message}`,
+            payload: { validation: error.issue, errorCode: error.code }
+          })
         await retryWrite(() =>
           this.repo.scans.analysisFailed(
             base.pathId,

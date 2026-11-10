@@ -1,4 +1,4 @@
-// Standalone local supervisor for CLI users; one long-lived service owns all LSP sessions.
+// Local supervisor owns snapshot queries and bounded, one-shot graph builds.
 import { isAbsolute, join } from 'node:path'
 import { stat } from 'node:fs/promises'
 import { openStorage } from '../src/service/storage/schema.ts'

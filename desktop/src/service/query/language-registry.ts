@@ -4,29 +4,12 @@ import type {
   QueryRequest,
   QueryItem
 } from '../../shared/query-contracts.ts'
-import type { QuerySnapshot } from './java-runtime.ts'
-import type { QueryRuntimeState } from '../../shared/query-contracts.ts'
-import { semanticJava } from './semantic-java.ts'
+import type { QuerySnapshot } from './query-runtime.ts'
 import { basicQuery } from './basic-adapter.ts'
-// 提供商适配输出只能是统一的快照内位置、符号和缺口；业务不消费原始 LSP DTO。
+// 引擎只返回快照内位置、符号和缺口；业务不消费上游图数据库DTO。
 export interface QueryAdapterOutput {
   items: QueryItem[]
   gaps: string[]
-}
-export interface QueryAdapterContext {
-  readonly root: string
-  readonly sourceGaps: string[]
-  readonly snapshot: QuerySnapshot
-  readonly state: QueryRuntimeState
-  request(method: string, params: unknown, signal: AbortSignal): Promise<unknown>
-}
-export interface ManagedQueryRuntime {
-  status(): QueryRuntimeState
-  use<T>(fn: (runtime: QueryAdapterContext) => Promise<T>, signal?: AbortSignal): Promise<T>
-}
-export interface QueryRuntimeProvider {
-  get(snapshot: QuerySnapshot): ManagedQueryRuntime
-  close(): Promise<void>
 }
 export interface LanguageAdapter {
   readonly language: string
@@ -36,11 +19,6 @@ export interface LanguageAdapter {
   readonly backend: string
   readonly backendLabel: string
   readonly basic?: (snapshot: QuerySnapshot, request: QueryRequest) => QueryAdapterOutput
-  readonly query: (
-    runtime: QueryAdapterContext,
-    request: QueryRequest,
-    signal: AbortSignal
-  ) => Promise<QueryAdapterOutput>
 }
 export class LanguageRegistry {
   private readonly adapters = new Map<string, LanguageAdapter>()
@@ -64,14 +42,13 @@ export class LanguageRegistry {
     return [...this.adapters.values()]
   }
 }
-export function defaultLanguages(): LanguageRegistry {
+export function defaultLanguages(backend: 'codegraph' | 'basic' = 'codegraph'): LanguageRegistry {
   const registry = new LanguageRegistry()
   registry.register({
     language: 'java',
-    backend: 'java-jdtls',
-    backendLabel: 'jdtls',
+    backend: 'java-' + backend,
+    backendLabel: backend,
     basic: basicQuery,
-    query: semanticJava,
     extensions: ['.java'],
     encodings: ['utf-16', 'utf-8', 'utf-32'],
     operations: [

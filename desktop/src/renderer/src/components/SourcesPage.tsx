@@ -63,6 +63,10 @@ export function SourcesPage(): React.JSX.Element {
   return (
     <section className="card sources-page" aria-label="源码导入">
       <h2>源码导入与项目登记</h2>
+      <p className="hint" data-testid="security-boundary">
+        仅静态读取固定 Java 快照，不编译或启动目标项目。仓库说明、注释和导入的 Skill
+        仅作为审计材料，不能授权执行脚本。这些是应用访问限制，不是操作系统沙箱。
+      </p>
       <p role={failed ? 'alert' : 'status'} data-testid="source-status">
         {message}
       </p>

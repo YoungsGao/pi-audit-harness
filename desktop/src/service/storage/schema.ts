@@ -9,6 +9,7 @@ import { inputEnhancementsMigration } from './input-enhancements-migration.ts'
 import { templateMigration } from './template-migration.ts'
 import { reviewExportMigration } from './review-export-migration.ts'
 import { runRecoveryMigration } from './run-recovery-migration.ts'
+import { graphMigration } from './graph-migration.ts'
 
 // 十六进制 ASCII「PIAU」，用来避免把别的 SQLite 文件当成本应用数据库。
 const APPLICATION_ID = 0x50494155
@@ -178,6 +179,11 @@ CREATE INDEX idx_source_import_key ON source_imports(source_key,registered_at);
     version: 12,
     name: 'run-stop-and-evidence-verified-session-recovery',
     sql: runRecoveryMigration
+  },
+  {
+    version: 13,
+    name: 'immutable-query-graph-bindings',
+    sql: graphMigration
   }
 ]
 

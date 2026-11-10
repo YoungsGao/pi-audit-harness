@@ -53,6 +53,7 @@ export function renderSavedReport(snapshot: ReportSnapshot): string {
     <p>源码指纹：${e(snapshot.run.sourceStamp)}；规则版本：${e(snapshot.run.rulesVersion)}</p><p>任务状态：${e(snapshot.run.status)} / ${e(snapshot.run.stage)}</p>
     <p>任务结束时间：${e(snapshot.run.finishedAt ?? '尚未结束或历史未记录')}；结束原因：${e(snapshot.run.errorCode ?? '未记录错误码')}</p>
     <h2>停止、恢复来源与用量边界</h2><p>控制状态：${e(snapshot.recovery.controlState)}；本次范围记录模型请求 ${snapshot.recovery.recordedRequests} 次，其中完成用量未确认 ${snapshot.recovery.uncertainRequests} 次。已发送请求可能收费；恢复可能重做未完成工作，记录次数不等于供应商账单。</p><pre>${e(JSON.stringify(snapshot.recovery.paths, null, 2))}</pre>
+    <h2>固定查询图与定位来源</h2><p>结构核验不等于Java类型绑定，也不直接证明漏洞。无图绑定的历史任务保留原证据。</p><pre>${e(JSON.stringify(snapshot.queryGraph, null, 2))}</pre>
     <h2>固定源码快照与实际发送记录</h2>${snapshot.sourceSnapshot ? `<p>快照 ID：${e(snapshot.sourceSnapshot.snapshotId)}；文件数：${snapshot.sourceSnapshot.files.length}</p><details><summary>文件摘要与忽略范围</summary><pre>${e(JSON.stringify({ files: snapshot.sourceSnapshot.files, ignored: snapshot.sourceSnapshot.ignored }, null, 2))}</pre></details>` : '<p>历史任务没有固定源码快照。</p>'}
     <p>以下为请求前保存的实际配置及 SDK 返回的模型标识；请求失败可能未真正送达，未返回时不补造上游模型。</p><pre>${e(JSON.stringify(snapshot.transmissions, null, 2))}</pre>
     <h2>任务审计知识与项目补充要求</h2><p>保存状态：${e(snapshot.reviewConfig.state)}；材料摘要：${e(snapshot.reviewConfig.contextHash)}</p><p>自定义知识未经验证；补充提示不代表新增全部漏洞发现能力。</p><pre>${e(JSON.stringify(snapshot.reviewConfig, null, 2))}</pre>

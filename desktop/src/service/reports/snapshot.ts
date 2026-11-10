@@ -14,8 +14,10 @@ import { ReviewRepository } from '../storage/review-repository.ts'
 import { createHash } from 'node:crypto'
 import { publicAnalysisValue } from '../../shared/path-detail-view.ts'
 import { SnapshotRepository } from '../storage/snapshot-repository.ts'
+import { GraphRepository } from '../storage/graph-repository.ts'
 
 export interface ReportSnapshot {
+  queryGraph: import('../query/graph-contracts.ts').GraphBinding | null
   recovery: {
     controlState: string
     recordedRequests: number
@@ -164,6 +166,7 @@ export function savedReportSnapshot(
       runId
     )
     const snapshot: ReportSnapshot = {
+      queryGraph: new GraphRepository(db).get(projectId, runId),
       recovery: {
         controlState: String(
           db.get('SELECT state FROM run_controls WHERE run_id=?', runId)?.state ?? 'legacy'

@@ -1,4 +1,5 @@
 import { ApiError } from '../../shared/api-error.ts'
+import { MAX_PATH_EDGES } from '../../shared/path-limits.ts'
 import type {
   CallEdge,
   CandidatePath,
@@ -16,7 +17,7 @@ export function expandCandidatePaths(
   if (
     ![maxDepth, maxNodes, maxPaths].every(Number.isInteger) ||
     maxDepth < 1 ||
-    maxDepth > 32 ||
+    maxDepth > MAX_PATH_EDGES ||
     maxNodes < 1 ||
     maxNodes > 2000 ||
     maxPaths < 1 ||

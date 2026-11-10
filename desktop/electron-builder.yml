@@ -1,27 +1,42 @@
-appId: com.electron.app
-productName: desktop
+appId: com.pi-audit-harness.desktop
+productName: pi-audit-harness
 directories:
   buildResources: build
 files:
+  - out/**
+  - package.json
+  - '!node_modules/@colbymchenry/codegraph-*/**'
   - '!tests/**'
   - '!out-*/**'
   - '!.*-test-data/**'
   - '!electron.*-test.config.ts'
   - '!**/.vscode/*'
-  - '!src/*'
   - '!electron.vite.config.{js,ts,mjs,cjs}'
   - '!{.eslintcache,eslint.config.mjs,.prettierignore,.prettierrc.yaml,dev-app-update.yml,CHANGELOG.md,README.md}'
   - '!{.env,.env.*,.npmrc,pnpm-lock.yaml}'
   - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
 asarUnpack:
-  - resources/**
+  - node_modules/@colbymchenry/codegraph*/**
+extraResources:
+  - from: resources/delivery
+    to: delivery
+  - from: resources/compliance
+    to: compliance
+  - from: resources/codegraph-worker.cjs
+    to: codegraph-worker.cjs
+  - from: node_modules/@colbymchenry
+    to: codegraph-packages
+    filter:
+      - codegraph-*/**/*
 win:
-  executableName: desktop
+  executableName: pi-audit-harness
+  target:
+    - nsis
 nsis:
-  artifactName: ${name}-${version}-setup.${ext}
+  artifactName: pi-audit-harness-${version}-win-x64-setup.${ext}
   shortcutName: ${productName}
   uninstallDisplayName: ${productName}
-  createDesktopShortcut: always
+  createDesktopShortcut: false
 mac:
   entitlementsInherit: build/entitlements.mac.plist
   extendInfo:
@@ -42,6 +57,3 @@ linux:
 appImage:
   artifactName: ${name}-${version}.${ext}
 npmRebuild: false
-publish:
-  provider: generic
-  url: https://example.com/auto-updates

@@ -10,7 +10,8 @@ export async function addManualRisk(
   repo: CallChainRepository,
   snapshots: SnapshotRepository,
   value: unknown,
-  signal: AbortSignal
+  signal: AbortSignal,
+  resolveCalls?: Parameters<typeof preprocessJava>[7]
 ): Promise<unknown> {
   const row = queryInput(value, [
     'projectId',
@@ -65,9 +66,15 @@ export async function addManualRisk(
   const call = calls.sort((a, b) => a.end - a.start - (b.end - b.start))[0]
   const startLine = call?.line ?? line,
     startColumn = call?.column ?? column
-  const automatic = findRiskCandidates(filePath, source, 100).find(
-    (c) => c.startLine === startLine && c.startColumn === startColumn && c.ruleId === ruleId
-  )
+  const automatic = findRiskCandidates(filePath, source, 100).find((candidate) => {
+    if (candidate.ruleId !== ruleId) return false
+    if (!call) return candidate.startLine === startLine && candidate.startColumn === startColumn
+    const start =
+      lines.slice(0, candidate.startLine - 1).reduce((n, text) => n + text.length + 1, 0) +
+      candidate.startColumn -
+      1
+    return call.start >= start && call.open < start + candidate.text.indexOf('(') + 1
+  })
   const candidate = automatic ?? {
     filePath,
     startLine,
@@ -91,7 +98,8 @@ export async function addManualRisk(
     files,
     signal,
     {},
-    candidate
+    candidate,
+    resolveCalls
   )
   for (const path of output.graph.paths)
     path.sourceRef = path.sourceRef + `;manual=${filePath}:${line}:${column}`

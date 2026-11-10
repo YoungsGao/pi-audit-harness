@@ -1,0 +1,132 @@
+{
+  "date": "2026-11-09",
+  "scope": "Windows10 x64 build19045 current machine, not a clean VM",
+  "versions": {
+    "node": "24.21.0",
+    "electron": "44.9.1",
+    "pi": "1.2.0",
+    "codegraph": "1.6.2"
+  },
+  "engineering": {
+    "cases": 18,
+    "trials": 3,
+    "executions": 54,
+    "ok": true,
+    "reference": "deterministic local protocol oracle; not LLM accuracy",
+    "modelQualityMeasured": false
+  },
+  "referenceModel": {
+    "model": "deepseek-flash",
+    "mode": "three batch evidence-card classification trials, not 54 real agent loops",
+    "trials": [
+      {
+        "trial": 1,
+        "correct": 18,
+        "cases": 18
+      },
+      {
+        "trial": 2,
+        "correct": 18,
+        "cases": 18
+      },
+      {
+        "trial": 3,
+        "correct": 18,
+        "cases": 18
+      }
+    ],
+    "totalTokens": 27239,
+    "totalRequests": 9,
+    "priorFailuresRetained": true,
+    "freeQuotePilotValid": 14,
+    "freeQuotePilotCases": 18
+  },
+  "ui": {
+    "scale10000": {
+      "importedMs": 40.98219999999992,
+      "preparedMs": 1596.0872000000002,
+      "candidates": 100,
+      "paths": 100,
+      "physicalLines": 10000
+    },
+    "scale50000": {
+      "importedMs": 30.674800000000232,
+      "preparedMs": 3373.1303000000003,
+      "candidates": 100,
+      "paths": 100,
+      "physicalLines": 50000
+    },
+    "list100ReadyMs": 74.22220000000016,
+    "paginationMs": [
+      76.13260000000082,
+      62.24799999999959,
+      62.274999999999636,
+      61.887000000000626
+    ],
+    "graph50ReadyMs": 74.49139999999898,
+    "graph50SourceMs": 63.667999999999665,
+    "stopAcknowledgementMs": 65.66300000000047,
+    "stoppedMs": 72.6153000000013,
+    "noDispatchObservationMs": 5000,
+    "beforePid": 13776,
+    "afterPid": 53500,
+    "graphBackend": "codegraph"
+  },
+  "soak": {
+    "ok": true,
+    "startedAt": "2026-11-09T13:30:55.231Z",
+    "finishedAt": "2026-11-09T14:30:55.236Z",
+    "elapsedMs": 3600005.3015,
+    "requiredMs": 3600000,
+    "oneHourComplete": true,
+    "cycles": 3510,
+    "prepareMs": 5346.665599999999,
+    "peakRss": 497635328,
+    "maxQueryMs": 18.729999999981374,
+    "maxLoopDelayMs": 16.09330000029877,
+    "modelRequests": 0,
+    "failures": []
+  },
+  "knownLimits": [
+    "small synthetic corpus; no general accuracy claim",
+    "one-hour backend loop, separate Electron stop/resume",
+    "unsigned Windows only",
+    "no clean VM; other platforms unverified",
+    "free-quote hallucination requires host evidence checks"
+  ],
+  "installed": {
+    "ok": true,
+    "runtime": {
+      "name": "pi-audit-harness",
+      "version": "1.0.0",
+      "electron": "44.9.1",
+      "node": "24.22.0"
+    },
+    "graphBackend": "codegraph",
+    "modelRequests": 2,
+    "model": "local fixture through real packaged Pi SDK; no paid provider",
+    "evidenceSteps": 1,
+    "checks": [
+      "actual NSIS installation",
+      "packaged bridge/service",
+      "real CodeGraph worker resource",
+      "native credential write",
+      "actual Pi tool loop",
+      "saved evidence",
+      "report command",
+      "offline delivery resources"
+    ],
+    "cleanup": {
+      "uninstalled": true,
+      "removedFakeCredentials": 1,
+      "personalProfileUsed": false
+    },
+    "unsigned": true
+  },
+  "compliance": {
+    "runtimePackages": 165,
+    "copiedLicenseTexts": 148,
+    "undeclared": 0,
+    "npmRuntimeAdvisories": 0
+  }
+}

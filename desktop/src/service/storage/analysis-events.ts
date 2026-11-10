@@ -3,18 +3,11 @@ import type { AnalysisEvents, EventInput } from '../../shared/agent-contracts'
 import type { LocalDatabase, SqlSession } from './database.ts'
 import { ApiError } from '../../shared/api-error.ts'
 import { mirrorStreamEvent } from './stream-events.ts'
+import { redactText } from '../../shared/redaction.ts'
 
 // Only bounded, redacted operational data. Never store prompts or hidden reasoning.
 export function redact(text: string, secrets: string[] = []): string {
-  for (const secret of secrets) if (secret) text = text.split(secret).join('[REDACTED]')
-  return text
-    .replace(/\bBearer\s+[^\s"',}]+/gi, 'Bearer [REDACTED]')
-    .replace(/(https?:\/\/)[^\s/@]+:[^\s/@]+@/gi, '$1[REDACTED]@')
-    .replace(/\bsk-[A-Za-z0-9_-]{8,}/g, '[REDACTED]')
-    .replace(
-      /((?:api[_-]?key|password|authorization|secret|token)\s*[=:]\s*["']?)[^\s"',;}]+/gi,
-      '$1[REDACTED]'
-    )
+  return redactText(text, secrets)
 }
 export function boundedLog(
   value: unknown,

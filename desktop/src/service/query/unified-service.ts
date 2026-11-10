@@ -1,20 +1,17 @@
-import { isAbsolute } from 'node:path'
 import { ApiError } from '../../shared/api-error.ts'
-import type {
-  QueryRequest,
-  QueryResult,
-  QueryOperation,
-  QueryStatus
-} from '../../shared/query-contracts.ts'
+import type { QueryRequest, QueryResult, QueryOperation } from '../../shared/query-contracts.ts'
 import type { SourceRepository } from '../sources/repository.ts'
 import { defaultLanguages } from './language-registry.ts'
-import type { QueryRuntimeProvider } from './language-registry.ts'
-import { JavaRuntimePool } from './java-runtime.ts'
-import type { QuerySnapshot, RuntimeOptions } from './java-runtime.ts'
-import { semanticJava } from './semantic-java.ts'
-import { toLspPosition } from './positions.ts'
+import type { QuerySnapshot, RuntimeOptions } from './query-runtime.ts'
+import { encodePosition } from './positions.ts'
 import type { JavaMethod, JavaCall } from '../scanning/java-index.ts'
 import type { ScanWarning } from '../../shared/scan-contracts.ts'
+import { CodeGraphEngine } from './codegraph-engine.ts'
+import { basicQuery } from './basic-adapter.ts'
+import type { QueryEngine, QueryBackend } from './graph-contracts.ts'
+import { GRAPH_ADAPTER } from './graph-contracts.ts'
+import { graphHash } from '../storage/graph-repository.ts'
+import { isSnapshotPath } from '../../shared/snapshot-path.ts'
 const operations: QueryOperation[] = [
   'capabilities',
   'status',
@@ -55,15 +52,7 @@ export function validateQuery(value: unknown): QueryRequest {
   for (const key of ['projectId', 'runId', 'language'])
     if (typeof row[key] !== 'string' || !/^[\w-]{1,80}$/.test(row[key] as string))
       throw new ApiError('QUERY_INVALID_INPUT', '查询范围或语言无效', 400)
-  if (
-    row.filePath !== undefined &&
-    (typeof row.filePath !== 'string' ||
-      row.filePath.length > 1000 ||
-      row.filePath.includes('\\') ||
-      [...row.filePath].some((c) => c.charCodeAt(0) < 32) ||
-      isAbsolute(row.filePath) ||
-      row.filePath.split('/').some((p) => !p || p === '.' || p === '..'))
-  )
+  if (row.filePath !== undefined && !isSnapshotPath(row.filePath))
     throw new ApiError('QUERY_INVALID_INPUT', '查询文件必须为快照内相对路径', 400)
   for (const key of ['line', 'column', 'endLine', 'maxResults'])
     if (
@@ -106,14 +95,41 @@ export function validateQuery(value: unknown): QueryRequest {
   return row as unknown as QueryRequest
 }
 export class UnifiedQueryService {
-  readonly languages = defaultLanguages()
-  private readonly pool: JavaRuntimePool
-  readonly backends = new Map<string, QueryRuntimeProvider>()
+  readonly languages: ReturnType<typeof defaultLanguages>
+  private readonly engine?: QueryEngine
+  readonly backend: QueryBackend
+  readonly backends = new Map<string, QueryEngine>()
   private readonly repo: SourceRepository
   constructor(repo: SourceRepository, options: RuntimeOptions = {}) {
     this.repo = repo
-    this.pool = new JavaRuntimePool(options)
-    this.backends.set('java-jdtls', this.pool)
+    const backend = options.backend ?? process.env.PI_AUDIT_QUERY_BACKEND ?? 'codegraph'
+    if (!['codegraph', 'basic'].includes(backend))
+      throw new ApiError('QUERY_BACKEND_INVALID', '查询后端配置无效', 503)
+    this.backend = backend as QueryBackend
+    this.languages = defaultLanguages(this.backend)
+    if (backend === 'codegraph')
+      this.engine = new CodeGraphEngine(options, options.dataRoot ?? repo.dataRoot, repo.graphs)
+    else
+      this.engine = {
+        backend: 'basic',
+        semantic: false,
+        status: () => ({
+          state: 'ready',
+          index: 'quiescent',
+          starts: 0,
+          pending: 0,
+          errorCode: null,
+          wholeWorkspaceIndexed: false,
+          positionEncoding: 'utf-16',
+          capabilities: ['symbols', 'definition', 'references', 'incomingCalls', 'outgoingCalls']
+        }),
+        query: async (snapshot, request) => ({
+          ...basicQuery(snapshot, request),
+          gaps: ['BASIC_CANDIDATES_NOT_SEMANTIC']
+        }),
+        close: async () => {}
+      }
+    this.backends.set('java-' + backend, this.engine)
   }
   async execute(value: unknown, signal: AbortSignal): Promise<QueryResult> {
     const originalSignal = signal
@@ -141,8 +157,8 @@ export class UnifiedQueryService {
       errorCode: null
     }
     const adapter = this.languages.get(request.language)
-    const provider = adapter ? this.backends.get(adapter.backend) : undefined
-    if (!adapter || !provider)
+    const engine = adapter ? this.backends.get(adapter.backend) : undefined
+    if (!adapter || !engine)
       return {
         ...result,
         status: 'unsupported',
@@ -157,7 +173,7 @@ export class UnifiedQueryService {
         gaps: ['LANGUAGE_OPERATION_UNSUPPORTED']
       }
     if (signal.aborted) return { ...result, status: 'cancelled', errorCode: 'QUERY_CANCELLED' }
-    // 每次访问仍验证 SQLite 原文摘要；不拿已启动 LSP 的缓存替代证据校验。
+    // 每次访问仍验证SQLite原文摘要；图缓存不代替原文校验。
     const snapshot: QuerySnapshot = {
       projectId: request.projectId,
       runId: request.runId,
@@ -172,7 +188,7 @@ export class UnifiedQueryService {
     if (request.filePath && !file)
       throw new ApiError('QUERY_FILE_OUT_OF_SCOPE', '文件不在任务快照范围', 403)
     if (request.line && file)
-      toLspPosition(file.source, { line: request.line, column: request.column ?? 1 }, 'utf-16')
+      encodePosition(file.source, { line: request.line, column: request.column ?? 1 }, 'utf-16')
     if (request.operation === 'read') {
       const lines = file!.source.split('\n')
       if (request.endLine! > lines.length)
@@ -205,77 +221,100 @@ export class UnifiedQueryService {
       const basic = adapter.basic(snapshot, request)
       return this.bounded({ ...result, backend: 'basic', ...basic }, request)
     }
-    let runtime
-    try {
-      runtime = provider.get(snapshot)
-    } catch (error) {
+    const fixedGraph = this.repo.graphs.get(request.projectId, request.runId)
+    if (fixedGraph && fixedGraph.backend !== 'basic' && fixedGraph.backend !== this.backend)
       return {
         ...result,
-        status: 'not-ready',
-        errorCode: error instanceof ApiError ? error.code : 'QUERY_RUNTIME_BUSY',
-        gaps: ['QUERY_RUNTIME_CAPACITY']
+        status: 'failed',
+        errorCode: 'RUN_GRAPH_BACKEND_CHANGED',
+        gaps: ['RUN_GRAPH_BACKEND_CHANGED']
       }
-    }
-    if (request.operation === 'capabilities' || request.operation === 'status')
-      return {
-        ...result,
-        runtime: runtime.status(),
-        capabilities: this.languages.list().map((a) => ({
-          language: a.language,
-          operations: [...a.operations],
-          semantic: this.backends.has(a.backend)
-        }))
-      }
-    try {
-      const output = await runtime.use(async (active) => {
-        if (request.operation === 'prepare') return { items: [], gaps: active.sourceGaps }
-        if (!active.state.capabilities.includes(request.operation))
-          throw new ApiError('QUERY_UNSUPPORTED', '语言服务器未声明此能力', 501)
-        return adapter.query(active, request, signal)
-      }, signal)
-      return this.bounded(
-        { ...result, backend: adapter.backendLabel, ...output, runtime: runtime.status() },
-        request
-      )
-    } catch (error) {
-      const code =
-        deadline.aborted && !originalSignal.aborted
-          ? 'QUERY_TIMEOUT'
-          : error instanceof ApiError
-            ? error.code
-            : 'QUERY_BACKEND_ERROR'
-      const status: QueryStatus =
-        code === 'QUERY_TIMEOUT'
-          ? 'timeout'
-          : code === 'QUERY_CANCELLED'
-            ? 'cancelled'
-            : code === 'QUERY_UNSUPPORTED'
-              ? 'unsupported'
-              : ['QUERY_RUNTIME_MISSING', 'QUERY_RUNTIME_EXITED'].includes(code)
-                ? 'not-ready'
-                : 'failed'
-      if (
-        request.fallback !== false &&
-        !['prepare', 'status', 'capabilities'].includes(request.operation) &&
-        status !== 'cancelled' &&
-        adapter.basic
-      ) {
-        const basic = adapter.basic(snapshot, request)
+    if (engine) {
+      const fixed = this.repo.graphs.get(request.projectId, request.runId)
+      if (fixed?.backend === 'basic') {
+        if (['status', 'capabilities'].includes(request.operation))
+          return {
+            ...result,
+            runtime: { ...engine.status(snapshot), state: 'ready', starts: 0 },
+            capabilities: [{ language: 'java', operations, semantic: false }]
+          }
+        const output =
+          request.operation === 'prepare' ? { items: [], gaps: [] } : basicQuery(snapshot, request)
         return this.bounded(
           {
             ...result,
-            ...basic,
+            ...output,
             backend: 'basic',
-            status: 'partial',
-            errorCode: code,
-            gaps: [code, 'BASIC_CANDIDATES_NOT_SEMANTIC', ...basic.gaps],
-            runtime: runtime.status()
+            gaps: [...new Set([...fixed.gaps, ...output.gaps])],
+            runtime: engine.status(snapshot)
           },
           request
         )
       }
-      return { ...result, status, errorCode: code, runtime: runtime.status(), gaps: [code] }
+      const runtime = engine.status(snapshot)
+      if (['capabilities', 'status'].includes(request.operation))
+        return {
+          ...result,
+          runtime,
+          capabilities: this.languages.list().map((a) => ({
+            language: a.language,
+            operations: [...a.operations],
+            semantic: a.backend === adapter.backend ? engine.semantic : false
+          }))
+        }
+      try {
+        const output = await engine.query(snapshot, request, signal)
+        return this.bounded(
+          { ...result, backend: engine.backend, ...output, runtime: engine.status(snapshot) },
+          request
+        )
+      } catch (error) {
+        const code = signal.aborted
+          ? originalSignal.aborted
+            ? 'QUERY_CANCELLED'
+            : 'QUERY_TIMEOUT'
+          : error instanceof ApiError
+            ? error.code
+            : 'QUERY_BACKEND_ERROR'
+        if (
+          request.fallback !== false &&
+          request.operation !== 'prepare' &&
+          !['QUERY_CANCELLED', 'RUN_GRAPH_CHANGED', 'RUN_GRAPH_CORRUPT'].includes(code) &&
+          adapter.basic
+        ) {
+          const output = adapter.basic(snapshot, request)
+          return this.bounded(
+            {
+              ...result,
+              ...output,
+              backend: 'basic',
+              status: 'partial',
+              errorCode: code,
+              gaps: [code, 'BASIC_CANDIDATES_NOT_SEMANTIC', ...output.gaps],
+              runtime: engine.status(snapshot)
+            },
+            request
+          )
+        }
+        return {
+          ...result,
+          status:
+            code === 'QUERY_CANCELLED'
+              ? 'cancelled'
+              : code === 'QUERY_TIMEOUT'
+                ? 'timeout'
+                : code === 'QUERY_UNSUPPORTED'
+                  ? 'unsupported'
+                  : code === 'QUERY_RUNTIME_BUSY'
+                    ? 'not-ready'
+                    : 'failed',
+          errorCode: code,
+          gaps: [code],
+          runtime: engine.status(snapshot)
+        }
+      }
     }
+    throw new ApiError('QUERY_BACKEND_INVALID', '查询引擎不可用', 503)
   }
   private bounded(result: QueryResult, request: QueryRequest): QueryResult {
     if (result.gaps.includes('QUERY_RESULT_LIMIT') || result.gaps.includes('HIERARCHY_ROOT_LIMIT'))
@@ -299,6 +338,29 @@ export class UnifiedQueryService {
     else if (!items.length && request.operation !== 'prepare') result.status = 'no-match'
     return result
   }
+  restoreCalls(projectId: string, runId: string, methods: JavaMethod[], calls: JavaCall[]): void {
+    const binding = this.repo.graphs.get(projectId, runId)
+    if (!binding || binding.backend === 'basic') return
+    if (!binding.facts) throw new ApiError('RUN_GRAPH_CORRUPT', '任务缺少已固定的调用定位事实', 409)
+    const targets = new Map(methods.map((method) => [method.key, method]))
+    const facts = new Map(
+      binding.facts.map((fact) => [JSON.stringify([fact.filePath, fact.line, fact.column]), fact])
+    )
+    for (const call of calls) {
+      const fact = facts.get(JSON.stringify([call.filePath, call.line, call.column]))
+      if (!fact) throw new ApiError('RUN_GRAPH_CHANGED', '调用位置与任务固定图不一致', 409)
+      call.semantic = false
+      if (fact.targets.length > 1) {
+        call.target = null
+        continue
+      }
+      if (fact.targets.length === 1) {
+        const target = targets.get(fact.targets[0])
+        if (!target) throw new ApiError('RUN_GRAPH_CHANGED', '固定调用目标无法映射到快照声明', 409)
+        if (!call.target || call.target.key === target.key) call.target = target
+      }
+    }
+  }
   async resolveCalls(
     projectId: string,
     runId: string,
@@ -318,92 +380,53 @@ export class UnifiedQueryService {
       }))
     }
     const warnings: ScanWarning[] = []
-    const add = (code: string, message: string): void => {
-      if (!warnings.some((w) => w.code === code)) warnings.push({ code, filePath: null, message })
+    if (this.engine instanceof CodeGraphEngine) {
+      try {
+        const gaps = await this.engine.resolveCalls(snapshot, methods, calls, signal)
+        return gaps.map((code) => ({
+          code,
+          filePath: null,
+          message: 'CodeGraph结构关系与快照核验；结构推断不等于Java类型绑定或漏洞证明。'
+        }))
+      } catch (error) {
+        if (signal.aborted) throw new ApiError('QUERY_CANCELLED', '构图已取消', 499)
+        const code = error instanceof ApiError ? error.code : 'QUERY_GRAPH_BUILD_FAILED'
+        if (/^(DB_|RUN_GRAPH_)/.test(code)) throw error
+        this.repo.graphs.save(projectId, runId, {
+          version: 1,
+          backend: 'basic',
+          engine: 'basic/java-parser/3.0.1',
+          adapter: GRAPH_ADAPTER,
+          graphKey: graphHash([projectId, info.snapshotId, 'basic']),
+          graphDigest: graphHash(calls.map((c) => [c.filePath, c.start, c.target?.key ?? null])),
+          gaps: [code, 'BASIC_CANDIDATES_NOT_SEMANTIC']
+        })
+        return [
+          { code, filePath: null, message: 'CodeGraph未完成，已固定基础候选模式；未自动启动Java。' }
+        ]
+      }
     }
-    const bounded = AbortSignal.any([signal, AbortSignal.timeout(90000)])
-    try {
-      await this.pool.get(snapshot).use(async (runtime) => {
-        if (!runtime.state.capabilities.includes('definition'))
-          throw new ApiError('QUERY_UNSUPPORTED', '定义能力不可用', 501)
-        for (const call of calls.slice(0, 64)) {
-          if (bounded.aborted)
-            throw new ApiError(
-              signal.aborted ? 'QUERY_CANCELLED' : 'QUERY_TIMEOUT',
-              '语义预处理达到时间预算',
-              504
-            )
-          const output = await semanticJava(
-            runtime,
-            {
-              operation: 'definition',
-              language: 'java',
-              projectId,
-              runId,
-              filePath: call.filePath,
-              line: call.line,
-              column: call.column,
-              maxResults: 4,
-              fallback: false
-            },
-            bounded
-          )
-          for (const gap of output.gaps)
-            add(gap, '语义查询只覆盖固定 Java 源文件；外部依赖、动态分派和未解析关系仍需人工核查。')
-          const targets = output.items.flatMap((item) => {
-            const file = snapshot.files.find((f) => f.filePath === item.location.filePath)!
-            const lines = file.source.split('\n')
-            const offset =
-              lines
-                .slice(0, item.location.start.line - 1)
-                .reduce((n, line) => n + line.length + 1, 0) +
-              item.location.start.column -
-              1
-            return methods.filter(
-              (m) =>
-                m.filePath === item.location.filePath &&
-                m.name === call.name &&
-                m.start <= offset &&
-                m.end >= offset
-            )
-          })
-          const unique = [...new Set(targets)]
-          if (
-            unique.length === 1 &&
-            !output.gaps.some((gap) =>
-              ['EXTERNAL_LOCATION_OMITTED', 'QUERY_RESULT_LIMIT'].includes(gap)
-            )
-          ) {
-            call.target = unique[0]
-            call.semantic = true
-          } else if (output.items.length) {
-            call.target = null
-            add('SEMANTIC_TARGET_OUTSIDE_INDEX', '语义定义不能映射到当前受控方法索引，保留未知。')
-          }
-          // 未取得语义定义时，原 CST 关系仍是 candidate，不能提升成 confirmed。
+    if (this.backend === 'basic') {
+      this.repo.graphs.save(projectId, runId, {
+        version: 1,
+        backend: 'basic',
+        engine: 'basic/java-parser/3.0.1',
+        adapter: GRAPH_ADAPTER,
+        graphKey: graphHash([projectId, info.snapshotId, 'basic']),
+        graphDigest: graphHash(calls.map((c) => [c.filePath, c.start, c.target?.key ?? null])),
+        gaps: ['BASIC_CANDIDATES_NOT_SEMANTIC']
+      })
+      return [
+        {
+          code: 'BASIC_CANDIDATES_NOT_SEMANTIC',
+          filePath: null,
+          message: '已显式选择基础候选后端。'
         }
-        if (calls.length > 64)
-          add(
-            'SEMANTIC_CALL_LIMIT',
-            '最多核查 64 个调用，其余保留 CST 候选；未覆盖部分不表示安全。'
-          )
-      }, bounded)
-    } catch (error) {
-      if (signal.aborted) throw new ApiError('QUERY_CANCELLED', '语义预处理已取消', 499)
-      add(
-        bounded.aborted && !signal.aborted
-          ? 'QUERY_TIMEOUT'
-          : error instanceof ApiError
-            ? error.code
-            : 'QUERY_BACKEND_ERROR',
-        'Java 语义查询未完成，已保留基础候选图和覆盖缺口；不能据此判定安全。'
-      )
+      ]
     }
     return warnings
   }
   async close(): Promise<void> {
-    await Promise.allSettled(
-      [...new Set(this.backends.values())].map((provider) => provider.close())
-    )
+    await Promise.allSettled([...new Set(this.backends.values())].map((engine) => engine.close()))
   }
 }

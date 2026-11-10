@@ -1,0 +1,187 @@
+{
+  "version": "qa-java-2026.11.09.1",
+  "split": "acceptance",
+  "annotationPolicy": "reference labels with rationale; not copied from development fixtures; not provider-generated labels",
+  "cases": [
+    {
+      "id": "sql-positive-1",
+      "category": "sql-injection",
+      "expected": "dangerous",
+      "rationale": "raw request parameter reaches SQL text",
+      "className": "Acceptance01",
+      "fileName": "Acceptance01.java",
+      "annotation": "source-derived engineering baseline; owner review can revise the versioned label",
+      "sha256": "4c0c6b81cdeaa71ddd218781edc17971338729511228d3500d442561c19f935d"
+    },
+    {
+      "id": "sql-positive-2",
+      "category": "sql-injection",
+      "expected": "dangerous",
+      "rationale": "concatenated LIKE clause is not parameter binding",
+      "className": "Acceptance02",
+      "fileName": "Acceptance02.java",
+      "annotation": "source-derived engineering baseline; owner review can revise the versioned label",
+      "sha256": "285acac25890f2e785a97345a3177d7b1f3cb90729e220630ae7cf99b9481aca"
+    },
+    {
+      "id": "sql-blocked-1",
+      "category": "sql-injection",
+      "expected": "safe",
+      "rationale": "query uses only a server-owned literal selected by closed whitelist",
+      "className": "Acceptance03",
+      "fileName": "Acceptance03.java",
+      "annotation": "source-derived engineering baseline; owner review can revise the versioned label",
+      "sha256": "ee69f2090ef3a44a8bf418862bc44a463f27018e5d201f77714c57e459158df0"
+    },
+    {
+      "id": "sql-blocked-2",
+      "category": "sql-injection",
+      "expected": "safe",
+      "rationale": "digits-only validation covers the numeric SQL insertion point",
+      "className": "Acceptance04",
+      "fileName": "Acceptance04.java",
+      "annotation": "source-derived engineering baseline; owner review can revise the versioned label",
+      "sha256": "531639725501ae414c276806a5914c1ad2e4a4ea7102fdb4d6d2a96bd243ecfc"
+    },
+    {
+      "id": "cmd-positive-1",
+      "category": "command-injection",
+      "expected": "dangerous",
+      "rationale": "attacker controls shell command body",
+      "className": "Acceptance05",
+      "fileName": "Acceptance05.java",
+      "annotation": "source-derived engineering baseline; owner review can revise the versioned label",
+      "sha256": "996134d5e4fe327b9e909c3530d635e563abef03c6ce9da7bebb5db01d38387b"
+    },
+    {
+      "id": "cmd-positive-2",
+      "category": "command-injection",
+      "expected": "dangerous",
+      "rationale": "shell -c receives concatenated external input",
+      "className": "Acceptance06",
+      "fileName": "Acceptance06.java",
+      "annotation": "source-derived engineering baseline; owner review can revise the versioned label",
+      "sha256": "1573ac438c688940891f5c6b60cf0ca8acae1c3024c9ce99b3f66858f02a1e7a"
+    },
+    {
+      "id": "cmd-blocked-1",
+      "category": "command-injection",
+      "expected": "safe",
+      "rationale": "both executable and argument are server-owned literals",
+      "className": "Acceptance07",
+      "fileName": "Acceptance07.java",
+      "annotation": "source-derived engineering baseline; owner review can revise the versioned label",
+      "sha256": "771a1b62b1383a427e7944ae55c555dce5d9dd2f987c1e30fffe2e403a4eccb5"
+    },
+    {
+      "id": "cmd-blocked-2",
+      "category": "command-injection",
+      "expected": "safe",
+      "rationale": "closed allowlist selects a fixed command, no user string reaches exec",
+      "className": "Acceptance08",
+      "fileName": "Acceptance08.java",
+      "annotation": "source-derived engineering baseline; owner review can revise the versioned label",
+      "sha256": "16ae3553943133561f9edfced9fd75cfd0237ce36257356ffb4007f8b4800aad"
+    },
+    {
+      "id": "path-positive-1",
+      "category": "path-traversal",
+      "expected": "dangerous",
+      "rationale": "relative traversal is resolved without a root containment guard",
+      "className": "Acceptance09",
+      "fileName": "Acceptance09.java",
+      "annotation": "source-derived engineering baseline; owner review can revise the versioned label",
+      "sha256": "01fc18ddc11226a4cfc0b9ab10d2b739f976ac93fd12bcd3245f4e03d4d82c2d"
+    },
+    {
+      "id": "path-positive-2",
+      "category": "path-traversal",
+      "expected": "dangerous",
+      "rationale": "external absolute or relative path is directly opened",
+      "className": "Acceptance10",
+      "fileName": "Acceptance10.java",
+      "annotation": "source-derived engineering baseline; owner review can revise the versioned label",
+      "sha256": "dde6b9f9eb30097bcc33bb6416779902ac4538dfea9262f8fb04703e04cd15b3"
+    },
+    {
+      "id": "path-blocked-1",
+      "category": "path-traversal",
+      "expected": "safe",
+      "rationale": "exact name and fixed absolute file path; input never participates in the open",
+      "className": "Acceptance11",
+      "fileName": "Acceptance11.java",
+      "annotation": "source-derived engineering baseline; owner review can revise the versioned label",
+      "sha256": "42a60a4eec4339424b7f35d7c05b37570e9d887b7d8fab65d4dc5ab2fd2f874b"
+    },
+    {
+      "id": "path-blocked-2",
+      "category": "path-traversal",
+      "expected": "safe",
+      "rationale": "closed enum maps to fixed trusted files rather than resolving user text",
+      "className": "Acceptance12",
+      "fileName": "Acceptance12.java",
+      "annotation": "source-derived engineering baseline; owner review can revise the versioned label",
+      "sha256": "3b631d9e7e1e39bddf666b9110f15d89164fdc3223e94029537ddb8dfafe99ca"
+    },
+    {
+      "id": "sql-unknown-dependency",
+      "category": "sql-injection",
+      "expected": "unknown",
+      "rationale": "sanitizer implementation and guarantees are unavailable",
+      "className": "Acceptance13",
+      "fileName": "Acceptance13.java",
+      "annotation": "source-derived engineering baseline; owner review can revise the versioned label",
+      "sha256": "fe67b44f40faf42bd934ae86b3e78590d0e634c579f035f61f31ed38c6be0e90"
+    },
+    {
+      "id": "sql-unknown-recursion",
+      "category": "sql-injection",
+      "expected": "unknown",
+      "rationale": "bounded candidate expansion contains a recursive boundary; do not assert complete coverage",
+      "className": "Acceptance14",
+      "fileName": "Acceptance14.java",
+      "annotation": "source-derived engineering baseline; owner review can revise the versioned label",
+      "sha256": "8a092bddb766479c3d7940bdeaa9eb1fabdaee9e59641614ceb31c9959bf0522"
+    },
+    {
+      "id": "cmd-unknown-dependency",
+      "category": "command-injection",
+      "expected": "unknown",
+      "rationale": "external command policy may replace or reject input, but its source is absent",
+      "className": "Acceptance15",
+      "fileName": "Acceptance15.java",
+      "annotation": "source-derived engineering baseline; owner review can revise the versioned label",
+      "sha256": "010e464589ade0c5cadd4a1dcf7d69c0906f346aeb40d8e1ae0938bcef9244ff"
+    },
+    {
+      "id": "cmd-unknown-source",
+      "category": "command-injection",
+      "expected": "unknown",
+      "rationale": "public method has no supported HTTP or other verified external source",
+      "className": "Acceptance16",
+      "fileName": "Acceptance16.java",
+      "annotation": "source-derived engineering baseline; owner review can revise the versioned label",
+      "sha256": "d9717fb144425ae7c7a25532d28231c242b8b49cd5070dc8914c689be947cc0b"
+    },
+    {
+      "id": "path-unknown-dependency",
+      "category": "path-traversal",
+      "expected": "unknown",
+      "rationale": "unavailable resolver prevents verifying containment and authorization",
+      "className": "Acceptance17",
+      "fileName": "Acceptance17.java",
+      "annotation": "source-derived engineering baseline; owner review can revise the versioned label",
+      "sha256": "1350885040ebe32159b8c3a2483f04450501ed4d4cfbd922160a17c58bc2491f"
+    },
+    {
+      "id": "path-unknown-overload",
+      "category": "path-traversal",
+      "expected": "unknown",
+      "rationale": "same-arity receiver type is unresolved; do not pick an arbitrary wrapper target",
+      "className": "Acceptance18",
+      "fileName": "Acceptance18.java",
+      "annotation": "source-derived engineering baseline; owner review can revise the versioned label",
+      "sha256": "bf8dfc6308192ba64671f6d67ce0194b9b76fd22d67fc3d995ea0037243afb9f"
+    }
+  ]
+}
