@@ -1,0 +1,3714 @@
+{
+  "date": "2026-11-12",
+  "source": "fresh database constructed only from application migration code; no personal project data",
+  "version": 15,
+  "tables": [
+    {
+      "name": "analysis_sessions",
+      "sql": "CREATE TABLE analysis_sessions (\n session_id TEXT PRIMARY KEY, run_id TEXT NOT NULL, project_id TEXT NOT NULL, chain_id TEXT NOT NULL,\n attempt_id INTEGER NOT NULL CHECK(attempt_id>0), model_config_id TEXT NOT NULL REFERENCES model_configs(id),\n state TEXT NOT NULL CHECK(state IN ('queue','analyze','completed','error','timeout','stop','cancel')),\n min_event_id INTEGER NOT NULL DEFAULT 1 CHECK(min_event_id>0), created_at TEXT NOT NULL, finished_at TEXT, error_code TEXT,\n UNIQUE(chain_id,attempt_id), FOREIGN KEY(chain_id,run_id,project_id) REFERENCES call_paths(path_id,run_id,project_id)\n) STRICT",
+      "columns": [
+        {
+          "cid": 0,
+          "name": "session_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 1
+        },
+        {
+          "cid": 1,
+          "name": "run_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 2,
+          "name": "project_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 3,
+          "name": "chain_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 4,
+          "name": "attempt_id",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 5,
+          "name": "model_config_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 6,
+          "name": "state",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 7,
+          "name": "min_event_id",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": "1",
+          "pk": 0
+        },
+        {
+          "cid": 8,
+          "name": "created_at",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 9,
+          "name": "finished_at",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 10,
+          "name": "error_code",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        }
+      ],
+      "foreignKeys": [
+        {
+          "id": 0,
+          "seq": 0,
+          "table": "call_paths",
+          "from": "chain_id",
+          "to": "path_id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION",
+          "match": "NONE"
+        },
+        {
+          "id": 0,
+          "seq": 1,
+          "table": "call_paths",
+          "from": "run_id",
+          "to": "run_id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION",
+          "match": "NONE"
+        },
+        {
+          "id": 0,
+          "seq": 2,
+          "table": "call_paths",
+          "from": "project_id",
+          "to": "project_id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION",
+          "match": "NONE"
+        },
+        {
+          "id": 1,
+          "seq": 0,
+          "table": "model_configs",
+          "from": "model_config_id",
+          "to": "id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION",
+          "match": "NONE"
+        }
+      ],
+      "indexes": [
+        {
+          "seq": 0,
+          "name": "idx_sessions_path",
+          "unique": 0,
+          "origin": "c",
+          "partial": 0,
+          "columns": [
+            {
+              "seqno": 0,
+              "cid": 1,
+              "name": "run_id"
+            },
+            {
+              "seqno": 1,
+              "cid": 3,
+              "name": "chain_id"
+            },
+            {
+              "seqno": 2,
+              "cid": 4,
+              "name": "attempt_id"
+            }
+          ],
+          "sql": "CREATE INDEX idx_sessions_path ON analysis_sessions(run_id,chain_id,attempt_id)"
+        },
+        {
+          "seq": 1,
+          "name": "sqlite_autoindex_analysis_sessions_2",
+          "unique": 1,
+          "origin": "u",
+          "partial": 0,
+          "columns": [
+            {
+              "seqno": 0,
+              "cid": 3,
+              "name": "chain_id"
+            },
+            {
+              "seqno": 1,
+              "cid": 4,
+              "name": "attempt_id"
+            }
+          ],
+          "sql": null
+        },
+        {
+          "seq": 2,
+          "name": "sqlite_autoindex_analysis_sessions_1",
+          "unique": 1,
+          "origin": "pk",
+          "partial": 0,
+          "columns": [
+            {
+              "seqno": 0,
+              "cid": 0,
+              "name": "session_id"
+            }
+          ],
+          "sql": null
+        }
+      ],
+      "triggers": []
+    },
+    {
+      "name": "audit_events",
+      "sql": "CREATE TABLE audit_events (\n event_id TEXT PRIMARY KEY, run_id TEXT NOT NULL, project_id TEXT NOT NULL, chain_id TEXT,\n seq INTEGER, time TEXT NOT NULL, type TEXT NOT NULL, summary TEXT, summary_missing INTEGER NOT NULL,\n tool_call_id TEXT,tool_name TEXT,status TEXT NOT NULL,duration_ms INTEGER,truncated INTEGER NOT NULL,\n body_json TEXT NOT NULL CHECK(json_valid(body_json)),\n session_id TEXT REFERENCES analysis_sessions(session_id),session_seq INTEGER,stream_event TEXT,\n UNIQUE(run_id,seq),UNIQUE(session_id,session_seq),\n FOREIGN KEY(run_id,project_id) REFERENCES audit_runs(id,project_id),\n FOREIGN KEY(chain_id,run_id,project_id) REFERENCES call_paths(path_id,run_id,project_id)\n) STRICT",
+      "columns": [
+        {
+          "cid": 0,
+          "name": "event_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 1
+        },
+        {
+          "cid": 1,
+          "name": "run_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 2,
+          "name": "project_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 3,
+          "name": "chain_id",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 4,
+          "name": "seq",
+          "type": "INTEGER",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 5,
+          "name": "time",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 6,
+          "name": "type",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 7,
+          "name": "summary",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 8,
+          "name": "summary_missing",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 9,
+          "name": "tool_call_id",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 10,
+          "name": "tool_name",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 11,
+          "name": "status",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 12,
+          "name": "duration_ms",
+          "type": "INTEGER",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 13,
+          "name": "truncated",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 14,
+          "name": "body_json",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 15,
+          "name": "session_id",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 16,
+          "name": "session_seq",
+          "type": "INTEGER",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 17,
+          "name": "stream_event",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        }
+      ],
+      "foreignKeys": [
+        {
+          "id": 0,
+          "seq": 0,
+          "table": "call_paths",
+          "from": "chain_id",
+          "to": "path_id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION",
+          "match": "NONE"
+        },
+        {
+          "id": 0,
+          "seq": 1,
+          "table": "call_paths",
+          "from": "run_id",
+          "to": "run_id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION",
+          "match": "NONE"
+        },
+        {
+          "id": 0,
+          "seq": 2,
+          "table": "call_paths",
+          "from": "project_id",
+          "to": "project_id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION",
+          "match": "NONE"
+        },
+        {
+          "id": 1,
+          "seq": 0,
+          "table": "audit_runs",
+          "from": "run_id",
+          "to": "id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION",
+          "match": "NONE"
+        },
+        {
+          "id": 1,
+          "seq": 1,
+          "table": "audit_runs",
+          "from": "project_id",
+          "to": "project_id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION",
+          "match": "NONE"
+        },
+        {
+          "id": 2,
+          "seq": 0,
+          "table": "analysis_sessions",
+          "from": "session_id",
+          "to": "session_id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION",
+          "match": "NONE"
+        }
+      ],
+      "indexes": [
+        {
+          "seq": 0,
+          "name": "idx_audit_events_path",
+          "unique": 0,
+          "origin": "c",
+          "partial": 0,
+          "columns": [
+            {
+              "seqno": 0,
+              "cid": 1,
+              "name": "run_id"
+            },
+            {
+              "seqno": 1,
+              "cid": 3,
+              "name": "chain_id"
+            },
+            {
+              "seqno": 2,
+              "cid": 4,
+              "name": "seq"
+            }
+          ],
+          "sql": "CREATE INDEX idx_audit_events_path ON audit_events(run_id,chain_id,seq)"
+        },
+        {
+          "seq": 1,
+          "name": "sqlite_autoindex_audit_events_3",
+          "unique": 1,
+          "origin": "u",
+          "partial": 0,
+          "columns": [
+            {
+              "seqno": 0,
+              "cid": 15,
+              "name": "session_id"
+            },
+            {
+              "seqno": 1,
+              "cid": 16,
+              "name": "session_seq"
+            }
+          ],
+          "sql": null
+        },
+        {
+          "seq": 2,
+          "name": "sqlite_autoindex_audit_events_2",
+          "unique": 1,
+          "origin": "u",
+          "partial": 0,
+          "columns": [
+            {
+              "seqno": 0,
+              "cid": 1,
+              "name": "run_id"
+            },
+            {
+              "seqno": 1,
+              "cid": 4,
+              "name": "seq"
+            }
+          ],
+          "sql": null
+        },
+        {
+          "seq": 3,
+          "name": "sqlite_autoindex_audit_events_1",
+          "unique": 1,
+          "origin": "pk",
+          "partial": 0,
+          "columns": [
+            {
+              "seqno": 0,
+              "cid": 0,
+              "name": "event_id"
+            }
+          ],
+          "sql": null
+        }
+      ],
+      "triggers": []
+    },
+    {
+      "name": "audit_runs",
+      "sql": "CREATE TABLE audit_runs (\n  id TEXT PRIMARY KEY, project_id TEXT NOT NULL REFERENCES projects(id),\n  status TEXT NOT NULL CHECK(status IN ('queued','running','completed','failed','cancelled')),\n  source_stamp TEXT NOT NULL, rules_version TEXT NOT NULL,\n  model_config_id TEXT REFERENCES model_configs(id),\n  created_at TEXT NOT NULL, updated_at TEXT NOT NULL, stage TEXT NOT NULL DEFAULT 'prepared'\n  CHECK(stage IN ('scanning','prepared','analyzing','completed','failed','interrupted')), started_at TEXT, finished_at TEXT, error_code TEXT, snapshot_id TEXT REFERENCES source_snapshots(snapshot_id), review_json TEXT CHECK(review_json IS NULL OR json_valid(review_json)), review_hash TEXT, graph_json TEXT CHECK(graph_json IS NULL OR json_valid(graph_json)), graph_hash TEXT, graph_created_at TEXT, scan_state TEXT CHECK(scan_state IN ('scanning','ready','partial','empty','failed')), candidate_count INTEGER NOT NULL DEFAULT 0 CHECK(candidate_count>=0), unresolved_calls INTEGER NOT NULL DEFAULT 0 CHECK(unresolved_calls>=0), scan_truncated INTEGER NOT NULL DEFAULT 0 CHECK(scan_truncated IN (0,1)), warnings_json TEXT CHECK(warnings_json IS NULL OR json_valid(warnings_json)), scan_error_code TEXT, scan_started_at TEXT, scan_finished_at TEXT, control_state TEXT NOT NULL DEFAULT 'idle' CHECK(control_state IN ('idle','running','stop_requested','waiting_external','stopped','interrupted','completed')), control_revision INTEGER NOT NULL DEFAULT 0 CHECK(control_revision>=0), control_updated_at TEXT, model_json TEXT NOT NULL DEFAULT 'null' CHECK(json_valid(model_json)),\n  UNIQUE(id, project_id)\n) STRICT",
+      "columns": [
+        {
+          "cid": 0,
+          "name": "id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 1
+        },
+        {
+          "cid": 1,
+          "name": "project_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 2,
+          "name": "status",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 3,
+          "name": "source_stamp",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 4,
+          "name": "rules_version",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 5,
+          "name": "model_config_id",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 6,
+          "name": "created_at",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 7,
+          "name": "updated_at",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 8,
+          "name": "stage",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": "'prepared'",
+          "pk": 0
+        },
+        {
+          "cid": 9,
+          "name": "started_at",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 10,
+          "name": "finished_at",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 11,
+          "name": "error_code",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 12,
+          "name": "snapshot_id",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 13,
+          "name": "review_json",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 14,
+          "name": "review_hash",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 15,
+          "name": "graph_json",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 16,
+          "name": "graph_hash",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 17,
+          "name": "graph_created_at",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 18,
+          "name": "scan_state",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 19,
+          "name": "candidate_count",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": "0",
+          "pk": 0
+        },
+        {
+          "cid": 20,
+          "name": "unresolved_calls",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": "0",
+          "pk": 0
+        },
+        {
+          "cid": 21,
+          "name": "scan_truncated",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": "0",
+          "pk": 0
+        },
+        {
+          "cid": 22,
+          "name": "warnings_json",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 23,
+          "name": "scan_error_code",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 24,
+          "name": "scan_started_at",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 25,
+          "name": "scan_finished_at",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 26,
+          "name": "control_state",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": "'idle'",
+          "pk": 0
+        },
+        {
+          "cid": 27,
+          "name": "control_revision",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": "0",
+          "pk": 0
+        },
+        {
+          "cid": 28,
+          "name": "control_updated_at",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 29,
+          "name": "model_json",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": "'null'",
+          "pk": 0
+        }
+      ],
+      "foreignKeys": [
+        {
+          "id": 0,
+          "seq": 0,
+          "table": "source_snapshots",
+          "from": "snapshot_id",
+          "to": "snapshot_id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION",
+          "match": "NONE"
+        },
+        {
+          "id": 1,
+          "seq": 0,
+          "table": "model_configs",
+          "from": "model_config_id",
+          "to": "id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION",
+          "match": "NONE"
+        },
+        {
+          "id": 2,
+          "seq": 0,
+          "table": "projects",
+          "from": "project_id",
+          "to": "id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION",
+          "match": "NONE"
+        }
+      ],
+      "indexes": [
+        {
+          "seq": 0,
+          "name": "idx_runs_model",
+          "unique": 0,
+          "origin": "c",
+          "partial": 0,
+          "columns": [
+            {
+              "seqno": 0,
+              "cid": 5,
+              "name": "model_config_id"
+            }
+          ],
+          "sql": "CREATE INDEX idx_runs_model ON audit_runs(model_config_id)"
+        },
+        {
+          "seq": 1,
+          "name": "idx_runs_project",
+          "unique": 0,
+          "origin": "c",
+          "partial": 0,
+          "columns": [
+            {
+              "seqno": 0,
+              "cid": 1,
+              "name": "project_id"
+            },
+            {
+              "seqno": 1,
+              "cid": 6,
+              "name": "created_at"
+            }
+          ],
+          "sql": "CREATE INDEX idx_runs_project ON audit_runs(project_id, created_at)"
+        },
+        {
+          "seq": 2,
+          "name": "sqlite_autoindex_audit_runs_2",
+          "unique": 1,
+          "origin": "u",
+          "partial": 0,
+          "columns": [
+            {
+              "seqno": 0,
+              "cid": 0,
+              "name": "id"
+            },
+            {
+              "seqno": 1,
+              "cid": 1,
+              "name": "project_id"
+            }
+          ],
+          "sql": null
+        },
+        {
+          "seq": 3,
+          "name": "sqlite_autoindex_audit_runs_1",
+          "unique": 1,
+          "origin": "pk",
+          "partial": 0,
+          "columns": [
+            {
+              "seqno": 0,
+              "cid": 0,
+              "name": "id"
+            }
+          ],
+          "sql": null
+        }
+      ],
+      "triggers": [
+        {
+          "name": "frozen_run_inputs",
+          "sql": "CREATE TRIGGER frozen_run_inputs BEFORE UPDATE OF snapshot_id,review_json,review_hash,graph_json,graph_hash ON audit_runs\nWHEN (OLD.snapshot_id IS NOT NULL AND NEW.snapshot_id IS NOT OLD.snapshot_id)\n OR (OLD.review_json IS NOT NULL AND (NEW.review_json IS NOT OLD.review_json OR NEW.review_hash IS NOT OLD.review_hash))\n OR (OLD.graph_json IS NOT NULL AND (NEW.graph_json IS NOT OLD.graph_json OR NEW.graph_hash IS NOT OLD.graph_hash))\nBEGIN SELECT RAISE(ABORT,'run inputs are frozen'); END"
+        },
+        {
+          "name": "run_snapshot_insert_scope",
+          "sql": "CREATE TRIGGER run_snapshot_insert_scope BEFORE INSERT ON audit_runs\nWHEN NEW.snapshot_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM source_snapshots WHERE snapshot_id=NEW.snapshot_id AND project_id=NEW.project_id)\nBEGIN SELECT RAISE(ABORT,'snapshot project mismatch'); END"
+        },
+        {
+          "name": "run_snapshot_scope",
+          "sql": "CREATE TRIGGER run_snapshot_scope BEFORE UPDATE OF snapshot_id,project_id ON audit_runs\nWHEN NEW.snapshot_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM source_snapshots WHERE snapshot_id=NEW.snapshot_id AND project_id=NEW.project_id)\nBEGIN SELECT RAISE(ABORT,'snapshot project mismatch'); END"
+        }
+      ]
+    },
+    {
+      "name": "audit_template_versions",
+      "sql": "CREATE TABLE audit_template_versions (\n  template_id TEXT NOT NULL, revision INTEGER NOT NULL CHECK(revision>0),\n  name TEXT NOT NULL, language TEXT NOT NULL CHECK(language='java'), category TEXT NOT NULL,\n  description TEXT NOT NULL, markdown TEXT NOT NULL,\n  origin TEXT NOT NULL CHECK(origin IN ('manual','markdown','skill')), source_name TEXT,\n  created_at TEXT NOT NULL, PRIMARY KEY(template_id,revision)\n) STRICT",
+      "columns": [
+        {
+          "cid": 0,
+          "name": "template_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 1
+        },
+        {
+          "cid": 1,
+          "name": "revision",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 2
+        },
+        {
+          "cid": 2,
+          "name": "name",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 3,
+          "name": "language",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 4,
+          "name": "category",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 5,
+          "name": "description",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 6,
+          "name": "markdown",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 7,
+          "name": "origin",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 8,
+          "name": "source_name",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 9,
+          "name": "created_at",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        }
+      ],
+      "foreignKeys": [],
+      "indexes": [
+        {
+          "seq": 0,
+          "name": "sqlite_autoindex_audit_template_versions_1",
+          "unique": 1,
+          "origin": "pk",
+          "partial": 0,
+          "columns": [
+            {
+              "seqno": 0,
+              "cid": 0,
+              "name": "template_id"
+            },
+            {
+              "seqno": 1,
+              "cid": 1,
+              "name": "revision"
+            }
+          ],
+          "sql": null
+        }
+      ],
+      "triggers": [
+        {
+          "name": "immutable_audit_template_versions_delete",
+          "sql": "CREATE TRIGGER immutable_audit_template_versions_delete BEFORE DELETE ON audit_template_versions\n   BEGIN SELECT RAISE(ABORT,'immutable audit configuration'); END"
+        },
+        {
+          "name": "immutable_audit_template_versions_update",
+          "sql": "CREATE TRIGGER immutable_audit_template_versions_update BEFORE UPDATE ON audit_template_versions\n   BEGIN SELECT RAISE(ABORT,'immutable audit configuration'); END"
+        }
+      ]
+    },
+    {
+      "name": "call_edges",
+      "sql": "CREATE TABLE call_edges (\n  uid TEXT PRIMARY KEY, run_id TEXT NOT NULL, project_id TEXT NOT NULL,\n  file_path TEXT NOT NULL, caller_key TEXT NOT NULL, callee_key TEXT NOT NULL,\n  call_line INTEGER NOT NULL CHECK(call_line >= 1),\n  is_sink INTEGER NOT NULL CHECK(is_sink IN (0,1)), rule_id TEXT, file_name TEXT NOT NULL DEFAULT '', function_name TEXT NOT NULL DEFAULT '', called_function_name TEXT NOT NULL DEFAULT '', called_function_file_name TEXT, called_function_file_path TEXT, call_column INTEGER NOT NULL DEFAULT 1 CHECK(call_column>=1), resolution_status TEXT NOT NULL DEFAULT 'unresolved'\n  CHECK(resolution_status IN ('candidate','confirmed','unresolved','invalid')), arguments_json TEXT NOT NULL DEFAULT '[]'\n  CHECK(json_valid(arguments_json) AND json_type(arguments_json)='array'),\n  UNIQUE(uid, run_id, project_id),\n  FOREIGN KEY(run_id, project_id) REFERENCES audit_runs(id, project_id)\n) STRICT",
+      "columns": [
+        {
+          "cid": 0,
+          "name": "uid",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 1
+        },
+        {
+          "cid": 1,
+          "name": "run_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 2,
+          "name": "project_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 3,
+          "name": "file_path",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 4,
+          "name": "caller_key",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 5,
+          "name": "callee_key",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 6,
+          "name": "call_line",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 7,
+          "name": "is_sink",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 8,
+          "name": "rule_id",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 9,
+          "name": "file_name",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": "''",
+          "pk": 0
+        },
+        {
+          "cid": 10,
+          "name": "function_name",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": "''",
+          "pk": 0
+        },
+        {
+          "cid": 11,
+          "name": "called_function_name",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": "''",
+          "pk": 0
+        },
+        {
+          "cid": 12,
+          "name": "called_function_file_name",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 13,
+          "name": "called_function_file_path",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 14,
+          "name": "call_column",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": "1",
+          "pk": 0
+        },
+        {
+          "cid": 15,
+          "name": "resolution_status",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": "'unresolved'",
+          "pk": 0
+        },
+        {
+          "cid": 16,
+          "name": "arguments_json",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": "'[]'",
+          "pk": 0
+        }
+      ],
+      "foreignKeys": [
+        {
+          "id": 0,
+          "seq": 0,
+          "table": "audit_runs",
+          "from": "run_id",
+          "to": "id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION",
+          "match": "NONE"
+        },
+        {
+          "id": 0,
+          "seq": 1,
+          "table": "audit_runs",
+          "from": "project_id",
+          "to": "project_id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION",
+          "match": "NONE"
+        }
+      ],
+      "indexes": [
+        {
+          "seq": 0,
+          "name": "idx_edges_location",
+          "unique": 0,
+          "origin": "c",
+          "partial": 0,
+          "columns": [
+            {
+              "seqno": 0,
+              "cid": 1,
+              "name": "run_id"
+            },
+            {
+              "seqno": 1,
+              "cid": 3,
+              "name": "file_path"
+            },
+            {
+              "seqno": 2,
+              "cid": 6,
+              "name": "call_line"
+            },
+            {
+              "seqno": 3,
+              "cid": 14,
+              "name": "call_column"
+            }
+          ],
+          "sql": "CREATE INDEX idx_edges_location ON call_edges(run_id,file_path,call_line,call_column)"
+        },
+        {
+          "seq": 1,
+          "name": "idx_edges_run",
+          "unique": 0,
+          "origin": "c",
+          "partial": 0,
+          "columns": [
+            {
+              "seqno": 0,
+              "cid": 1,
+              "name": "run_id"
+            },
+            {
+              "seqno": 1,
+              "cid": 2,
+              "name": "project_id"
+            }
+          ],
+          "sql": "CREATE INDEX idx_edges_run ON call_edges(run_id, project_id)"
+        },
+        {
+          "seq": 2,
+          "name": "sqlite_autoindex_call_edges_2",
+          "unique": 1,
+          "origin": "u",
+          "partial": 0,
+          "columns": [
+            {
+              "seqno": 0,
+              "cid": 0,
+              "name": "uid"
+            },
+            {
+              "seqno": 1,
+              "cid": 1,
+              "name": "run_id"
+            },
+            {
+              "seqno": 2,
+              "cid": 2,
+              "name": "project_id"
+            }
+          ],
+          "sql": null
+        },
+        {
+          "seq": 3,
+          "name": "sqlite_autoindex_call_edges_1",
+          "unique": 1,
+          "origin": "pk",
+          "partial": 0,
+          "columns": [
+            {
+              "seqno": 0,
+              "cid": 0,
+              "name": "uid"
+            }
+          ],
+          "sql": null
+        }
+      ],
+      "triggers": []
+    },
+    {
+      "name": "call_paths",
+      "sql": "CREATE TABLE call_paths (\n  path_id TEXT PRIMARY KEY, run_id TEXT NOT NULL, project_id TEXT NOT NULL,\n  path_hash TEXT NOT NULL, sink_edge_id TEXT,\n  verdict TEXT NOT NULL CHECK(verdict IN ('unknown','safe','dangerous')),\n  dangerous INTEGER CHECK(dangerous IN (0,1)),\n  result_summary TEXT NOT NULL, created_at TEXT NOT NULL, source_ref TEXT, rule_id TEXT, status TEXT NOT NULL DEFAULT 'pending'\n  CHECK(status IN ('pending','analyzing','completed','failed','unresolved','invalid')), truncated INTEGER NOT NULL DEFAULT 0 CHECK(truncated IN (0,1)), truncation_reason TEXT NOT NULL DEFAULT ''\n  CHECK((truncated=0 AND truncation_reason='') OR (truncated=1 AND length(truncation_reason)>0)), updated_at TEXT NOT NULL DEFAULT '', manual_points_json TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(manual_points_json)),\n  CHECK((verdict = 'unknown' AND dangerous IS NULL) OR\n        (verdict = 'safe' AND dangerous IS NOT NULL AND dangerous = 0) OR\n        (verdict = 'dangerous' AND dangerous IS NOT NULL AND dangerous = 1)),\n  UNIQUE(run_id, path_hash), UNIQUE(path_id, run_id, project_id),\n  FOREIGN KEY(run_id, project_id) REFERENCES audit_runs(id, project_id),\n  FOREIGN KEY(sink_edge_id, run_id, project_id) REFERENCES call_edges(uid, run_id, project_id)\n) STRICT",
+      "columns": [
+        {
+          "cid": 0,
+          "name": "path_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 1
+        },
+        {
+          "cid": 1,
+          "name": "run_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 2,
+          "name": "project_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 3,
+          "name": "path_hash",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 4,
+          "name": "sink_edge_id",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 5,
+          "name": "verdict",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 6,
+          "name": "dangerous",
+          "type": "INTEGER",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 7,
+          "name": "result_summary",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 8,
+          "name": "created_at",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 9,
+          "name": "source_ref",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 10,
+          "name": "rule_id",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 11,
+          "name": "status",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": "'pending'",
+          "pk": 0
+        },
+        {
+          "cid": 12,
+          "name": "truncated",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": "0",
+          "pk": 0
+        },
+        {
+          "cid": 13,
+          "name": "truncation_reason",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": "''",
+          "pk": 0
+        },
+        {
+          "cid": 14,
+          "name": "updated_at",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": "''",
+          "pk": 0
+        },
+        {
+          "cid": 15,
+          "name": "manual_points_json",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": "'[]'",
+          "pk": 0
+        }
+      ],
+      "foreignKeys": [
+        {
+          "id": 0,
+          "seq": 0,
+          "table": "call_edges",
+          "from": "sink_edge_id",
+          "to": "uid",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION",
+          "match": "NONE"
+        },
+        {
+          "id": 0,
+          "seq": 1,
+          "table": "call_edges",
+          "from": "run_id",
+          "to": "run_id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION",
+          "match": "NONE"
+        },
+        {
+          "id": 0,
+          "seq": 2,
+          "table": "call_edges",
+          "from": "project_id",
+          "to": "project_id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION",
+          "match": "NONE"
+        },
+        {
+          "id": 1,
+          "seq": 0,
+          "table": "audit_runs",
+          "from": "run_id",
+          "to": "id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION",
+          "match": "NONE"
+        },
+        {
+          "id": 1,
+          "seq": 1,
+          "table": "audit_runs",
+          "from": "project_id",
+          "to": "project_id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION",
+          "match": "NONE"
+        }
+      ],
+      "indexes": [
+        {
+          "seq": 0,
+          "name": "idx_paths_work_queue",
+          "unique": 0,
+          "origin": "c",
+          "partial": 0,
+          "columns": [
+            {
+              "seqno": 0,
+              "cid": 1,
+              "name": "run_id"
+            },
+            {
+              "seqno": 1,
+              "cid": 11,
+              "name": "status"
+            },
+            {
+              "seqno": 2,
+              "cid": 8,
+              "name": "created_at"
+            },
+            {
+              "seqno": 3,
+              "cid": 0,
+              "name": "path_id"
+            }
+          ],
+          "sql": "CREATE INDEX idx_paths_work_queue ON call_paths(run_id,status,created_at,path_id)"
+        },
+        {
+          "seq": 1,
+          "name": "idx_paths_sink",
+          "unique": 0,
+          "origin": "c",
+          "partial": 0,
+          "columns": [
+            {
+              "seqno": 0,
+              "cid": 4,
+              "name": "sink_edge_id"
+            },
+            {
+              "seqno": 1,
+              "cid": 1,
+              "name": "run_id"
+            },
+            {
+              "seqno": 2,
+              "cid": 2,
+              "name": "project_id"
+            }
+          ],
+          "sql": "CREATE INDEX idx_paths_sink ON call_paths(sink_edge_id, run_id, project_id)"
+        },
+        {
+          "seq": 2,
+          "name": "idx_paths_run",
+          "unique": 0,
+          "origin": "c",
+          "partial": 0,
+          "columns": [
+            {
+              "seqno": 0,
+              "cid": 1,
+              "name": "run_id"
+            },
+            {
+              "seqno": 1,
+              "cid": 2,
+              "name": "project_id"
+            }
+          ],
+          "sql": "CREATE INDEX idx_paths_run ON call_paths(run_id, project_id)"
+        },
+        {
+          "seq": 3,
+          "name": "sqlite_autoindex_call_paths_3",
+          "unique": 1,
+          "origin": "u",
+          "partial": 0,
+          "columns": [
+            {
+              "seqno": 0,
+              "cid": 0,
+              "name": "path_id"
+            },
+            {
+              "seqno": 1,
+              "cid": 1,
+              "name": "run_id"
+            },
+            {
+              "seqno": 2,
+              "cid": 2,
+              "name": "project_id"
+            }
+          ],
+          "sql": null
+        },
+        {
+          "seq": 4,
+          "name": "sqlite_autoindex_call_paths_2",
+          "unique": 1,
+          "origin": "u",
+          "partial": 0,
+          "columns": [
+            {
+              "seqno": 0,
+              "cid": 1,
+              "name": "run_id"
+            },
+            {
+              "seqno": 1,
+              "cid": 3,
+              "name": "path_hash"
+            }
+          ],
+          "sql": null
+        },
+        {
+          "seq": 5,
+          "name": "sqlite_autoindex_call_paths_1",
+          "unique": 1,
+          "origin": "pk",
+          "partial": 0,
+          "columns": [
+            {
+              "seqno": 0,
+              "cid": 0,
+              "name": "path_id"
+            }
+          ],
+          "sql": null
+        }
+      ],
+      "triggers": []
+    },
+    {
+      "name": "credential_cleanup",
+      "sql": "CREATE TABLE credential_cleanup (\n  secret_ref TEXT PRIMARY KEY, created_at TEXT NOT NULL\n) STRICT",
+      "columns": [
+        {
+          "cid": 0,
+          "name": "secret_ref",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 1
+        },
+        {
+          "cid": 1,
+          "name": "created_at",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        }
+      ],
+      "foreignKeys": [],
+      "indexes": [
+        {
+          "seq": 0,
+          "name": "sqlite_autoindex_credential_cleanup_1",
+          "unique": 1,
+          "origin": "pk",
+          "partial": 0,
+          "columns": [
+            {
+              "seqno": 0,
+              "cid": 0,
+              "name": "secret_ref"
+            }
+          ],
+          "sql": null
+        }
+      ],
+      "triggers": []
+    },
+    {
+      "name": "disclosure_grants",
+      "sql": "CREATE TABLE disclosure_grants (\n  scope_key TEXT PRIMARY KEY, project_id TEXT NOT NULL, snapshot_id TEXT NOT NULL,\n  scope_json TEXT NOT NULL CHECK(json_valid(scope_json)), confirmed_at TEXT NOT NULL,\n  FOREIGN KEY(snapshot_id,project_id) REFERENCES source_snapshots(snapshot_id,project_id)\n) STRICT",
+      "columns": [
+        {
+          "cid": 0,
+          "name": "scope_key",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 1
+        },
+        {
+          "cid": 1,
+          "name": "project_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 2,
+          "name": "snapshot_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 3,
+          "name": "scope_json",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 4,
+          "name": "confirmed_at",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        }
+      ],
+      "foreignKeys": [
+        {
+          "id": 0,
+          "seq": 0,
+          "table": "source_snapshots",
+          "from": "snapshot_id",
+          "to": "snapshot_id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION",
+          "match": "NONE"
+        },
+        {
+          "id": 0,
+          "seq": 1,
+          "table": "source_snapshots",
+          "from": "project_id",
+          "to": "project_id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION",
+          "match": "NONE"
+        }
+      ],
+      "indexes": [
+        {
+          "seq": 0,
+          "name": "sqlite_autoindex_disclosure_grants_1",
+          "unique": 1,
+          "origin": "pk",
+          "partial": 0,
+          "columns": [
+            {
+              "seqno": 0,
+              "cid": 0,
+              "name": "scope_key"
+            }
+          ],
+          "sql": null
+        }
+      ],
+      "triggers": [
+        {
+          "name": "immutable_disclosure_grants_delete",
+          "sql": "CREATE TRIGGER immutable_disclosure_grants_delete BEFORE DELETE ON disclosure_grants\n     BEGIN SELECT RAISE(ABORT,'immutable source record'); END"
+        },
+        {
+          "name": "immutable_disclosure_grants_update",
+          "sql": "CREATE TRIGGER immutable_disclosure_grants_update BEFORE UPDATE ON disclosure_grants\n     BEGIN SELECT RAISE(ABORT,'immutable source record'); END"
+        }
+      ]
+    },
+    {
+      "name": "model_configs",
+      "sql": "CREATE TABLE model_configs (\n  id TEXT PRIMARY KEY, name TEXT NOT NULL, base_url TEXT NOT NULL,\n  model_id TEXT NOT NULL, secret_ref TEXT, revision INTEGER NOT NULL CHECK(revision > 0)\n, api TEXT NOT NULL DEFAULT 'openai-completions'\n  CHECK(api = 'openai-completions'), created_at TEXT NOT NULL DEFAULT '', updated_at TEXT NOT NULL DEFAULT '') STRICT",
+      "columns": [
+        {
+          "cid": 0,
+          "name": "id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 1
+        },
+        {
+          "cid": 1,
+          "name": "name",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 2,
+          "name": "base_url",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 3,
+          "name": "model_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 4,
+          "name": "secret_ref",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 5,
+          "name": "revision",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 6,
+          "name": "api",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": "'openai-completions'",
+          "pk": 0
+        },
+        {
+          "cid": 7,
+          "name": "created_at",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": "''",
+          "pk": 0
+        },
+        {
+          "cid": 8,
+          "name": "updated_at",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": "''",
+          "pk": 0
+        }
+      ],
+      "foreignKeys": [],
+      "indexes": [
+        {
+          "seq": 0,
+          "name": "idx_models_secret_ref",
+          "unique": 1,
+          "origin": "c",
+          "partial": 1,
+          "columns": [
+            {
+              "seqno": 0,
+              "cid": 4,
+              "name": "secret_ref"
+            }
+          ],
+          "sql": "CREATE UNIQUE INDEX idx_models_secret_ref ON model_configs(secret_ref) WHERE secret_ref IS NOT NULL"
+        },
+        {
+          "seq": 1,
+          "name": "sqlite_autoindex_model_configs_1",
+          "unique": 1,
+          "origin": "pk",
+          "partial": 0,
+          "columns": [
+            {
+              "seqno": 0,
+              "cid": 0,
+              "name": "id"
+            }
+          ],
+          "sql": null
+        }
+      ],
+      "triggers": []
+    },
+    {
+      "name": "model_requests",
+      "sql": "CREATE TABLE model_requests (\n request_id TEXT PRIMARY KEY,journey_id TEXT,path_id TEXT NOT NULL,run_id TEXT NOT NULL,project_id TEXT NOT NULL,\n epoch INTEGER,attempt INTEGER,state TEXT NOT NULL CHECK(state IN ('authorized','started','received','uncertain')),\n usage_json TEXT CHECK(usage_json IS NULL OR json_valid(usage_json)),started_at TEXT NOT NULL,finished_at TEXT,\n scope_key TEXT REFERENCES disclosure_grants(scope_key),config_id TEXT,revision INTEGER,base_url TEXT,model_id TEXT,observed_model_id TEXT,\n FOREIGN KEY(path_id,run_id,project_id) REFERENCES call_paths(path_id,run_id,project_id)\n) STRICT",
+      "columns": [
+        {
+          "cid": 0,
+          "name": "request_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 1
+        },
+        {
+          "cid": 1,
+          "name": "journey_id",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 2,
+          "name": "path_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 3,
+          "name": "run_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 4,
+          "name": "project_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 5,
+          "name": "epoch",
+          "type": "INTEGER",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 6,
+          "name": "attempt",
+          "type": "INTEGER",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 7,
+          "name": "state",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 8,
+          "name": "usage_json",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 9,
+          "name": "started_at",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 10,
+          "name": "finished_at",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 11,
+          "name": "scope_key",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 12,
+          "name": "config_id",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 13,
+          "name": "revision",
+          "type": "INTEGER",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 14,
+          "name": "base_url",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 15,
+          "name": "model_id",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 16,
+          "name": "observed_model_id",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        }
+      ],
+      "foreignKeys": [
+        {
+          "id": 0,
+          "seq": 0,
+          "table": "call_paths",
+          "from": "path_id",
+          "to": "path_id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION",
+          "match": "NONE"
+        },
+        {
+          "id": 0,
+          "seq": 1,
+          "table": "call_paths",
+          "from": "run_id",
+          "to": "run_id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION",
+          "match": "NONE"
+        },
+        {
+          "id": 0,
+          "seq": 2,
+          "table": "call_paths",
+          "from": "project_id",
+          "to": "project_id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION",
+          "match": "NONE"
+        },
+        {
+          "id": 1,
+          "seq": 0,
+          "table": "disclosure_grants",
+          "from": "scope_key",
+          "to": "scope_key",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION",
+          "match": "NONE"
+        }
+      ],
+      "indexes": [
+        {
+          "seq": 0,
+          "name": "idx_model_requests_run",
+          "unique": 0,
+          "origin": "c",
+          "partial": 0,
+          "columns": [
+            {
+              "seqno": 0,
+              "cid": 3,
+              "name": "run_id"
+            },
+            {
+              "seqno": 1,
+              "cid": 2,
+              "name": "path_id"
+            }
+          ],
+          "sql": "CREATE INDEX idx_model_requests_run ON model_requests(run_id,path_id)"
+        },
+        {
+          "seq": 1,
+          "name": "idx_model_requests_journey",
+          "unique": 0,
+          "origin": "c",
+          "partial": 0,
+          "columns": [
+            {
+              "seqno": 0,
+              "cid": 1,
+              "name": "journey_id"
+            },
+            {
+              "seqno": 1,
+              "cid": 7,
+              "name": "state"
+            }
+          ],
+          "sql": "CREATE INDEX idx_model_requests_journey ON model_requests(journey_id,state)"
+        },
+        {
+          "seq": 2,
+          "name": "sqlite_autoindex_model_requests_1",
+          "unique": 1,
+          "origin": "pk",
+          "partial": 0,
+          "columns": [
+            {
+              "seqno": 0,
+              "cid": 0,
+              "name": "request_id"
+            }
+          ],
+          "sql": null
+        }
+      ],
+      "triggers": []
+    },
+    {
+      "name": "model_selection",
+      "sql": "CREATE TABLE model_selection (\n  slot INTEGER PRIMARY KEY CHECK(slot=1),\n  config_id TEXT REFERENCES model_configs(id),\n  revision INTEGER NOT NULL CHECK(revision>=0)\n) STRICT",
+      "columns": [
+        {
+          "cid": 0,
+          "name": "slot",
+          "type": "INTEGER",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 1
+        },
+        {
+          "cid": 1,
+          "name": "config_id",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 2,
+          "name": "revision",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        }
+      ],
+      "foreignKeys": [
+        {
+          "id": 0,
+          "seq": 0,
+          "table": "model_configs",
+          "from": "config_id",
+          "to": "id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION",
+          "match": "NONE"
+        }
+      ],
+      "indexes": [],
+      "triggers": []
+    },
+    {
+      "name": "path_recovery",
+      "sql": "CREATE TABLE path_recovery (\n path_id TEXT PRIMARY KEY, run_id TEXT NOT NULL, project_id TEXT NOT NULL,\n journey_id TEXT NOT NULL, epoch INTEGER NOT NULL CHECK(epoch>0), attempt INTEGER NOT NULL,\n binding_json TEXT NOT NULL CHECK(json_valid(binding_json)), binding_hash TEXT NOT NULL,\n limits_json TEXT NOT NULL DEFAULT 'null' CHECK(json_valid(limits_json)),\n state TEXT NOT NULL CHECK(state IN ('running','stopped','interrupted','completed','failed')),\n requests INTEGER NOT NULL DEFAULT 0, tools INTEGER NOT NULL DEFAULT 0, rounds INTEGER NOT NULL DEFAULT 0,\n receipt_json TEXT NOT NULL DEFAULT 'null' CHECK(json_valid(receipt_json)),\n pi_session_id TEXT, session_file TEXT, updated_at TEXT NOT NULL,\n FOREIGN KEY(path_id,run_id,project_id) REFERENCES call_paths(path_id,run_id,project_id)\n) STRICT",
+      "columns": [
+        {
+          "cid": 0,
+          "name": "path_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 1
+        },
+        {
+          "cid": 1,
+          "name": "run_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 2,
+          "name": "project_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 3,
+          "name": "journey_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 4,
+          "name": "epoch",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 5,
+          "name": "attempt",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 6,
+          "name": "binding_json",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 7,
+          "name": "binding_hash",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 8,
+          "name": "limits_json",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": "'null'",
+          "pk": 0
+        },
+        {
+          "cid": 9,
+          "name": "state",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 10,
+          "name": "requests",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": "0",
+          "pk": 0
+        },
+        {
+          "cid": 11,
+          "name": "tools",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": "0",
+          "pk": 0
+        },
+        {
+          "cid": 12,
+          "name": "rounds",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": "0",
+          "pk": 0
+        },
+        {
+          "cid": 13,
+          "name": "receipt_json",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": "'null'",
+          "pk": 0
+        },
+        {
+          "cid": 14,
+          "name": "pi_session_id",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 15,
+          "name": "session_file",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 16,
+          "name": "updated_at",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        }
+      ],
+      "foreignKeys": [
+        {
+          "id": 0,
+          "seq": 0,
+          "table": "call_paths",
+          "from": "path_id",
+          "to": "path_id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION",
+          "match": "NONE"
+        },
+        {
+          "id": 0,
+          "seq": 1,
+          "table": "call_paths",
+          "from": "run_id",
+          "to": "run_id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION",
+          "match": "NONE"
+        },
+        {
+          "id": 0,
+          "seq": 2,
+          "table": "call_paths",
+          "from": "project_id",
+          "to": "project_id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION",
+          "match": "NONE"
+        }
+      ],
+      "indexes": [
+        {
+          "seq": 0,
+          "name": "sqlite_autoindex_path_recovery_1",
+          "unique": 1,
+          "origin": "pk",
+          "partial": 0,
+          "columns": [
+            {
+              "seqno": 0,
+              "cid": 0,
+              "name": "path_id"
+            }
+          ],
+          "sql": null
+        }
+      ],
+      "triggers": []
+    },
+    {
+      "name": "path_review_versions",
+      "sql": "CREATE TABLE path_review_versions (\n project_id TEXT NOT NULL, run_id TEXT NOT NULL, path_id TEXT NOT NULL,\n revision INTEGER NOT NULL CHECK(revision>0),\n status TEXT NOT NULL CHECK(status IN ('unreviewed','confirmed','false_positive','needs_more_info')),\n note TEXT NOT NULL CHECK(length(note)<=6000),\n baseline_json TEXT NOT NULL CHECK(json_valid(baseline_json)), saved_at TEXT NOT NULL,\n PRIMARY KEY(project_id,run_id,path_id,revision),\n FOREIGN KEY(path_id,run_id,project_id) REFERENCES call_paths(path_id,run_id,project_id)\n) STRICT",
+      "columns": [
+        {
+          "cid": 0,
+          "name": "project_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 1
+        },
+        {
+          "cid": 1,
+          "name": "run_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 2
+        },
+        {
+          "cid": 2,
+          "name": "path_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 3
+        },
+        {
+          "cid": 3,
+          "name": "revision",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 4
+        },
+        {
+          "cid": 4,
+          "name": "status",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 5,
+          "name": "note",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 6,
+          "name": "baseline_json",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 7,
+          "name": "saved_at",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        }
+      ],
+      "foreignKeys": [
+        {
+          "id": 0,
+          "seq": 0,
+          "table": "call_paths",
+          "from": "path_id",
+          "to": "path_id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION",
+          "match": "NONE"
+        },
+        {
+          "id": 0,
+          "seq": 1,
+          "table": "call_paths",
+          "from": "run_id",
+          "to": "run_id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION",
+          "match": "NONE"
+        },
+        {
+          "id": 0,
+          "seq": 2,
+          "table": "call_paths",
+          "from": "project_id",
+          "to": "project_id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION",
+          "match": "NONE"
+        }
+      ],
+      "indexes": [
+        {
+          "seq": 0,
+          "name": "sqlite_autoindex_path_review_versions_1",
+          "unique": 1,
+          "origin": "pk",
+          "partial": 0,
+          "columns": [
+            {
+              "seqno": 0,
+              "cid": 0,
+              "name": "project_id"
+            },
+            {
+              "seqno": 1,
+              "cid": 1,
+              "name": "run_id"
+            },
+            {
+              "seqno": 2,
+              "cid": 2,
+              "name": "path_id"
+            },
+            {
+              "seqno": 3,
+              "cid": 3,
+              "name": "revision"
+            }
+          ],
+          "sql": null
+        }
+      ],
+      "triggers": [
+        {
+          "name": "immutable_path_review_versions_delete",
+          "sql": "CREATE TRIGGER immutable_path_review_versions_delete BEFORE DELETE ON path_review_versions\n BEGIN SELECT RAISE(ABORT,'review versions are immutable'); END"
+        },
+        {
+          "name": "immutable_path_review_versions_update",
+          "sql": "CREATE TRIGGER immutable_path_review_versions_update BEFORE UPDATE ON path_review_versions\n BEGIN SELECT RAISE(ABORT,'review versions are immutable'); END"
+        }
+      ]
+    },
+    {
+      "name": "path_steps",
+      "sql": "CREATE TABLE path_steps (\n  path_id TEXT NOT NULL, step_index INTEGER NOT NULL CHECK(step_index >= 0),\n  edge_uid TEXT NOT NULL, run_id TEXT NOT NULL, project_id TEXT NOT NULL, dangerous INTEGER CHECK(dangerous IN (0,1)), taint_in_json TEXT NOT NULL DEFAULT '[]'\n  CHECK(json_valid(taint_in_json) AND json_type(taint_in_json)='array'), taint_out_json TEXT NOT NULL DEFAULT '[]'\n  CHECK(json_valid(taint_out_json) AND json_type(taint_out_json)='array'), evidence_json TEXT NOT NULL DEFAULT '[]'\n  CHECK(json_valid(evidence_json) AND json_type(evidence_json)='array'), defense_summary TEXT NOT NULL DEFAULT '', propagation_json TEXT NOT NULL DEFAULT '{}' CHECK(json_valid(propagation_json)),\n  PRIMARY KEY(path_id, step_index),\n  FOREIGN KEY(path_id, run_id, project_id) REFERENCES call_paths(path_id, run_id, project_id),\n  FOREIGN KEY(edge_uid, run_id, project_id) REFERENCES call_edges(uid, run_id, project_id)\n) STRICT",
+      "columns": [
+        {
+          "cid": 0,
+          "name": "path_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 1
+        },
+        {
+          "cid": 1,
+          "name": "step_index",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 2
+        },
+        {
+          "cid": 2,
+          "name": "edge_uid",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 3,
+          "name": "run_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 4,
+          "name": "project_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 5,
+          "name": "dangerous",
+          "type": "INTEGER",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 6,
+          "name": "taint_in_json",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": "'[]'",
+          "pk": 0
+        },
+        {
+          "cid": 7,
+          "name": "taint_out_json",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": "'[]'",
+          "pk": 0
+        },
+        {
+          "cid": 8,
+          "name": "evidence_json",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": "'[]'",
+          "pk": 0
+        },
+        {
+          "cid": 9,
+          "name": "defense_summary",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": "''",
+          "pk": 0
+        },
+        {
+          "cid": 10,
+          "name": "propagation_json",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": "'{}'",
+          "pk": 0
+        }
+      ],
+      "foreignKeys": [
+        {
+          "id": 0,
+          "seq": 0,
+          "table": "call_edges",
+          "from": "edge_uid",
+          "to": "uid",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION",
+          "match": "NONE"
+        },
+        {
+          "id": 0,
+          "seq": 1,
+          "table": "call_edges",
+          "from": "run_id",
+          "to": "run_id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION",
+          "match": "NONE"
+        },
+        {
+          "id": 0,
+          "seq": 2,
+          "table": "call_edges",
+          "from": "project_id",
+          "to": "project_id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION",
+          "match": "NONE"
+        },
+        {
+          "id": 1,
+          "seq": 0,
+          "table": "call_paths",
+          "from": "path_id",
+          "to": "path_id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION",
+          "match": "NONE"
+        },
+        {
+          "id": 1,
+          "seq": 1,
+          "table": "call_paths",
+          "from": "run_id",
+          "to": "run_id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION",
+          "match": "NONE"
+        },
+        {
+          "id": 1,
+          "seq": 2,
+          "table": "call_paths",
+          "from": "project_id",
+          "to": "project_id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION",
+          "match": "NONE"
+        }
+      ],
+      "indexes": [
+        {
+          "seq": 0,
+          "name": "idx_steps_edge",
+          "unique": 0,
+          "origin": "c",
+          "partial": 0,
+          "columns": [
+            {
+              "seqno": 0,
+              "cid": 2,
+              "name": "edge_uid"
+            },
+            {
+              "seqno": 1,
+              "cid": 3,
+              "name": "run_id"
+            },
+            {
+              "seqno": 2,
+              "cid": 4,
+              "name": "project_id"
+            }
+          ],
+          "sql": "CREATE INDEX idx_steps_edge ON path_steps(edge_uid, run_id, project_id)"
+        },
+        {
+          "seq": 1,
+          "name": "sqlite_autoindex_path_steps_1",
+          "unique": 1,
+          "origin": "pk",
+          "partial": 0,
+          "columns": [
+            {
+              "seqno": 0,
+              "cid": 0,
+              "name": "path_id"
+            },
+            {
+              "seqno": 1,
+              "cid": 1,
+              "name": "step_index"
+            }
+          ],
+          "sql": null
+        }
+      ],
+      "triggers": []
+    },
+    {
+      "name": "projects",
+      "sql": "CREATE TABLE projects (\n  id TEXT PRIMARY KEY, name TEXT NOT NULL CHECK(length(trim(name)) > 0),\n  path TEXT NOT NULL, source_type TEXT NOT NULL CHECK(source_type IN ('local','git')),\n  created_at TEXT NOT NULL, updated_at TEXT NOT NULL\n, git_url TEXT, git_commit TEXT, git_dirty INTEGER CHECK(git_dirty IN (0,1)), revision INTEGER NOT NULL DEFAULT 1 CHECK(revision > 0), source_key TEXT, source_stamp TEXT, file_count INTEGER CHECK(file_count>0), total_bytes INTEGER CHECK(total_bytes>=0), registered_at TEXT, review_json TEXT CHECK(review_json IS NULL OR json_valid(review_json))) STRICT",
+      "columns": [
+        {
+          "cid": 0,
+          "name": "id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 1
+        },
+        {
+          "cid": 1,
+          "name": "name",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 2,
+          "name": "path",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 3,
+          "name": "source_type",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 4,
+          "name": "created_at",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 5,
+          "name": "updated_at",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 6,
+          "name": "git_url",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 7,
+          "name": "git_commit",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 8,
+          "name": "git_dirty",
+          "type": "INTEGER",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 9,
+          "name": "revision",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": "1",
+          "pk": 0
+        },
+        {
+          "cid": 10,
+          "name": "source_key",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 11,
+          "name": "source_stamp",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 12,
+          "name": "file_count",
+          "type": "INTEGER",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 13,
+          "name": "total_bytes",
+          "type": "INTEGER",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 14,
+          "name": "registered_at",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 15,
+          "name": "review_json",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        }
+      ],
+      "foreignKeys": [],
+      "indexes": [
+        {
+          "seq": 0,
+          "name": "idx_projects_source",
+          "unique": 0,
+          "origin": "c",
+          "partial": 1,
+          "columns": [
+            {
+              "seqno": 0,
+              "cid": 10,
+              "name": "source_key"
+            },
+            {
+              "seqno": 1,
+              "cid": 14,
+              "name": "registered_at"
+            }
+          ],
+          "sql": "CREATE INDEX idx_projects_source ON projects(source_key,registered_at) WHERE source_key IS NOT NULL"
+        },
+        {
+          "seq": 1,
+          "name": "sqlite_autoindex_projects_1",
+          "unique": 1,
+          "origin": "pk",
+          "partial": 0,
+          "columns": [
+            {
+              "seqno": 0,
+              "cid": 0,
+              "name": "id"
+            }
+          ],
+          "sql": null
+        }
+      ],
+      "triggers": [
+        {
+          "name": "validate_git_project_insert",
+          "sql": "CREATE TRIGGER validate_git_project_insert BEFORE INSERT ON projects\nWHEN NEW.source_type='git' AND (NEW.git_url IS NULL OR NEW.git_url='' OR\n NEW.git_commit IS NULL OR length(NEW.git_commit) NOT IN (40,64) OR NEW.git_dirty IS NULL)\nBEGIN SELECT RAISE(ABORT,'git metadata required'); END"
+        },
+        {
+          "name": "validate_git_project_update",
+          "sql": "CREATE TRIGGER validate_git_project_update BEFORE UPDATE OF source_type,git_url,git_commit,git_dirty ON projects\nWHEN NEW.source_type='git' AND (NEW.git_url IS NULL OR NEW.git_url='' OR\n NEW.git_commit IS NULL OR length(NEW.git_commit) NOT IN (40,64) OR NEW.git_dirty IS NULL)\nBEGIN SELECT RAISE(ABORT,'git metadata required'); END"
+        }
+      ]
+    },
+    {
+      "name": "recovery_checkpoints",
+      "sql": "CREATE TABLE recovery_checkpoints (\n checkpoint_id TEXT PRIMARY KEY, path_id TEXT NOT NULL, run_id TEXT NOT NULL, project_id TEXT NOT NULL,\n journey_id TEXT NOT NULL, epoch INTEGER NOT NULL, attempt INTEGER NOT NULL,\n binding_hash TEXT NOT NULL, pi_session_id TEXT NOT NULL, leaf_id TEXT NOT NULL,\n file_name TEXT NOT NULL UNIQUE, sha256 TEXT NOT NULL, size INTEGER NOT NULL,\n host_json TEXT NOT NULL CHECK(json_valid(host_json)), created_at TEXT NOT NULL,\n FOREIGN KEY(path_id,run_id,project_id) REFERENCES call_paths(path_id,run_id,project_id)\n) STRICT",
+      "columns": [
+        {
+          "cid": 0,
+          "name": "checkpoint_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 1
+        },
+        {
+          "cid": 1,
+          "name": "path_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 2,
+          "name": "run_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 3,
+          "name": "project_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 4,
+          "name": "journey_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 5,
+          "name": "epoch",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 6,
+          "name": "attempt",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 7,
+          "name": "binding_hash",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 8,
+          "name": "pi_session_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 9,
+          "name": "leaf_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 10,
+          "name": "file_name",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 11,
+          "name": "sha256",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 12,
+          "name": "size",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 13,
+          "name": "host_json",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 14,
+          "name": "created_at",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        }
+      ],
+      "foreignKeys": [
+        {
+          "id": 0,
+          "seq": 0,
+          "table": "call_paths",
+          "from": "path_id",
+          "to": "path_id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION",
+          "match": "NONE"
+        },
+        {
+          "id": 0,
+          "seq": 1,
+          "table": "call_paths",
+          "from": "run_id",
+          "to": "run_id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION",
+          "match": "NONE"
+        },
+        {
+          "id": 0,
+          "seq": 2,
+          "table": "call_paths",
+          "from": "project_id",
+          "to": "project_id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION",
+          "match": "NONE"
+        }
+      ],
+      "indexes": [
+        {
+          "seq": 0,
+          "name": "idx_recovery_checkpoints_path",
+          "unique": 0,
+          "origin": "c",
+          "partial": 0,
+          "columns": [
+            {
+              "seqno": 0,
+              "cid": 1,
+              "name": "path_id"
+            },
+            {
+              "seqno": 1,
+              "cid": 14,
+              "name": "created_at"
+            }
+          ],
+          "sql": "CREATE INDEX idx_recovery_checkpoints_path ON recovery_checkpoints(path_id,created_at)"
+        },
+        {
+          "seq": 1,
+          "name": "sqlite_autoindex_recovery_checkpoints_2",
+          "unique": 1,
+          "origin": "u",
+          "partial": 0,
+          "columns": [
+            {
+              "seqno": 0,
+              "cid": 10,
+              "name": "file_name"
+            }
+          ],
+          "sql": null
+        },
+        {
+          "seq": 2,
+          "name": "sqlite_autoindex_recovery_checkpoints_1",
+          "unique": 1,
+          "origin": "pk",
+          "partial": 0,
+          "columns": [
+            {
+              "seqno": 0,
+              "cid": 0,
+              "name": "checkpoint_id"
+            }
+          ],
+          "sql": null
+        }
+      ],
+      "triggers": [
+        {
+          "name": "immutable_recovery_checkpoints_delete",
+          "sql": "CREATE TRIGGER immutable_recovery_checkpoints_delete BEFORE DELETE ON recovery_checkpoints BEGIN SELECT RAISE(ABORT,'checkpoints are immutable'); END"
+        },
+        {
+          "name": "immutable_recovery_checkpoints_update",
+          "sql": "CREATE TRIGGER immutable_recovery_checkpoints_update BEFORE UPDATE ON recovery_checkpoints BEGIN SELECT RAISE(ABORT,'checkpoints are immutable'); END"
+        }
+      ]
+    },
+    {
+      "name": "reports",
+      "sql": "CREATE TABLE reports (\n  id TEXT PRIMARY KEY, run_id TEXT NOT NULL, project_id TEXT NOT NULL,\n  file_path TEXT NOT NULL, status TEXT NOT NULL CHECK(status IN ('pending','ready','failed')),\n  summary TEXT NOT NULL, created_at TEXT NOT NULL, summary_json TEXT NOT NULL DEFAULT '{}' CHECK(json_valid(summary_json)), generated_at TEXT, error_message TEXT, format TEXT NOT NULL DEFAULT 'html' CHECK(format IN ('html','json')), filter_json TEXT NOT NULL DEFAULT '{\"verdict\":\"all\",\"pathStatus\":\"all\",\"reviewStatus\":\"all\"}' CHECK(json_valid(filter_json)),\n  FOREIGN KEY(run_id, project_id) REFERENCES audit_runs(id, project_id)\n) STRICT",
+      "columns": [
+        {
+          "cid": 0,
+          "name": "id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 1
+        },
+        {
+          "cid": 1,
+          "name": "run_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 2,
+          "name": "project_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 3,
+          "name": "file_path",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 4,
+          "name": "status",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 5,
+          "name": "summary",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 6,
+          "name": "created_at",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 7,
+          "name": "summary_json",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": "'{}'",
+          "pk": 0
+        },
+        {
+          "cid": 8,
+          "name": "generated_at",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 9,
+          "name": "error_message",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 10,
+          "name": "format",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": "'html'",
+          "pk": 0
+        },
+        {
+          "cid": 11,
+          "name": "filter_json",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": "'{\"verdict\":\"all\",\"pathStatus\":\"all\",\"reviewStatus\":\"all\"}'",
+          "pk": 0
+        }
+      ],
+      "foreignKeys": [
+        {
+          "id": 0,
+          "seq": 0,
+          "table": "audit_runs",
+          "from": "run_id",
+          "to": "id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION",
+          "match": "NONE"
+        },
+        {
+          "id": 0,
+          "seq": 1,
+          "table": "audit_runs",
+          "from": "project_id",
+          "to": "project_id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION",
+          "match": "NONE"
+        }
+      ],
+      "indexes": [
+        {
+          "seq": 0,
+          "name": "idx_reports_run",
+          "unique": 0,
+          "origin": "c",
+          "partial": 0,
+          "columns": [
+            {
+              "seqno": 0,
+              "cid": 1,
+              "name": "run_id"
+            },
+            {
+              "seqno": 1,
+              "cid": 2,
+              "name": "project_id"
+            }
+          ],
+          "sql": "CREATE INDEX idx_reports_run ON reports(run_id, project_id)"
+        },
+        {
+          "seq": 1,
+          "name": "sqlite_autoindex_reports_1",
+          "unique": 1,
+          "origin": "pk",
+          "partial": 0,
+          "columns": [
+            {
+              "seqno": 0,
+              "cid": 0,
+              "name": "id"
+            }
+          ],
+          "sql": null
+        }
+      ],
+      "triggers": []
+    },
+    {
+      "name": "schema_migrations",
+      "sql": "CREATE TABLE schema_migrations (\n      version INTEGER PRIMARY KEY, name TEXT NOT NULL, checksum TEXT NOT NULL, applied_at TEXT NOT NULL\n    ) STRICT",
+      "columns": [
+        {
+          "cid": 0,
+          "name": "version",
+          "type": "INTEGER",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 1
+        },
+        {
+          "cid": 1,
+          "name": "name",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 2,
+          "name": "checksum",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 3,
+          "name": "applied_at",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        }
+      ],
+      "foreignKeys": [],
+      "indexes": [],
+      "triggers": []
+    },
+    {
+      "name": "snapshot_files",
+      "sql": "CREATE TABLE snapshot_files (\n  snapshot_id TEXT NOT NULL REFERENCES source_snapshots(snapshot_id),\n  file_path TEXT NOT NULL, sha256 TEXT NOT NULL CHECK(length(sha256)=64),\n  content BLOB NOT NULL, PRIMARY KEY(snapshot_id,file_path)\n) STRICT",
+      "columns": [
+        {
+          "cid": 0,
+          "name": "snapshot_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 1
+        },
+        {
+          "cid": 1,
+          "name": "file_path",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 2
+        },
+        {
+          "cid": 2,
+          "name": "sha256",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 3,
+          "name": "content",
+          "type": "BLOB",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        }
+      ],
+      "foreignKeys": [
+        {
+          "id": 0,
+          "seq": 0,
+          "table": "source_snapshots",
+          "from": "snapshot_id",
+          "to": "snapshot_id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION",
+          "match": "NONE"
+        }
+      ],
+      "indexes": [
+        {
+          "seq": 0,
+          "name": "sqlite_autoindex_snapshot_files_1",
+          "unique": 1,
+          "origin": "pk",
+          "partial": 0,
+          "columns": [
+            {
+              "seqno": 0,
+              "cid": 0,
+              "name": "snapshot_id"
+            },
+            {
+              "seqno": 1,
+              "cid": 1,
+              "name": "file_path"
+            }
+          ],
+          "sql": null
+        }
+      ],
+      "triggers": [
+        {
+          "name": "immutable_snapshot_files_delete",
+          "sql": "CREATE TRIGGER immutable_snapshot_files_delete BEFORE DELETE ON snapshot_files\n     BEGIN SELECT RAISE(ABORT,'immutable source record'); END"
+        },
+        {
+          "name": "immutable_snapshot_files_update",
+          "sql": "CREATE TRIGGER immutable_snapshot_files_update BEFORE UPDATE ON snapshot_files\n     BEGIN SELECT RAISE(ABORT,'immutable source record'); END"
+        }
+      ]
+    },
+    {
+      "name": "source_snapshots",
+      "sql": "CREATE TABLE source_snapshots (\n  snapshot_id TEXT PRIMARY KEY, project_id TEXT NOT NULL REFERENCES projects(id),\n  source_stamp TEXT NOT NULL, manifest_json TEXT NOT NULL CHECK(json_valid(manifest_json)),\n  ignored_json TEXT NOT NULL CHECK(json_valid(ignored_json)),\n  source_commit TEXT, created_at TEXT NOT NULL,\n  UNIQUE(project_id,source_stamp), UNIQUE(snapshot_id,project_id)\n) STRICT",
+      "columns": [
+        {
+          "cid": 0,
+          "name": "snapshot_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 1
+        },
+        {
+          "cid": 1,
+          "name": "project_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 2,
+          "name": "source_stamp",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 3,
+          "name": "manifest_json",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 4,
+          "name": "ignored_json",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 5,
+          "name": "source_commit",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 6,
+          "name": "created_at",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        }
+      ],
+      "foreignKeys": [
+        {
+          "id": 0,
+          "seq": 0,
+          "table": "projects",
+          "from": "project_id",
+          "to": "id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION",
+          "match": "NONE"
+        }
+      ],
+      "indexes": [
+        {
+          "seq": 0,
+          "name": "sqlite_autoindex_source_snapshots_3",
+          "unique": 1,
+          "origin": "u",
+          "partial": 0,
+          "columns": [
+            {
+              "seqno": 0,
+              "cid": 0,
+              "name": "snapshot_id"
+            },
+            {
+              "seqno": 1,
+              "cid": 1,
+              "name": "project_id"
+            }
+          ],
+          "sql": null
+        },
+        {
+          "seq": 1,
+          "name": "sqlite_autoindex_source_snapshots_2",
+          "unique": 1,
+          "origin": "u",
+          "partial": 0,
+          "columns": [
+            {
+              "seqno": 0,
+              "cid": 1,
+              "name": "project_id"
+            },
+            {
+              "seqno": 1,
+              "cid": 2,
+              "name": "source_stamp"
+            }
+          ],
+          "sql": null
+        },
+        {
+          "seq": 2,
+          "name": "sqlite_autoindex_source_snapshots_1",
+          "unique": 1,
+          "origin": "pk",
+          "partial": 0,
+          "columns": [
+            {
+              "seqno": 0,
+              "cid": 0,
+              "name": "snapshot_id"
+            }
+          ],
+          "sql": null
+        }
+      ],
+      "triggers": [
+        {
+          "name": "immutable_source_snapshots_delete",
+          "sql": "CREATE TRIGGER immutable_source_snapshots_delete BEFORE DELETE ON source_snapshots\n     BEGIN SELECT RAISE(ABORT,'immutable source record'); END"
+        },
+        {
+          "name": "immutable_source_snapshots_update",
+          "sql": "CREATE TRIGGER immutable_source_snapshots_update BEFORE UPDATE ON source_snapshots\n     BEGIN SELECT RAISE(ABORT,'immutable source record'); END"
+        }
+      ]
+    },
+    {
+      "name": "tool_receipts",
+      "sql": "CREATE TABLE tool_receipts (\n journey_id TEXT NOT NULL,request_key TEXT NOT NULL,tool_name TEXT NOT NULL,step_index INTEGER,\n path_id TEXT NOT NULL,run_id TEXT NOT NULL,project_id TEXT NOT NULL,binding_hash TEXT NOT NULL,\n receipt_json TEXT NOT NULL CHECK(json_valid(receipt_json)),sha256 TEXT NOT NULL,epoch INTEGER,saved_at TEXT NOT NULL,\n PRIMARY KEY(journey_id,request_key),\n FOREIGN KEY(path_id,run_id,project_id) REFERENCES call_paths(path_id,run_id,project_id)\n) STRICT",
+      "columns": [
+        {
+          "cid": 0,
+          "name": "journey_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 1
+        },
+        {
+          "cid": 1,
+          "name": "request_key",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 2
+        },
+        {
+          "cid": 2,
+          "name": "tool_name",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 3,
+          "name": "step_index",
+          "type": "INTEGER",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 4,
+          "name": "path_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 5,
+          "name": "run_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 6,
+          "name": "project_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 7,
+          "name": "binding_hash",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 8,
+          "name": "receipt_json",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 9,
+          "name": "sha256",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 10,
+          "name": "epoch",
+          "type": "INTEGER",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 11,
+          "name": "saved_at",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        }
+      ],
+      "foreignKeys": [
+        {
+          "id": 0,
+          "seq": 0,
+          "table": "call_paths",
+          "from": "path_id",
+          "to": "path_id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION",
+          "match": "NONE"
+        },
+        {
+          "id": 0,
+          "seq": 1,
+          "table": "call_paths",
+          "from": "run_id",
+          "to": "run_id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION",
+          "match": "NONE"
+        },
+        {
+          "id": 0,
+          "seq": 2,
+          "table": "call_paths",
+          "from": "project_id",
+          "to": "project_id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION",
+          "match": "NONE"
+        }
+      ],
+      "indexes": [
+        {
+          "seq": 0,
+          "name": "sqlite_autoindex_tool_receipts_1",
+          "unique": 1,
+          "origin": "pk",
+          "partial": 0,
+          "columns": [
+            {
+              "seqno": 0,
+              "cid": 0,
+              "name": "journey_id"
+            },
+            {
+              "seqno": 1,
+              "cid": 1,
+              "name": "request_key"
+            }
+          ],
+          "sql": null
+        }
+      ],
+      "triggers": [
+        {
+          "name": "immutable_tool_receipts_delete",
+          "sql": "CREATE TRIGGER immutable_tool_receipts_delete BEFORE DELETE ON tool_receipts BEGIN SELECT RAISE(ABORT,'tool receipts are immutable'); END"
+        },
+        {
+          "name": "immutable_tool_receipts_update",
+          "sql": "CREATE TRIGGER immutable_tool_receipts_update BEFORE UPDATE ON tool_receipts BEGIN SELECT RAISE(ABORT,'tool receipts are immutable'); END"
+        }
+      ]
+    }
+  ],
+  "migrations": [
+    {
+      "version": 1,
+      "name": "initial-storage",
+      "checksum": "f95883faa463a6e44a2abc403fbadc66b4be1305dfdefa340b2d084a5db01107"
+    },
+    {
+      "version": 2,
+      "name": "project-model-metadata",
+      "checksum": "57430f74ec6e00cdb8c803708af63c7592bb148c5c15c7f75b0bc84222f8c442"
+    },
+    {
+      "version": 3,
+      "name": "explicit-model-selection",
+      "checksum": "cfc2164c5b97e459a9e74a2bec8cd9bb745c14f84d9de90cbc7843d7f05ae99f"
+    },
+    {
+      "version": 4,
+      "name": "source-import-registration",
+      "checksum": "22f68d69fe46ea842cbaf15a39c2d6f4d84a3cfc121c438096bed10c43d7aa52"
+    },
+    {
+      "version": 5,
+      "name": "call-chain-graph-and-work-items",
+      "checksum": "6b20f53d15313e035d0a95635bd8d99eace4d13998be2053df9fd7a21bf36f6f"
+    },
+    {
+      "version": 6,
+      "name": "scan-progress-and-path-attempts",
+      "checksum": "d09d17a24fef65415f06fc8c4ee870268ccfd2f8cf3077ae271e43107555ef85"
+    },
+    {
+      "version": 7,
+      "name": "analysis-events-run-lifecycle-and-reports",
+      "checksum": "b8e6b8933b92e718aaf83f00930b40fe820d84aa4eab224d91088cdec0d8184a"
+    },
+    {
+      "version": 8,
+      "name": "taint-review-and-session-scoped-stream-events",
+      "checksum": "605679d0aa138b3f21ffcc2b8a02ba66482b7d18b8f376b912b5b4ebdee2ecc4"
+    },
+    {
+      "version": 9,
+      "name": "immutable-source-disclosure-and-manual-risks",
+      "checksum": "3cda3211641e578fdbc440dac50ff901c18a808f0523f82b8ff9aa3323afc6af"
+    },
+    {
+      "version": 10,
+      "name": "audit-knowledge-templates-and-project-review",
+      "checksum": "f0be1fc64d96d79ce872a89c88edfd2e899e898407401173b154cabc094b145c"
+    },
+    {
+      "version": 11,
+      "name": "human-review-versions-and-report-export",
+      "checksum": "c77c7041a75240162b8713a3dfc3ce52267dce45def2fc28f7e751b900f01e68"
+    },
+    {
+      "version": 12,
+      "name": "run-stop-and-evidence-verified-session-recovery",
+      "checksum": "2c24e378e60eab676113e62bff7fb2c2bc680238eeb3e291c1c4bb16e5845477"
+    },
+    {
+      "version": 13,
+      "name": "immutable-query-graph-bindings",
+      "checksum": "aec4d08d763ea6492b5798e01ad1fab8ce4c9c70d09fde1f0632c4f2735582c4"
+    },
+    {
+      "version": 14,
+      "name": "scoped-mcp-tool-receipts",
+      "checksum": "2c8d7225c23c67f76820adb96a5cca5d87ab612d8a8c8227ecbcfbc016faf2a0"
+    },
+    {
+      "version": 15,
+      "name": "consolidated-project-run-and-audit-records",
+      "checksum": "b216d69d10661313c515648bdaea8655e5d187e5781005978ffb74aaba75aca0"
+    }
+  ],
+  "foreignKeyCheck": [],
+  "quickCheck": {
+    "quick_check": "ok"
+  }
+}

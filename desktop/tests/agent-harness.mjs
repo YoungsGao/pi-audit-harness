@@ -27,7 +27,10 @@ export async function createAgentHarness(t, mode = 'continue', budgets = {}, mod
   const db = openStorage(join(root, 'runtime')),
     sources = new SourceRepository(db)
   const project = await importLocal(sources, { projectName: 'agent learning', path: source })
-  const query = new CodeQueryService(sources),
+  const query = new CodeQueryService(
+      sources,
+      mode === 'mcp' ? { dataRoot: join(root, 'runtime') } : {}
+    ),
     repo = new CallChainRepository(db),
     chains = new CallChainService(repo, query)
   const model = await createAgentModelFixture({ mode, ...modelOptions }),

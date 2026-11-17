@@ -57,6 +57,7 @@ export function renderSavedReport(snapshot: ReportSnapshot): string {
     <h2>固定源码快照与实际发送记录</h2>${snapshot.sourceSnapshot ? `<p>快照 ID：${e(snapshot.sourceSnapshot.snapshotId)}；文件数：${snapshot.sourceSnapshot.files.length}</p><details><summary>文件摘要与忽略范围</summary><pre>${e(JSON.stringify({ files: snapshot.sourceSnapshot.files, ignored: snapshot.sourceSnapshot.ignored }, null, 2))}</pre></details>` : '<p>历史任务没有固定源码快照。</p>'}
     <p>以下为请求前保存的实际配置及 SDK 返回的模型标识；请求失败可能未真正送达，未返回时不补造上游模型。</p><pre>${e(JSON.stringify(snapshot.transmissions, null, 2))}</pre>
     <h2>任务审计知识与项目补充要求</h2><p>保存状态：${e(snapshot.reviewConfig.state)}；材料摘要：${e(snapshot.reviewConfig.contextHash)}</p><p>自定义知识未经验证；补充提示不代表新增全部漏洞发现能力。</p><pre>${e(JSON.stringify(snapshot.reviewConfig, null, 2))}</pre>
+    <h2>MCP补证与独立静态发现</h2><p>仅汇总本次筛选路径的当前调查回执。调用关系和规则命中是候选信息，独立于机器风险统计；零命中、失败或不可用不证明安全。${snapshot.mcp?.truncated ? '回执超过500条，以下清单已明确截断。' : ''}</p><pre>${e(JSON.stringify(snapshot.mcp ?? { receipts: [], truncated: false }, null, 2))}</pre>
     <h2>分析摘要与统计快照</h2><p>已登记 ${stats.paths} 条路径；危险路径 ${stats.dangerous} 条，按 Sink/规则去重后的风险点 ${stats.riskPoints} 个。</p>
     <table><thead><tr><th>口径</th><th>数量</th></tr></thead><tbody>${[
       ['危险路径（不同 pathId）', stats.dangerous],

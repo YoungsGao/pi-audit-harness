@@ -12,6 +12,7 @@ import { CallChainRepository } from '../src/service/storage/call-chain-repositor
 import { CallChainService } from '../src/service/chains/service.ts'
 import { TemplateService } from '../src/service/rules/template-service.ts'
 import { TemplateRepository } from '../src/service/storage/template-repository.ts'
+import { builtinRules } from '../src/service/rules/builtin.ts'
 import {
   importTemplateDocument,
   parseTemplateDocument
@@ -93,7 +94,7 @@ test('TPL-02 create/edit validates document fields, persists immutable revisions
   const h = await fixture(t),
     repo = h.service.repository
   const initial = repo.catalog()
-  assert.equal(initial.templates.length, 5)
+  assert.equal(initial.templates.length, builtinRules.rules.length)
   const first = repo.save(draft)
   assert.equal(first.verification, 'unverified')
   assert.equal(isTemplateData('save', first), true)
@@ -159,7 +160,7 @@ test('TPL-03 imports scalar/block metadata, .md and Skill directory as inert pre
   assert.equal(isTemplateData('import', imported), true)
   assert.ok(imported.notices.some((n) => n.includes('不执行')))
   await assert.rejects(readFile(marker))
-  assert.equal(h.service.repository.catalog().total, 5) // 导入预览不等于保存。
+  assert.equal(h.service.repository.catalog().total, builtinRules.rules.length) // 导入预览不等于保存。
   const md = join(h.root, 'guide.md')
   await writeFile(md, '# 标题回退\n\n简介回退。\n\n## 检查内容')
   const plain = await importTemplateDocument({ path: md, kind: 'file' })
@@ -204,15 +205,17 @@ test('TPL-04 project requirements and selected revisions freeze with run creatio
     code: 'PROJECT_REVIEW_CONFLICT'
   })
   assert.equal(h.db.get('SELECT count(*) AS n FROM audit_runs').n, count)
-  assert.throws(() => h.db.exec('DELETE FROM run_review_configs'), { code: 'DB_QUERY_FAILED' })
+  assert.throws(() => h.db.exec('UPDATE audit_runs SET review_json=NULL'), {
+    code: 'DB_QUERY_FAILED'
+  })
   const other = openStorage(join(h.root, 'runtime'))
   try {
     assert.deepEqual(new TemplateRepository(other).run(id, run.runId), config)
   } finally {
     other.close()
   }
-  h.db.exec('DROP TRIGGER immutable_run_review_configs_update')
-  h.db.run("UPDATE run_review_configs SET context_hash='bad' WHERE run_id=?", run.runId)
+  h.db.exec('DROP TRIGGER frozen_run_inputs')
+  h.db.run("UPDATE audit_runs SET review_hash='bad' WHERE id=?", run.runId)
   assert.throws(() => repo.run(id, run.runId), { code: 'RUN_REVIEW_CORRUPT' })
 })
 test('TPL context is bounded, typed, authenticated and sent through strict main DTO; no SQL/arbitrary actions', async (t) => {

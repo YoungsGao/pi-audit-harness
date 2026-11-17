@@ -49,8 +49,8 @@ export class LocalDatabase implements SqlSession {
     this.ensureOpen()
     try {
       this.connection.exec(sql)
-    } catch {
-      throw new ApiError('DB_QUERY_FAILED', '数据库操作失败，请检查约束或锁状态')
+    } catch (error) {
+      throw queryError(error, '数据库操作失败，请检查约束或锁状态')
     }
   }
 
@@ -58,8 +58,8 @@ export class LocalDatabase implements SqlSession {
     this.ensureOpen()
     try {
       this.connection.prepare(sql).run(...params)
-    } catch {
-      throw new ApiError('DB_QUERY_FAILED', '数据库写入失败，请检查约束或锁状态')
+    } catch (error) {
+      throw queryError(error, '数据库写入失败，请检查约束或锁状态')
     }
   }
 
@@ -67,13 +67,18 @@ export class LocalDatabase implements SqlSession {
     this.ensureOpen()
     try {
       return this.connection.prepare(sql).all(...params)
-    } catch {
-      throw new ApiError('DB_QUERY_FAILED', '数据库查询失败')
+    } catch (error) {
+      throw queryError(error, '数据库查询失败')
     }
   }
 
   get(sql: string, ...params: SQLInputValue[]): Row | undefined {
-    return this.all(sql, ...params)[0]
+    this.ensureOpen()
+    try {
+      return this.connection.prepare(sql).get(...params)
+    } catch (error) {
+      throw queryError(error, '数据库查询失败')
+    }
   }
 
   transaction<T>(work: (session: SqlSession) => T): T {
@@ -130,4 +135,10 @@ export class LocalDatabase implements SqlSession {
     this.connection.close()
     this.closed = true
   }
+}
+
+function queryError(error: unknown, message: string): ApiError {
+  // SQLite primary result codes 5/6 are BUSY/LOCKED. Constraint and SQL errors are not transient.
+  const code = Number((error as { errcode?: number } | null)?.errcode) & 255
+  return new ApiError('DB_QUERY_FAILED', message, 500, code === 5 || code === 6)
 }

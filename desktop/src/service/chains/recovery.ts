@@ -30,6 +30,11 @@ import type { LoopLimits } from './agent-loop.ts'
 import { loadPiSdk } from '../pi-sdk.ts'
 import { containsKnownCredential, redactKnownCredentials } from '../../shared/redaction.ts'
 import { evidenceCards } from './evidence-citations.ts'
+import { MCP_PROFILE, mcpHash, mcpArgs, checkMcpOutput } from '../mcp/contracts.ts'
+import type { McpReceipt, McpArgs, McpOutput, McpToolName } from '../mcp/contracts.ts'
+import { STATIC_RULES_DIGEST } from '../mcp/static-scanner.ts'
+import { mcpSettingsHash } from '../mcp/settings.ts'
+import { AUDIT_PROMPT_VERSION } from './policy.ts'
 
 export const recoveryProtocol = 'audit-recovery/1;tool/1;validator/1;pi/1.2.0'
 export const digest = (v: unknown): string =>
@@ -47,6 +52,7 @@ export interface LoopCheckpoint {
   result: unknown
   repairs?: number
   networkRetries?: number
+  mcpKeys?: string[]
 }
 interface CheckedCheckpoint {
   row: Row
@@ -69,38 +75,41 @@ export class RunRecoveryStore {
     this.root = join(dirname(dirname(db.filePath)), 'recovery')
   }
   control(scope: Scope): { state: ControlState; revision: number } {
-    if (
-      !this.db.get(
-        'SELECT id FROM audit_runs WHERE id=? AND project_id=?',
-        scope.runId,
-        scope.projectId
-      )
-    )
-      throw new ApiError('RUN_NOT_FOUND', '任务不属于当前项目', 404)
     const r = this.db.get(
-      'SELECT * FROM run_controls WHERE run_id=? AND project_id=?',
+      'SELECT control_state,control_revision FROM audit_runs WHERE id=? AND project_id=?',
       scope.runId,
       scope.projectId
     )
-    return { state: r ? (r.state as ControlState) : 'idle', revision: Number(r?.revision ?? 0) }
+    if (!r) throw new ApiError('RUN_NOT_FOUND', '任务不属于当前项目', 404)
+    return { state: r.control_state as ControlState, revision: Number(r.control_revision) }
   }
   setState(scope: Scope, state: ControlState): void {
     this.control(scope)
     this.db.run(
-      'INSERT INTO run_controls(run_id,project_id,state,revision,updated_at) VALUES(?,?,?,1,?) ON CONFLICT(run_id) DO UPDATE SET state=excluded.state,revision=run_controls.revision+1,updated_at=excluded.updated_at',
-      scope.runId,
-      scope.projectId,
+      'UPDATE audit_runs SET control_state=?,control_revision=control_revision+1,control_updated_at=? WHERE id=? AND project_id=?',
       state,
-      now()
+      now(),
+      scope.runId,
+      scope.projectId
     )
   }
   assertStart(scope: Scope): void {
     if (stopped(this.control(scope).state))
       throw new ApiError('RUN_RESUME_REQUIRED', '任务已停止或中断，请先核对恢复清单再继续', 409)
   }
-  binding(scope: Scope, pathId: string, modelId: string): Record<string, unknown> {
+  binding(
+    scope: Scope,
+    pathId: string,
+    modelId: string,
+    newProfile?: string
+  ): Record<string, unknown> {
+    const previous = this.db.get('SELECT binding_json FROM path_recovery WHERE path_id=?', pathId)
+    const profile =
+      newProfile ?? (previous ? JSON.parse(String(previous.binding_json)).mcpProfile : undefined)
+    if (profile !== undefined && profile !== MCP_PROFILE)
+      throw new ApiError('RUN_MCP_VERSION_CHANGED', '原任务MCP工具配置版本不可用', 409)
     const run = this.db.get(
-      'SELECT * FROM audit_runs WHERE id=? AND project_id=?',
+      'SELECT rules_version,model_json FROM audit_runs WHERE id=? AND project_id=?',
       scope.runId,
       scope.projectId
     )
@@ -116,10 +125,7 @@ export class RunRecoveryStore {
     )
     if (!run || !path || !model)
       throw new ApiError('RUN_MATERIAL_MISSING', '恢复所需路径或模型配置缺失', 409)
-    const frozenModel = this.db.get(
-      'SELECT model_json FROM run_controls WHERE run_id=?',
-      scope.runId
-    )?.model_json
+    const frozenModel = run.model_json
     if (
       frozenModel &&
       frozenModel !== 'null' &&
@@ -151,6 +157,19 @@ export class RunRecoveryStore {
       rulesHash: digest(builtinRules),
       model,
       protocol: recoveryProtocol,
+      ...(newProfile || (previous && JSON.parse(String(previous.binding_json)).promptPolicy)
+        ? { promptPolicy: AUDIT_PROMPT_VERSION }
+        : {}),
+      ...(profile
+        ? {
+            mcpProfile: profile,
+            mcpRulesDigest: STATIC_RULES_DIGEST,
+            ...(newProfile ||
+            (previous && JSON.parse(String(previous.binding_json)).mcpSettingsHash)
+              ? { mcpSettingsHash: mcpSettingsHash(dirname(this.root)) }
+              : {})
+          }
+        : {}),
       ...(new GraphRepository(this.db).get(scope.projectId, scope.runId)
         ? { queryGraph: new GraphRepository(this.db).get(scope.projectId, scope.runId) }
         : {})
@@ -163,7 +182,7 @@ export class RunRecoveryStore {
     attempt: number,
     resume: boolean
   ): RecoveryExecution {
-    const binding = this.binding(scope, pathId, modelId),
+    const binding = this.binding(scope, pathId, modelId, resume ? undefined : MCP_PROFILE),
       hash = digest(binding)
     const prior = this.db.get('SELECT * FROM path_recovery WHERE path_id=?', pathId)
     if (resume && (!prior || prior.state === 'completed' || prior.binding_hash !== hash))
@@ -190,7 +209,7 @@ export class RunRecoveryStore {
     )
     this.setState(scope, 'running')
     this.db.run(
-      "UPDATE run_controls SET model_json=? WHERE run_id=? AND model_json='null'",
+      "UPDATE audit_runs SET model_json=? WHERE id=? AND model_json='null'",
       JSON.stringify(binding.model),
       scope.runId
     )
@@ -229,7 +248,7 @@ export class RunRecoveryStore {
   recover(): void {
     this.db.transaction((tx) => {
       for (const r of tx.all(
-        "SELECT * FROM run_controls WHERE state IN ('running','stop_requested','waiting_external')"
+        "SELECT id AS run_id,project_id,control_state AS state FROM audit_runs WHERE control_state IN ('running','stop_requested','waiting_external')"
       )) {
         const state = r.state === 'running' ? 'interrupted' : 'stopped'
         this.setState({ projectId: String(r.project_id), runId: String(r.run_id) }, state)
@@ -248,7 +267,7 @@ export class RunRecoveryStore {
         now()
       )
       tx.run(
-        "UPDATE recovery_requests SET state='uncertain',finished_at=? WHERE state='started'",
+        "UPDATE model_requests SET state='uncertain',finished_at=? WHERE state='started'",
         now()
       )
     })
@@ -282,7 +301,7 @@ export class RunRecoveryStore {
   }
   evidence(path: Row, stepIndex: number): Evidence | null {
     const r = this.db.get(
-      'SELECT * FROM recovery_tools WHERE journey_id=? AND step_index=? AND path_id=? AND binding_hash=?',
+      `SELECT receipt_json AS evidence_json,sha256 FROM tool_receipts WHERE tool_name='audit_read_step' AND journey_id=? AND step_index=? AND path_id=? AND binding_hash=?`,
       path.journey_id,
       stepIndex,
       path.path_id,
@@ -327,6 +346,46 @@ export class RunRecoveryStore {
     )
       throw new ApiError('RUN_EVIDENCE_CORRUPT', '取证组合文本不一致', 409)
     return evidence
+  }
+  mcpReceipts(path: Row): McpReceipt[] {
+    const receipts: McpReceipt[] = []
+    for (const row of this.db.all(
+      `SELECT * FROM tool_receipts WHERE tool_name!='audit_read_step' AND journey_id=? AND path_id=? ORDER BY rowid`,
+      path.journey_id,
+      path.path_id
+    )) {
+      const receipt = JSON.parse(String(row.receipt_json)) as McpReceipt
+      checkMcpOutput(receipt.output)
+      mcpArgs(receipt.name, receipt.args, 16)
+      if (
+        row.binding_hash !== path.binding_hash ||
+        row.request_key !== receipt.key ||
+        receipt.key !== mcpHash([receipt.name, receipt.args]) ||
+        digest(receipt) !== row.sha256
+      )
+        throw new ApiError('RUN_MCP_CORRUPT', 'MCP回执摘要不一致', 409)
+      const snapshot = new SnapshotRepository(this.db).info(
+        String(path.project_id),
+        String(path.run_id)
+      )
+      if (
+        receipt.output.snapshotId !== snapshot.snapshotId ||
+        receipt.output.sourceStamp !== snapshot.sourceStamp
+      )
+        throw new ApiError('RUN_MCP_CORRUPT', 'MCP回执快照不一致', 409)
+      for (const range of receipt.output.ranges) {
+        const text = new SnapshotRepository(this.db)
+          .read(String(path.project_id), String(path.run_id), range.filePath)
+          .split('\n')
+          .slice(range.startLine - 1, range.endLine)
+          .join('\n')
+        if (text !== range.text) throw new ApiError('RUN_MCP_CORRUPT', 'MCP原文回执不一致', 409)
+      }
+      receipts.push(receipt)
+    }
+    if (receipts.length > 24 || Buffer.byteLength(JSON.stringify(receipts)) > 131072)
+      throw new ApiError('RUN_MCP_CORRUPT', 'MCP回执总量超限', 409)
+    return receipts
   }
   checkpoint(path: Row): CheckedCheckpoint | null {
     for (const row of this.db.all(
@@ -378,7 +437,14 @@ export class RunRecoveryStore {
         )
           continue
         const seen = new Set<string>(),
-          calls = new Map<string, number>()
+          calls = new Map<string, { name: string; args: Record<string, unknown> }>()
+        const mcp = this.mcpReceipts(path),
+          attachedMcp = new Set<string>()
+        if (
+          host.mcpKeys &&
+          (!Array.isArray(host.mcpKeys) || host.mcpKeys.some((k) => !mcp.some((r) => r.key === k)))
+        )
+          throw Error('missing MCP receipts')
         const attachedSteps = new Set<number>()
         for (const entry of entries) {
           if (
@@ -413,6 +479,12 @@ export class RunRecoveryStore {
                     throw Error('rebuilt evidence differs')
                   attachedSteps.add(stepIndex)
                 }
+              const rebuilt = context.recovery as { mcpReceipts?: McpReceipt[] } | undefined
+              for (const receipt of rebuilt?.mcpReceipts ?? []) {
+                if (!mcp.some((r) => digest(r) === digest(receipt)))
+                  throw Error('rebuilt MCP receipt differs')
+                attachedMcp.add(receipt.key)
+              }
             }
           }
           if (entry.type === 'message' && entry.message.role === 'assistant') {
@@ -421,23 +493,37 @@ export class RunRecoveryStore {
             for (const item of entry.message.content)
               if (item.type === 'toolCall') {
                 if (
-                  item.name !== 'audit_read_step' ||
-                  Object.keys(item.arguments).length !== 1 ||
-                  !Number.isInteger(item.arguments.stepIndex)
+                  item.name === 'audit_read_step' &&
+                  (Object.keys(item.arguments).length !== 1 ||
+                    !Number.isInteger(item.arguments.stepIndex))
                 )
                   throw Error('unexpected tool')
-                calls.set(item.id, item.arguments.stepIndex)
+                if (item.name !== 'audit_read_step') {
+                  if (JSON.parse(String(path.binding_json)).mcpProfile !== MCP_PROFILE)
+                    throw Error('legacy tool set')
+                  mcpArgs(item.name, item.arguments, 16)
+                }
+                calls.set(item.id, { name: item.name, args: item.arguments })
               }
           }
           if (entry.type === 'message' && entry.message.role === 'toolResult') {
-            const index = calls.get(entry.message.toolCallId)
-            if (
-              index === undefined ||
-              entry.message.isError ||
-              entry.message.toolName !== 'audit_read_step'
-            )
+            const call = calls.get(entry.message.toolCallId)
+            if (!call || entry.message.isError || entry.message.toolName !== call.name)
               throw Error('unmatched tool result')
             calls.delete(entry.message.toolCallId)
+            if (call.name !== 'audit_read_step') {
+              const payload = JSON.parse(
+                entry.message.content.map((c: { text?: string }) => c.text ?? '').join('')
+              )
+              const receipt = mcp.find(
+                (r) => r.key === mcpHash([call.name, mcpArgs(call.name, call.args, 16)])
+              )
+              if (!receipt || digest(payload) !== digest(receipt.output))
+                throw Error('MCP transcript differs')
+              attachedMcp.add(receipt.key)
+              continue
+            }
+            const index = Number(call.args.stepIndex)
             const { stepIndex, ...payload } = JSON.parse(
               entry.message.content
                 .map((c: { type: string; text?: string }) => (c.type === 'text' ? c.text : ''))
@@ -466,7 +552,9 @@ export class RunRecoveryStore {
         if (
           calls.size ||
           new Set(host.readSteps).size !== host.readSteps.length ||
-          host.readSteps.some((index) => !attachedSteps.has(index))
+          host.readSteps.some((index) => !attachedSteps.has(index)) ||
+          new Set(host.mcpKeys ?? []).size !== attachedMcp.size ||
+          (host.mcpKeys ?? []).some((k) => !attachedMcp.has(k))
         )
           continue
         const evidence = host.readSteps.map((index) => this.evidence(path, index))
@@ -490,7 +578,7 @@ export class RunRecoveryStore {
   view(scope: Scope): RunRecoveryView {
     const control = this.control(scope)
     const paths = this.db.all(
-      `SELECT p.path_id,p.status,r.state AS recovery_state,a.phase AS attempt_phase FROM call_paths p LEFT JOIN path_recovery r ON r.path_id=p.path_id LEFT JOIN path_attempts a ON a.path_id=p.path_id WHERE p.project_id=? AND p.run_id=? ORDER BY p.created_at,p.path_id`,
+      `SELECT p.path_id,p.status,r.state AS recovery_state FROM call_paths p LEFT JOIN path_recovery r ON r.path_id=p.path_id WHERE p.project_id=? AND p.run_id=? ORDER BY p.created_at,p.path_id`,
       scope.projectId,
       scope.runId
     )
@@ -498,10 +586,7 @@ export class RunRecoveryStore {
     const candidate =
         candidates[0] ??
         (['stopped', 'interrupted', 'idle'].includes(control.state) &&
-        this.db.get(
-          "SELECT run_id FROM run_controls WHERE run_id=? AND model_json!='null'",
-          scope.runId
-        )
+        this.db.get("SELECT id FROM audit_runs WHERE id=? AND model_json!='null'", scope.runId)
           ? paths.find((p) => p.status === 'pending')
           : undefined),
       active = candidates.find((p) => p.recovery_state === 'running')
@@ -523,13 +608,14 @@ export class RunRecoveryStore {
             409
           )
         const receipts = this.db.all(
-          'SELECT step_index FROM recovery_tools WHERE journey_id=? ORDER BY step_index',
+          `SELECT step_index FROM tool_receipts WHERE tool_name='audit_read_step' AND journey_id=? ORDER BY step_index`,
           path.journey_id
         )
         for (const r of receipts) {
           this.evidence(path, Number(r.step_index))
           readSteps.push(Number(r.step_index))
         }
+        this.mcpReceipts(path)
         checkpoint = this.checkpoint(path)
         mode = checkpoint ? 'native' : readSteps.length ? 'rebuild' : 'restart'
         if (checkpoint) readSteps.splice(0, readSteps.length, ...checkpoint.host.readSteps)
@@ -599,7 +685,7 @@ export class RunRecoveryStore {
     const uncertainRequests = path
       ? Number(
           this.db.get(
-            "SELECT count(*) AS n FROM recovery_requests WHERE journey_id=? AND state IN ('started','uncertain')",
+            "SELECT count(*) AS n FROM model_requests WHERE journey_id=? AND state IN ('started','uncertain')",
             path.journey_id
           )!.n
         )
@@ -715,6 +801,34 @@ export class RecoveryExecution {
       this.epoch
     )
   }
+  get supportsMcp(): boolean {
+    return JSON.parse(String(this.assertLive().binding_json)).mcpProfile === MCP_PROFILE
+  }
+  async mcp(name: McpToolName, args: McpArgs, work: () => Promise<McpOutput>): Promise<McpReceipt> {
+    const row = this.assertLive(),
+      key = mcpHash([name, args])
+    if (!this.supportsMcp) throw new ApiError('AGENT_TOOL_SCOPE', '旧会话不能扩展工具权限', 409)
+    const cached = this.store.mcpReceipts(row).find((r) => r.key === key)
+    if (cached) return cached
+    const output = await work()
+    this.assertLive()
+    const receipt: McpReceipt = { key, name, args, output }
+    checkMcpOutput(output)
+    this.store.db.run(
+      'INSERT INTO tool_receipts(journey_id,request_key,tool_name,path_id,run_id,project_id,binding_hash,receipt_json,sha256,saved_at) VALUES(?,?,?,?,?,?,?,?,?,?)',
+      this.journeyId,
+      key,
+      name,
+      this.pathId,
+      this.scope.runId,
+      this.scope.projectId,
+      this.bindingHash,
+      JSON.stringify(receipt),
+      digest(receipt),
+      now()
+    )
+    return receipt
+  }
   counts(): { requests: number; tools: number; rounds: number } {
     const r = this.assertLive()
     return { requests: Number(r.requests), tools: Number(r.tools), rounds: Number(r.rounds) }
@@ -738,25 +852,30 @@ export class RecoveryExecution {
       this.epoch
     )
   }
-  request(max: number): void {
-    this.spend('requests', max)
-    this.requestId = randomUUID()
-    this.store.db.run(
-      "INSERT INTO recovery_requests VALUES(?,?,?,?,?,?,'started',NULL,?,NULL)",
-      this.requestId,
-      this.journeyId,
-      this.pathId,
-      this.scope.runId,
-      this.scope.projectId,
-      this.epoch,
-      now()
-    )
+  request(max: number, authorize?: () => string | void): void {
+    this.store.db.transaction((tx) => {
+      this.spend('requests', max)
+      this.requestId = authorize?.() || randomUUID()
+      tx.run(
+        `INSERT INTO model_requests(request_id,journey_id,path_id,run_id,project_id,epoch,attempt,state,started_at)
+        VALUES(?,?,?,?,?,?,?,'started',?) ON CONFLICT(request_id) DO UPDATE SET
+        journey_id=excluded.journey_id,epoch=excluded.epoch,attempt=excluded.attempt,state='started'`,
+        this.requestId,
+        this.journeyId,
+        this.pathId,
+        this.scope.runId,
+        this.scope.projectId,
+        this.epoch,
+        this.attempt,
+        now()
+      )
+    })
   }
   received(usage: unknown): void {
     this.assertLive()
     if (this.requestId)
       this.store.db.run(
-        "UPDATE recovery_requests SET state='received',usage_json=?,finished_at=? WHERE request_id=? AND epoch=?",
+        "UPDATE model_requests SET state='received',usage_json=?,finished_at=? WHERE request_id=? AND epoch=?",
         JSON.stringify(usage ?? null),
         now(),
         this.requestId,
@@ -768,7 +887,7 @@ export class RecoveryExecution {
     this.assertLive()
     if (this.requestId)
       this.store.db.run(
-        "UPDATE recovery_requests SET state='uncertain',finished_at=? WHERE request_id=? AND epoch=? AND state='started'",
+        "UPDATE model_requests SET state='uncertain',finished_at=? WHERE request_id=? AND epoch=? AND state='started'",
         now(),
         this.requestId,
         this.epoch
@@ -782,8 +901,9 @@ export class RecoveryExecution {
     const evidence = await work()
     this.assertLive()
     this.store.db.run(
-      'INSERT INTO recovery_tools VALUES(?,?,?,?,?,?,?,?,?,?)',
+      `INSERT INTO tool_receipts VALUES(?,?,'audit_read_step',?,?,?,?,?,?,?,?,?)`,
       this.journeyId,
+      'step:' + index,
       index,
       this.pathId,
       this.scope.runId,
@@ -801,6 +921,7 @@ export class RecoveryExecution {
     host: LoopCheckpoint | null
     reused: Map<number, Evidence>
     receipt: RecoveryReceipt | null
+    mcpReceipts: McpReceipt[]
   }> {
     const sdk = await loadPiSdk(),
       row = this.assertLive(),
@@ -808,7 +929,7 @@ export class RecoveryExecution {
     const reused = new Map<number, Evidence>()
     if (this.resuming)
       for (const r of this.store.db.all(
-        'SELECT step_index FROM recovery_tools WHERE journey_id=? ORDER BY step_index',
+        `SELECT step_index FROM tool_receipts WHERE tool_name='audit_read_step' AND journey_id=? ORDER BY step_index`,
         this.journeyId
       )) {
         const index = Number(r.step_index),
@@ -839,7 +960,12 @@ export class RecoveryExecution {
       this.pathId,
       this.epoch
     )
-    return { manager, host: checkpoint?.host ?? null, reused, receipt }
+    const mcpReceipts = this.resuming
+      ? this.store
+          .mcpReceipts(row)
+          .filter((r) => !checkpoint || checkpoint.host.mcpKeys?.includes(r.key))
+      : []
+    return { manager, host: checkpoint?.host ?? null, reused, receipt, mcpReceipts }
   }
   save(manager: SessionManager, host: LoopCheckpoint, secret: string): void {
     this.assertLive()

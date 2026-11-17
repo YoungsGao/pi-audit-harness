@@ -66,7 +66,7 @@ test('dangerous paths deduplicate by pathId and risk points by shared Sink/rule;
   assert.ok(!html.includes('fixture-report-private'))
   assert.ok(html.includes('取证范围'))
   h.db.run(
-    "UPDATE scan_runs SET state='partial',warnings_json=? WHERE run_id=?",
+    "UPDATE audit_runs SET scan_state='partial',warnings_json=? WHERE id=?",
     JSON.stringify([{ code: 'JAVA_PARSE_FAILED', message: 'fixture coverage warning' }]),
     h.scope.runId
   )

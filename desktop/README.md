@@ -90,3 +90,22 @@ QA-01～03：[质量验收、性能基线与交付](../docs/technical/15.质量�
 `npm run query:serve`在已有任务库上启动轻量监督器，CLI从stdin接收JSON；使用可信父进程注入连接token。接口见[说明](query-skill/SKILL.md)。真实SDK及统一查询验证：`node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test tests/query-codegraph.test.mjs tests/query-enhancements.test.mjs tests/query-lab.test.mjs`。亲手实验：`node scripts/query-lab.mjs init`，再用输出的labFile执行`node scripts/query-lab.mjs query <labFile>`。
 
 [架构与运行](../docs/technical/01.项目架构与运行.md) · [源码与预处理](../docs/technical/02.源码输入与预处理.md) · [数据模型](../docs/technical/03.数据模型与持久化.md) · [Agent 与 SSE](../docs/technical/04.Agent分析与事件协议.md) · [工作台](../docs/technical/05.审计工作台.md) · [报告](../docs/technical/06.报告生成与管理.md) · [进度与验收](../docs/technical/07.实现进度与验收.md) · [配置授权、快照与手工调查](../docs/technical/08.配置授权快照与手工调查.md)。
+
+## CodeGraph 补证与静态扫描 MCP（2026-11-11）
+
+新调查开放 audit_find_related、audit_read_related、audit_static_scan，与 audit_read_step 共用原预算。Semgrep 1.185.0 由可信启动窗口以 PI_AUDIT_SEMGREP_PATH 绝对路径配置；缺少时显示 unavailable，不作为安全结论。
+
+```powershell
+npm run test:mcp
+npm run mcp:lab -- init
+```
+
+完整配置、自动发现 lab.json、demo/interactive/stdio、恢复与限制见 [17 技术文档](../docs/technical/17.CodeGraph补证与静态扫描MCP.md)。MCP 单项测试不调用付费模型；未配置扫描器时真实 Semgrep 专项会明确 skip。
+
+## Python MCP 与扩展服务
+
+2026-11-15新增“对照评测”入口与审计页证据缺口面板。支持工程回归/真实模型、三组固定工具对照、预算、历史和JSON另存；新增框架SQL/Servlet识别与准备语句候选。使用方法和范围见[21 技术文档](../docs/technical/21.证据调查面板对照评测与Java检测增强.md)。免费实验：`npm run eval:lab -- --cases helper-allowlist`；确定性回归：`npm run test:investigation`。只有显式真实方式会发出付费模型请求。
+
+客户端左侧“扩展服务”可管理配置、导入JSON、连接测试和选择工具。内置服务使用一个受管 Python 进程、两个 HTTP MCP 端点；Python 3.11+，依赖在 ../python/requirements-runtime.txt。优先检测仓库虚拟环境，也可在界面配置解释器。自定义服务支持本地 stdio / HTTP，导入后默认停用。
+
+验证：`npm run test:mcp`、`npm run test:mcp:ui`。正式源码工具、预算、证据回执和恢复仍沿用原契约；详见[20 技术文档](../docs/technical/20.Python本地MCP服务与客户端管理.md)。

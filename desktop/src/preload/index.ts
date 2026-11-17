@@ -3,6 +3,10 @@ import type { IpcRendererEvent } from 'electron'
 import type { DesktopApi, ServiceStatus } from '../shared/desktop-api'
 
 const audit: DesktopApi = {
+  saveEvaluation: (id) => ipcRenderer.invoke('evaluations:save', id),
+  evaluations: (action, input) => ipcRenderer.invoke('evaluations:action', action, input),
+  mcp: (action, input) => ipcRenderer.invoke('mcp:action', action, input),
+  importMcpConfig: () => ipcRenderer.invoke('mcp:import'),
   templates: (action, input) => ipcRenderer.invoke('templates:action', action, input),
   importTemplateDocument: (kind) => ipcRenderer.invoke('templates:import-document', kind),
   openHelpLink: (id) => ipcRenderer.invoke('help:open', id),

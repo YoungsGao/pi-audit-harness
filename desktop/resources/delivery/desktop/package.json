@@ -7,6 +7,11 @@
   "license": "MIT",
   "homepage": "https://github.com/YoungsGao/pi-audit-harness",
   "scripts": {
+    "eval:lab": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/eval-lab.mjs",
+    "test:investigation": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test tests/investigation.test.mjs tests/evaluation.test.mjs tests/framework-detection.test.mjs",
+    "test:mcp": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test tests/mcp-evidence.test.mjs tests/mcp-agent.test.mjs tests/mcp-management.test.mjs",
+    "test:mcp:ui": "electron-vite build --config electron.mcp-test.config.ts && node tests/run-mcp-electron.mjs",
+    "mcp:lab": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/mcp-lab.mjs",
     "query": "node scripts/query-cli.mjs",
     "query:serve": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/query-service.mjs",
     "test:qa04": "electron-vite build --config electron.scan-test.config.ts && node tests/run-scan-electron.mjs --qa04",
@@ -35,10 +40,12 @@
     "@earendil-works/pi-coding-agent": "1.2.0",
     "@electron-toolkit/preload": "^3.0.2",
     "@electron-toolkit/utils": "^4.0.0",
+    "@modelcontextprotocol/sdk": "1.32.2",
     "electron-updater": "^6.8.9",
     "java-parser": "3.0.1"
   },
   "overrides": {
+    "fast-uri": "3.1.9",
     "@earendil-works/pi-coding-agent": {
       "minimatch": "11.0.1",
       "undici": "8.12.2"

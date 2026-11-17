@@ -10,11 +10,14 @@ const root = resolve(process.argv[2]),
 const manifest = await loadManifest(),
   db = new DatabaseSync(join(root, 'runtime/storage/audit.sqlite3'), { readOnly: true })
 try {
+  const version = db.prepare('PRAGMA user_version').get().user_version
   const materials = receipt.materials.map((item) => {
     const known = manifest.cases.find((c) => c.id === item.id)
     const row = db
       .prepare(
-        'SELECT f.content FROM run_snapshots r JOIN snapshot_files f ON f.snapshot_id=r.snapshot_id WHERE r.project_id=? AND r.run_id=? AND f.file_path=?'
+        version >= 15
+          ? 'SELECT f.content FROM audit_runs r JOIN snapshot_files f ON f.snapshot_id=r.snapshot_id WHERE r.project_id=? AND r.id=? AND f.file_path=?'
+          : 'SELECT f.content FROM run_snapshots r JOIN snapshot_files f ON f.snapshot_id=r.snapshot_id WHERE r.project_id=? AND r.run_id=? AND f.file_path=?'
       )
       .get(item.scope.projectId, item.scope.runId, known.fileName)
     const source = Buffer.from(row.content).toString('utf8')

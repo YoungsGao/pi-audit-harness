@@ -54,12 +54,11 @@ export class ScanRepository {
       )
       this.templates.freeze(tx, projectId, runId, templateRefs, projectReviewRevision)
       tx.run(
-        "INSERT INTO scan_runs (run_id,project_id,state,started_at) VALUES (?,?,'scanning',?)",
-        runId,
-        projectId,
-        now
+        "UPDATE audit_runs SET stage='scanning',scan_state='scanning',scan_started_at=?,started_at=? WHERE id=?",
+        now,
+        now,
+        runId
       )
-      tx.run("UPDATE audit_runs SET stage='scanning',started_at=? WHERE id=?", now, runId)
       appendEvent(tx, projectId, runId, null, {
         type: 'process',
         status: 'scanning',
@@ -69,7 +68,7 @@ export class ScanRepository {
   }
   finish(tx: SqlSession, runId: string, summary: ScanSummary): void {
     tx.run(
-      'UPDATE scan_runs SET state=?,candidate_count=?,unresolved_calls=?,truncated=?,warnings_json=?,finished_at=? WHERE run_id=?',
+      'UPDATE audit_runs SET scan_state=?,candidate_count=?,unresolved_calls=?,scan_truncated=?,warnings_json=?,scan_finished_at=? WHERE id=?',
       summary.state,
       summary.candidateCount,
       summary.unresolvedCalls,
@@ -99,7 +98,7 @@ export class ScanRepository {
   fail(runId: string, code: string): void {
     this.db.transaction((tx) => {
       tx.run(
-        "UPDATE scan_runs SET state='failed',error_code=?,finished_at=? WHERE run_id=?",
+        "UPDATE audit_runs SET scan_state='failed',scan_error_code=?,scan_finished_at=? WHERE id=?",
         code,
         new Date().toISOString(),
         runId
@@ -125,8 +124,9 @@ export class ScanRepository {
       projectId,
       runs: this.db
         .all(
-          `SELECT a.*,s.state,s.candidate_count,s.unresolved_calls,s.truncated,s.warnings_json,COALESCE(a.error_code,s.error_code) AS error_code
-      FROM audit_runs a LEFT JOIN scan_runs s ON s.run_id=a.id WHERE a.project_id=? ORDER BY a.created_at DESC,a.id DESC LIMIT 50`,
+          `SELECT id,source_stamp,rules_version,scan_state AS state,candidate_count,unresolved_calls,scan_truncated AS truncated,warnings_json,
+      COALESCE(error_code,scan_error_code) AS error_code,created_at,status,model_config_id
+      FROM audit_runs WHERE project_id=? ORDER BY created_at DESC,id DESC LIMIT 50`,
           projectId
         )
         .map((row) => ({
@@ -221,18 +221,13 @@ export class ScanRepository {
           409
         )
       const attempt =
-        Number(tx.get('SELECT attempt FROM path_attempts WHERE path_id=?', pathId)?.attempt ?? 0) +
-        1
+        Number(
+          tx.get(
+            'SELECT max(attempt_id) AS attempt FROM analysis_sessions WHERE chain_id=?',
+            pathId
+          )?.attempt ?? 0
+        ) + 1
       const now = new Date().toISOString()
-      tx.run(
-        "INSERT INTO path_attempts (path_id,run_id,project_id,attempt,model_config_id,phase,started_at) VALUES (?,?,?,?,?,'analyzing',?) ON CONFLICT(path_id) DO UPDATE SET attempt=excluded.attempt,model_config_id=excluded.model_config_id,phase='analyzing',started_at=excluded.started_at,finished_at=NULL,error_code=NULL",
-        pathId,
-        runId,
-        projectId,
-        attempt,
-        modelId,
-        now
-      )
       tx.run(
         "UPDATE call_paths SET status='analyzing',verdict='unknown',dangerous=NULL,result_summary='',updated_at=? WHERE path_id=?",
         now,
@@ -274,13 +269,16 @@ export class ScanRepository {
   ): void {
     this.db.transaction((tx) => {
       const current = tx.get(
-        "SELECT run_id FROM path_attempts WHERE path_id=? AND attempt=? AND phase='analyzing'",
+        "SELECT run_id FROM analysis_sessions WHERE chain_id=? AND attempt_id=? AND state IN ('queue','analyze')",
         pathId,
         attempt
       )
       if (!current) throw new ApiError('ANALYSIS_STALE', '旧分析尝试不能覆盖当前路径', 409)
       const guard = tx.get('SELECT state,attempt FROM path_recovery WHERE path_id=?', pathId)
-      const control = tx.get('SELECT state FROM run_controls WHERE run_id=?', current.run_id)
+      const control = tx.get(
+        'SELECT control_state AS state FROM audit_runs WHERE id=?',
+        current.run_id
+      )
       if (
         ['stop_requested', 'waiting_external', 'stopped', 'interrupted'].includes(
           String(control?.state)
@@ -330,12 +328,6 @@ export class ScanRepository {
           step.stepIndex
         )
       tx.run(
-        "UPDATE path_attempts SET phase='completed',finished_at=? WHERE path_id=? AND attempt=?",
-        now,
-        pathId,
-        attempt
-      )
-      tx.run(
         "UPDATE path_recovery SET state='completed',updated_at=? WHERE path_id=? AND attempt=?",
         now,
         pathId,
@@ -364,19 +356,22 @@ export class ScanRepository {
   analysisFailed(pathId: string, attempt: number, code: string): void {
     this.db.transaction((tx) => {
       const current = tx.get(
-        "SELECT run_id FROM path_attempts WHERE path_id=? AND attempt=? AND phase='analyzing'",
+        "SELECT run_id FROM analysis_sessions WHERE chain_id=? AND attempt_id=? AND state IN ('queue','analyze')",
         pathId,
         attempt
       )
       if (!current) return
-      const control = tx.get('SELECT state FROM run_controls WHERE run_id=?', current.run_id)
+      const control = tx.get(
+        'SELECT control_state AS state FROM audit_runs WHERE id=?',
+        current.run_id
+      )
       const interrupted = code === 'RUN_INTERRUPTED'
       const userStop =
         code === 'RUN_USER_STOP' ||
         ['stop_requested', 'waiting_external', 'stopped'].includes(String(control?.state))
       const finalCode = userStop ? 'RUN_USER_STOP' : interrupted ? 'ANALYSIS_INTERRUPTED' : code
       tx.run(
-        "UPDATE path_attempts SET phase='failed',error_code=?,finished_at=? WHERE path_id=? AND attempt=?",
+        'UPDATE analysis_sessions SET error_code=?,finished_at=? WHERE chain_id=? AND attempt_id=?',
         finalCode,
         new Date().toISOString(),
         pathId,
@@ -401,7 +396,7 @@ export class ScanRepository {
         attempt
       )
       tx.run(
-        "UPDATE recovery_requests SET state='uncertain',finished_at=? WHERE path_id=? AND state='started'",
+        "UPDATE model_requests SET state='uncertain',finished_at=? WHERE path_id=? AND state='started'",
         new Date().toISOString(),
         pathId
       )
@@ -452,7 +447,9 @@ export class ScanRepository {
   }
   recover(): void {
     this.db.transaction((tx) => {
-      for (const scan of tx.all("SELECT run_id,project_id FROM scan_runs WHERE state='scanning'")) {
+      for (const scan of tx.all(
+        "SELECT id AS run_id,project_id FROM audit_runs WHERE scan_state='scanning'"
+      )) {
         tx.run(
           "UPDATE audit_runs SET status='failed',stage='interrupted',error_code='SCAN_INTERRUPTED',finished_at=? WHERE id=?",
           new Date().toISOString(),
@@ -466,11 +463,11 @@ export class ScanRepository {
         })
       }
       tx.run(
-        "UPDATE scan_runs SET state='failed',error_code='SCAN_INTERRUPTED',finished_at=? WHERE state='scanning'",
+        "UPDATE audit_runs SET scan_state='failed',scan_error_code='SCAN_INTERRUPTED',scan_finished_at=? WHERE scan_state='scanning'",
         new Date().toISOString()
       )
       const attempts = tx.all(
-        "SELECT path_id,run_id,project_id FROM path_attempts WHERE phase='analyzing'"
+        "SELECT chain_id AS path_id,run_id,project_id FROM analysis_sessions WHERE state IN ('queue','analyze')"
       )
       for (const row of attempts)
         tx.run(
@@ -479,7 +476,7 @@ export class ScanRepository {
           row.path_id
         )
       tx.run(
-        "UPDATE path_attempts SET phase='failed',error_code='ANALYSIS_INTERRUPTED',finished_at=? WHERE phase='analyzing'",
+        "UPDATE analysis_sessions SET error_code='ANALYSIS_INTERRUPTED',finished_at=? WHERE state IN ('queue','analyze')",
         new Date().toISOString()
       )
       for (const row of attempts) {
@@ -510,7 +507,7 @@ export class ScanRepository {
   }
   state(projectId: string, runId: string): RunState {
     const row = this.db.get(
-      'SELECT * FROM audit_runs WHERE id=? AND project_id=?',
+      'SELECT id,stage,status,source_stamp,rules_version,model_config_id,started_at,finished_at,error_code FROM audit_runs WHERE id=? AND project_id=?',
       runId,
       projectId
     )

@@ -65,6 +65,21 @@ export async function createAgentModelFixture({
       .filter(Boolean)
     const indexes = new Set(tools.map((e) => e.stepIndex))
     const stepIndex = context.steps.find((s) => !indexes.has(s.stepIndex))?.stepIndex
+    let mcpCall
+    if (mode === 'mcp' && stepIndex === undefined) {
+      const found = tools.find((t) => t.tool === 'audit_find_related'),
+        read = tools.find((t) => t.tool === 'audit_read_related'),
+        scan = tools.find((t) => t.tool === 'audit_static_scan')
+      if (!found)
+        mcpCall = { name: 'audit_find_related', args: { stepIndex: 0, direction: 'outgoing' } }
+      else if (!read && found.items.length)
+        mcpCall = {
+          name: 'audit_read_related',
+          args: { stepIndex: 0, targetId: found.items[0].targetId }
+        }
+      else if (!scan)
+        mcpCall = { name: 'audit_static_scan', args: { stepIndex: context.steps.length - 1 } }
+    }
     await new Promise((r) => setTimeout(r, delayMs))
     if (response.destroyed) return
     if (mode === 'hold') return
@@ -78,7 +93,23 @@ export async function createAgentModelFixture({
     })
     const send = (delta, finish_reason) =>
       response.write('data: ' + JSON.stringify(chunk(delta, finish_reason)) + '\n\n')
-    if (stepIndex !== undefined || mode === 'scope' || mode === 'tools') {
+    if (mcpCall) {
+      send(
+        {
+          role: 'assistant',
+          tool_calls: [
+            {
+              index: 0,
+              id: 'mcp-' + requests.length,
+              type: 'function',
+              function: { name: mcpCall.name, arguments: JSON.stringify(mcpCall.args) }
+            }
+          ]
+        },
+        null
+      )
+      send({}, 'tool_calls')
+    } else if (stepIndex !== undefined || mode === 'scope' || mode === 'tools') {
       const args =
         mode === 'scope'
           ? { stepIndex: 999, path: '../outside.java' }
@@ -133,6 +164,10 @@ export async function createAgentModelFixture({
             ]
           }
         })
+      }
+      if (mode === 'mcp') {
+        const extra = tools.find((t) => t.tool === 'audit_read_related')
+        if (extra?.citations.length) result.steps[0].quotes = [extra.citations[0].id]
       }
       if (['dangerous', 'safe', 'invalid', 'contradiction', 'missing-check'].includes(mode)) {
         result.verdict =

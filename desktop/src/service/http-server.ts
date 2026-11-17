@@ -11,6 +11,8 @@ import type { ChainAction } from './chains/service'
 import { serveAnalyze } from './analyze-http.ts'
 import type { AnalyzeStreamApi } from './analyze-http.ts'
 import type { ReportAction } from '../shared/report-contracts'
+import { mcpActions } from '../shared/mcp-settings.ts'
+import { evaluationActions } from '../shared/evaluation.ts'
 
 export interface RunningHttpServer {
   port: number
@@ -18,6 +20,15 @@ export interface RunningHttpServer {
 }
 
 export interface LocalApi {
+  evaluationAction?: (
+    action: import('../shared/evaluation').EvaluationAction,
+    input: unknown
+  ) => Promise<unknown>
+  mcpAction?: (
+    action: import('../shared/mcp-settings.ts').McpAction,
+    input: unknown,
+    signal: AbortSignal
+  ) => Promise<unknown>
   reviewAction?: (
     action: import('../shared/review-contracts').ReviewAction,
     input: unknown,
@@ -81,6 +92,40 @@ export async function startHttpServer(
       if (request.headers.authorization !== 'Bearer ' + token)
         throw new ApiError('UNAUTHORIZED', '本地服务认证失败', 401)
       if (closing) throw new ApiError('SERVICE_STOPPING', '服务正在关闭', 503)
+      if (
+        request.method === 'POST' &&
+        evaluationActions.some((a) => request.url === '/evaluations/' + a)
+      ) {
+        if (!api.evaluationAction) throw new ApiError('EVAL_NOT_READY', '评测中心未就绪', 503)
+        if (!request.headers['content-type']?.startsWith('application/json'))
+          throw new ApiError('EVAL_INVALID_INPUT', '评测请求须为JSON', 415)
+        const chunks: Buffer[] = []
+        let size = 0
+        for await (const chunk of request) {
+          size += chunk.length
+          if (size > 32768) throw new ApiError('EVAL_INPUT_LIMIT', '评测参数过大', 413)
+          chunks.push(chunk)
+        }
+        let value: unknown
+        try {
+          value = JSON.parse(Buffer.concat(chunks).toString('utf8'))
+        } catch {
+          throw new ApiError('EVAL_INVALID_INPUT', '评测JSON无效', 400)
+        }
+        send(
+          200,
+          successResult(
+            context,
+            await api.evaluationAction(
+              request.url!.slice(
+                '/evaluations/'.length
+              ) as import('../shared/evaluation').EvaluationAction,
+              value
+            )
+          )
+        )
+        return
+      }
       if (request.method === 'POST' && request.url === '/analyze') {
         if (!api.analyzeStream)
           throw new ApiError('ANALYSIS_NOT_READY', '流式分析服务尚未接入', 503)
@@ -103,6 +148,39 @@ export async function startHttpServer(
       if (request.method === 'GET' && request.url === '/rules') {
         if (!api.getRules) throw new ApiError('RULES_NOT_READY', '内置规则尚未接入', 503)
         send(200, successResult(context, api.getRules()))
+        return
+      }
+      if (
+        request.method === 'POST' &&
+        mcpActions.some((action) => request.url === '/mcp/' + action)
+      ) {
+        if (!api.mcpAction) throw new ApiError('MCP_NOT_READY', 'MCP管理服务未就绪', 503)
+        if (!request.headers['content-type']?.startsWith('application/json'))
+          throw new ApiError('MCP_INPUT_INVALID', 'MCP配置请求必须为JSON', 415)
+        const chunks: Buffer[] = []
+        let size = 0
+        for await (const chunk of request) {
+          size += chunk.length
+          if (size > 524288) throw new ApiError('MCP_INPUT_LIMIT', 'MCP配置超过512KiB', 413)
+          chunks.push(chunk)
+        }
+        let value: unknown
+        try {
+          value = JSON.parse(Buffer.concat(chunks).toString('utf8'))
+        } catch {
+          throw new ApiError('MCP_INPUT_INVALID', 'MCP配置JSON无效', 400)
+        }
+        send(
+          200,
+          successResult(
+            context,
+            await api.mcpAction(
+              request.url!.slice(5) as import('../shared/mcp-settings.ts').McpAction,
+              value,
+              controller.signal
+            )
+          )
+        )
         return
       }
       const templateRoutes = ['list', 'save', 'import', 'project', 'saveProject', 'run'].map(

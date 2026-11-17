@@ -5,7 +5,8 @@ import type { SourceScan } from './scan'
 import { SnapshotRepository } from '../storage/snapshot-repository.ts'
 import { GraphRepository } from '../storage/graph-repository.ts'
 import { dirname } from 'node:path'
-const select = `SELECT p.*,s.source_stamp,s.file_count,s.total_bytes,s.registered_at FROM projects p JOIN source_imports s ON s.project_id=p.id`
+const select = `SELECT p.id,p.name,p.path,p.source_type,p.git_url,p.git_commit,p.git_dirty,
+  p.source_stamp,p.file_count,p.total_bytes,p.registered_at FROM projects p WHERE p.source_key IS NOT NULL`
 function project(row: Row): SourceProject {
   return {
     projectId: String(row.id),
@@ -34,17 +35,19 @@ export class SourceRepository {
   }
   catalog(): SourceCatalog {
     return {
-      projects: this.db.all(select + ' ORDER BY s.registered_at DESC,p.id LIMIT 100').map(project),
-      total: Number(this.db.get('SELECT count(*) AS n FROM source_imports')?.n)
+      projects: this.db.all(select + ' ORDER BY p.registered_at DESC,p.id LIMIT 100').map(project),
+      total: Number(
+        this.db.get('SELECT count(*) AS n FROM projects WHERE source_key IS NOT NULL')?.n
+      )
     }
   }
   get(id: string): SourceProject | undefined {
-    const row = this.db.get(select + ' WHERE p.id=?', id)
+    const row = this.db.get(select + ' AND p.id=?', id)
     return row ? project(row) : undefined
   }
   find(key: string): SourceProject | undefined {
     const row = this.db.get(
-      select + ' WHERE s.source_key=? ORDER BY s.registered_at DESC LIMIT 1',
+      select + ' AND p.source_key=? ORDER BY p.registered_at DESC LIMIT 1',
       key
     )
     return row ? project(row) : undefined
@@ -57,29 +60,24 @@ export class SourceRepository {
   ): SourceProject {
     const id = randomUUID(),
       now = new Date().toISOString()
-    this.db.transaction((tx) => {
-      tx.run(
-        `INSERT INTO projects (id,name,path,source_type,created_at,updated_at,git_url,git_commit,git_dirty,revision) VALUES (?,?,?,?,?,?,?,?,?,1)`,
-        id,
-        name,
-        scan.path,
-        git ? 'git' : 'local',
-        now,
-        now,
-        git?.url ?? null,
-        git?.commit ?? null,
-        git ? Number(git.dirty) : null
-      )
-      tx.run(
-        'INSERT INTO source_imports VALUES (?,?,?,?,?,?)',
-        id,
-        key,
-        scan.stamp,
-        scan.fileCount,
-        scan.totalBytes,
-        now
-      )
-    })
+    this.db.run(
+      `INSERT INTO projects (id,name,path,source_type,created_at,updated_at,git_url,git_commit,git_dirty,revision,
+        source_key,source_stamp,file_count,total_bytes,registered_at) VALUES (?,?,?,?,?,?,?,?,?,1,?,?,?,?,?)`,
+      id,
+      name,
+      scan.path,
+      git ? 'git' : 'local',
+      now,
+      now,
+      git?.url ?? null,
+      git?.commit ?? null,
+      git ? Number(git.dirty) : null,
+      key,
+      scan.stamp,
+      scan.fileCount,
+      scan.totalBytes,
+      now
+    )
     return this.get(id)!
   }
 }

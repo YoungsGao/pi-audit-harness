@@ -9,6 +9,7 @@ import type { PathDetail, ScanStatistics } from '../../../shared/scan-contracts'
 import { mergeAnalysisFrames, analysisErrorHelp } from '../../../shared/analysis-view'
 import { publicAnalysisText, publicAnalysisValue } from '../../../shared/path-detail-view'
 import { AnalysisTimeline } from './AnalysisTimeline'
+import { InvestigationPanel } from './InvestigationPanel'
 
 const verdicts = {
   unknown: '未知，需要补证',
@@ -424,6 +425,7 @@ export function AnalysisStreamPanel({
           ))}
         </select>
       </label>
+      <InvestigationPanel frames={frames} detail={detail} expired={expired} />
       <AnalysisTimeline frames={frames} />
       <div data-testid="analysis-stream-events" className="analysis-sections">
         <section aria-label="思考区域" data-testid="analysis-thinking">

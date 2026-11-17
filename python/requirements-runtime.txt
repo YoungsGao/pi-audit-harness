@@ -1,0 +1,6 @@
+# Runtime dependencies for the local audit MCP services; Python >= 3.11.
+mcp==1.30.0
+pydantic==2.12.5
+starlette==1.8.0
+uvicorn==0.54.0
+httpx==0.28.1

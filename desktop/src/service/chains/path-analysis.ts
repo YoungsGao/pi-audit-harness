@@ -11,11 +11,18 @@ import type { RecoveryExecution } from './recovery.ts'
 import { MAX_AGENT_STEPS } from '../../shared/path-limits.ts'
 import { invalidResult, ResultValidationError } from './result-validation.ts'
 import { constantRiskArguments } from './constant-arguments.ts'
+import { AuditMcpBackend } from '../mcp/backend.ts'
+import type { McpReceipt } from '../mcp/contracts.ts'
+import { combinedEvidence } from './evidence-citations.ts'
 
 export interface ReviewInput {
+  mcpBackend?: AuditMcpBackend
+  mcpReceipts?: McpReceipt[]
   recovery?: RecoveryExecution
   reviewConfig?: import('../../shared/template-contracts').RunReviewConfig
-  authorizeModel?: (model: Readonly<import('../../shared/pi-contracts').ModelConfig>) => void
+  authorizeModel?: (
+    model: Readonly<import('../../shared/pi-contracts').ModelConfig>
+  ) => string | void
   observedModel?: (modelId: string) => void
   beforeModelRequest?: (estimate: { inputBytes: number; maxOutputTokens: number }) => void
   observeDecision?: (text: string, stopReason: string) => void
@@ -66,7 +73,7 @@ export function validateResult(
   for (const step of result.steps) {
     if (!step || typeof step !== 'object')
       invalidResult('ANALYSIS_RESULT_INVALID', 'steps', 'object', '每个步骤必须是对象')
-    const evidence = input.evidence[step.stepIndex]
+    const evidence = combinedEvidence(input, step.stepIndex)
     const fail = (field: string, rule: string, message: string): never =>
       invalidResult(
         'ANALYSIS_EVIDENCE_INVALID',
@@ -77,6 +84,7 @@ export function validateResult(
       )
     if (!Number.isInteger(step.stepIndex) || !evidence || seen.has(step.stepIndex))
       fail('stepIndex', 'unique-read-step', '步骤编号必须有效、已经读取且不能重复')
+    if (!evidence) throw new Error('unreachable missing step evidence')
     if (![null, 0, 1].includes(step.dangerous))
       fail('dangerous', 'tri-state', 'dangerous只能是null、0或1')
     if (typeof step.reason !== 'string' || step.reason.length > 2000)
@@ -414,6 +422,7 @@ export class PathAnalysisService {
             attempt,
             model
           )
+          return transmissionId
         },
         observedModel: (modelId) => {
           if (transmissionId) this.repo.scans.disclosure.observed(transmissionId, modelId)
@@ -426,6 +435,8 @@ export class PathAnalysisService {
           })
         }
       }
+      if (this.agentMode && (!execution || execution.supportsMcp))
+        input.mcpBackend = new AuditMcpBackend(this.query, input)
       if (input.rulesVersion !== builtinRules.version)
         throw new ApiError('ANALYSIS_RULES_CHANGED', '历史规则版本不匹配，请重新预处理', 409)
       let result = validateResult(await this.reviewer(input, signal), input, this.agentMode)
@@ -433,7 +444,7 @@ export class PathAnalysisService {
         result = reconcileTaint(
           result,
           base.path.truncated ||
-            evidence.some((e) => e.complete === false) ||
+            evidence.some((_e, i) => combinedEvidence(input, i)?.complete === false) ||
             base.path.steps.some((s) => s.edge.resolutionStatus === 'unresolved'),
           base.path.sourceRef
         )
@@ -449,7 +460,7 @@ export class PathAnalysisService {
           base.pathId,
           attempt,
           result,
-          evidence,
+          evidence.map((_e, index) => combinedEvidence(input, index)!),
           base.path.truncated ||
             base.path.steps.some((s) => s.edge.resolutionStatus === 'unresolved')
         )

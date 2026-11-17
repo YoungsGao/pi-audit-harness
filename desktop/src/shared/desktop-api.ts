@@ -29,6 +29,16 @@ export interface ServiceStatus {
 }
 
 export interface DesktopApi {
+  saveEvaluation: (id: string) => Promise<string | null>
+  evaluations: (
+    action: import('./evaluation').EvaluationAction,
+    input: unknown
+  ) => Promise<ApiResult<unknown>>
+  mcp: (
+    action: import('./mcp-settings').McpAction,
+    input: unknown
+  ) => Promise<ApiResult<import('./mcp-settings').McpData>>
+  importMcpConfig: () => Promise<ApiResult<import('./mcp-settings').McpData> | null>
   reviews: (
     action: import('./review-contracts').ReviewAction,
     input: unknown

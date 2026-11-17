@@ -19,6 +19,7 @@ export function AnalysisTimeline({ frames }: { frames: StreamFrame[] }): React.J
         {frames.map((frame) => {
           const info = asRecord(publicAnalysisValue(frame.data.details))
           const payload = asRecord(info.payload)
+          const toolOutput = asRecord(payload.output)
           const isTool = typeof info.toolName === 'string'
           const code = typeof payload.errorCode === 'string' ? payload.errorCode : ''
           const validation = asRecord(payload.validation)
@@ -32,7 +33,11 @@ export function AnalysisTimeline({ frames }: { frames: StreamFrame[] }): React.J
                   : '阶段未记录'
             : ''
           return (
-            <li key={frame.data.sessionId + ':' + frame.id} data-event-id={frame.id}>
+            <li
+              key={frame.data.sessionId + ':' + frame.id}
+              data-event-id={frame.id}
+              id={`analysis-event-${frame.id}`}
+            >
               <strong>
                 #{frame.id} ·{' '}
                 {frame.event === 'validation_info'
@@ -57,6 +62,31 @@ export function AnalysisTimeline({ frames }: { frames: StreamFrame[] }): React.J
                     ` · 耗时 ${Math.round(info.durationMs)} ms`}
                 </p>
               )}
+              {typeof toolOutput.profile === 'string' &&
+                toolOutput.profile.startsWith('audit-mcp/') && (
+                  <div data-testid="mcp-feedback">
+                    <p>
+                      {toolOutput.tool === 'audit_static_scan'
+                        ? '静态扫描 MCP'
+                        : 'CodeGraph 补证 MCP'}
+                      {' · 状态：'}
+                      {String(toolOutput.status)}
+                      {' · 引擎：'}
+                      {String(toolOutput.engine)}
+                      {' · 返回项：'}
+                      {Array.isArray(toolOutput.items) ? toolOutput.items.length : 0}
+                      {payload.cached === true && ' · 已复用核验回执'}
+                    </p>
+                    <p>
+                      {toolOutput.tool === 'audit_static_scan'
+                        ? '静态命中是待核查发现；零命中、不可用或失败均不能证明安全。'
+                        : '调用关系是候选信息；补充源码须以证据编号和固定原文核验。'}
+                    </p>
+                    {Array.isArray(toolOutput.gaps) && toolOutput.gaps.length > 0 && (
+                      <p>检查缺口：{toolOutput.gaps.map(String).join('、')}</p>
+                    )}
+                  </div>
+                )}
               {frame.data.type === 'result' && (
                 <p>
                   最终判断依据：{publicAnalysisText(frame.data.message ?? '本会话未保存判断说明。')}

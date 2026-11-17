@@ -34,3 +34,5 @@ out-security-test/
 out-qa-test/
 .reliability-test-data/
 out-reliability-test/
+out-mcp-test/
+.mcp-test-data/

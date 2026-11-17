@@ -3,6 +3,8 @@ import { AuditPage } from './components/AuditPage'
 import { ReportsPage } from './components/ReportsPage'
 import { ModelsPage } from './components/ModelsPage'
 import { TemplatesPage } from './components/TemplatesPage'
+import { McpPage } from './components/McpPage'
+import { EvaluationsPage } from './components/EvaluationsPage'
 import { useEffect, useRef, useState } from 'react'
 import { MetadataCard } from './components/MetadataCard'
 import { StorageCard } from './components/StorageCard'
@@ -33,6 +35,16 @@ const pages = [
     id: 'reports',
     title: '审计报告',
     description: '筛选已保存结果，保留独立人工结论，生成 HTML 或导出 JSON。'
+  },
+  {
+    id: 'mcp',
+    title: '扩展服务',
+    description: '管理本地 Python MCP、导入扩展配置、测试连接并选择工具。'
+  },
+  {
+    id: 'evaluations',
+    title: '对照评测',
+    description: '在固定样例、模型与预算下比较工具能力，区分工程回归和真实模型质量。'
   }
 ] as const
 
@@ -40,6 +52,12 @@ type PageId = (typeof pages)[number]['id']
 
 function PageIcon({ page }: { page: PageId }): React.JSX.Element {
   const paths: Record<PageId, React.JSX.Element> = {
+    evaluations: <path d="M4 20h16M7 16V9m5 7V4m5 12v-5" />,
+    mcp: (
+      <>
+        <path d="M8 3v4m8-4v4M6 7h12v4a6 6 0 0 1-12 0ZM12 17v4" />
+      </>
+    ),
     templates: (
       <>
         <path d="M5 3h14v18H5ZM8 7h8M8 11h8M8 15h5" />
@@ -217,7 +235,11 @@ function App(): React.JSX.Element {
               {serviceLabel}
             </span>
           </header>
-          {pageId === 'models' ? (
+          {pageId === 'evaluations' ? (
+            <EvaluationsPage />
+          ) : pageId === 'mcp' ? (
+            <McpPage />
+          ) : pageId === 'models' ? (
             <ModelsPage />
           ) : pageId === 'projects' ? (
             <>

@@ -4,6 +4,45 @@ import { invalidResult } from './result-validation.ts'
 import { propagationChecks } from '../../shared/taint-contracts.ts'
 
 type Scope = Pick<ReviewInput, 'projectId' | 'runId' | 'pathId'>
+export function combinedEvidence(
+  input: ReviewInput,
+  stepIndex: number
+): ReviewInput['evidence'][number] | undefined {
+  const base = input.evidence[stepIndex]
+  if (!base) return undefined
+  const extra = (input.mcpReceipts ?? [])
+    .filter((r) => r.name === 'audit_read_related' && r.args.stepIndex === stepIndex)
+    .flatMap((r) => r.output.ranges)
+  if (!extra.length) return base
+  const ranges = [
+    ...new Map(
+      [...(base.ranges ?? [base]), ...extra].map((r) => [
+        JSON.stringify([r.filePath, r.startLine, r.endLine, r.text]),
+        r
+      ])
+    ).values()
+  ]
+  return {
+    ...base,
+    complete:
+      base.complete !== false &&
+      !(input.mcpReceipts ?? []).some(
+        (r) =>
+          r.name === 'audit_read_related' && r.args.stepIndex === stepIndex && r.output.truncated
+      ),
+    ranges,
+    text: ranges.map((r) => `${r.filePath}:${r.startLine}-${r.endLine}\n${r.text}`).join('\n')
+  }
+}
+export function stepCards(input: ReviewInput, index: number): ReturnType<typeof evidenceCards> {
+  const base = input.evidence[index]
+  return [
+    ...(base ? evidenceCards(base, index, input) : []),
+    ...(input.mcpReceipts ?? [])
+      .filter((r) => r.name === 'audit_read_related' && r.args.stepIndex === index)
+      .flatMap((r) => r.output.citations)
+  ]
+}
 export function evidenceCards(
   evidence: ReviewInput['evidence'][number],
   stepIndex: number,
@@ -38,15 +77,15 @@ export function resolveResultCitations(value: unknown, input: ReviewInput): unkn
   const result = structuredClone(value) as { steps: Record<string, unknown>[] }
   const registered = new Map(
     input.evidence.flatMap((e, i) =>
-      e ? evidenceCards(e, i, input).map((c) => [c.id, c.text] as const) : []
+      e ? stepCards(input, i).map((c) => [c.id, c.text] as const) : []
     )
   )
   for (const step of result.steps) {
     if (!step || typeof step !== 'object') continue
     const index = Number(step.stepIndex),
-      evidence = input.evidence[index]
+      evidence = combinedEvidence(input, index)
     if (!Number.isInteger(step.stepIndex) || !evidence) continue
-    const cards = new Map(evidenceCards(evidence, index, input).map((c) => [c.id, c.text]))
+    const cards = new Map(stepCards(input, index).map((c) => [c.id, c.text]))
     const quotes = (v: unknown, field: string): unknown =>
       Array.isArray(v)
         ? v.map((q, i) => {

@@ -108,7 +108,7 @@ test('CodeGraph actual SDK freezes cross-file call sites, candidates, provenance
   assert.equal(second.runtime.starts, 1)
   const report = savedReportSnapshot(h.db, h.scope.projectId, h.scope.runId)
   assert.deepEqual(report.queryGraph, binding)
-  assert.throws(() => h.db.exec('DELETE FROM run_graph_bindings'))
+  assert.throws(() => h.db.exec('UPDATE audit_runs SET graph_json=NULL'))
 })
 test('SCAN-02 manual paths reuse frozen CodeGraph targets and basic identity without rebuilding', async (t) => {
   const repoText =

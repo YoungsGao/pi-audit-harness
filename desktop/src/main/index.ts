@@ -1,5 +1,7 @@
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import { helpLinks } from '../shared/help-links'
+import { mcpActions } from '../shared/mcp-settings'
+import { readFile, stat, writeFile } from 'node:fs/promises'
 import { templateActions } from '../shared/template-contracts'
 import type { IpcMainInvokeEvent } from 'electron'
 import { join } from 'node:path'
@@ -59,6 +61,52 @@ function createWindow(): void {
 }
 
 void app.whenReady().then(() => {
+  ipcMain.handle('evaluations:save', async (event, id: string) => {
+    assertClient(event)
+    const result = await service.evaluations('detail', { id })
+    if (!result.ok) throw new Error(result.error.message)
+    const chosen = await dialog.showSaveDialog(mainWindow!, {
+      title: '导出评测汇总',
+      defaultPath: `evaluation-${id}.json`,
+      filters: [{ name: 'JSON', extensions: ['json'] }]
+    })
+    if (chosen.canceled || !chosen.filePath) return null
+    await writeFile(chosen.filePath, JSON.stringify(result.data, null, 2), 'utf8')
+    return chosen.filePath
+  })
+  ipcMain.handle(
+    'evaluations:action',
+    (event, action: import('../shared/evaluation').EvaluationAction, input: unknown) => {
+      assertClient(event)
+      return service.evaluations(action, input)
+    }
+  )
+  ipcMain.handle(
+    'mcp:action',
+    (event, action: import('../shared/mcp-settings').McpAction, input: unknown) => {
+      assertClient(event)
+      if (!mcpActions.includes(action)) throw new Error('不支持的MCP操作')
+      return service.mcp(action, input)
+    }
+  )
+  ipcMain.handle('mcp:import', async (event) => {
+    assertClient(event)
+    const chosen = await dialog.showOpenDialog(mainWindow!, {
+      title: '导入MCP服务配置',
+      properties: ['openFile'],
+      filters: [{ name: 'JSON 配置', extensions: ['json'] }]
+    })
+    if (chosen.canceled || !chosen.filePaths[0]) return null
+    const file = chosen.filePaths[0]
+    if ((await stat(file)).size > 524288) throw new Error('MCP配置最多512KiB')
+    let config: unknown
+    try {
+      config = JSON.parse((await readFile(file, 'utf8')).replace(/^\uFEFF/, ''))
+    } catch {
+      throw new Error('MCP配置不是有效JSON')
+    }
+    return service.mcp('import', config)
+  })
   console.info('客户端主进程 PID=', process.pid)
   app.setAppUserModelId('com.pi-audit-harness.desktop')
   ipcMain.handle('app:get-info', (event): AppInfo => {

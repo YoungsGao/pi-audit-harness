@@ -10,6 +10,8 @@ import { templateMigration } from './template-migration.ts'
 import { reviewExportMigration } from './review-export-migration.ts'
 import { runRecoveryMigration } from './run-recovery-migration.ts'
 import { graphMigration } from './graph-migration.ts'
+import { mcpMigration } from './mcp-migration.ts'
+import { consolidationMigration } from './consolidation-migration.ts'
 
 // 十六进制 ASCII「PIAU」，用来避免把别的 SQLite 文件当成本应用数据库。
 const APPLICATION_ID = 0x50494155
@@ -184,6 +186,16 @@ CREATE INDEX idx_source_import_key ON source_imports(source_key,registered_at);
     version: 13,
     name: 'immutable-query-graph-bindings',
     sql: graphMigration
+  },
+  {
+    version: 14,
+    name: 'scoped-mcp-tool-receipts',
+    sql: mcpMigration
+  },
+  {
+    version: 15,
+    name: 'consolidated-project-run-and-audit-records',
+    sql: consolidationMigration
   }
 ]
 

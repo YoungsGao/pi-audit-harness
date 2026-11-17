@@ -2,6 +2,8 @@ import { DatabaseSync } from 'node:sqlite'
 import { resolve } from 'node:path'
 if (!process.argv[2]) throw Error('用法：node scripts/inspect-analysis.mjs <audit.sqlite3 的路径>')
 const db = new DatabaseSync(resolve(process.argv[2]), { readOnly: true, allowExtension: false })
+const eventTable =
+  db.prepare('PRAGMA user_version').get().user_version >= 15 ? 'audit_events' : 'analysis_events'
 try {
   console.log(
     JSON.stringify(
@@ -17,7 +19,7 @@ try {
           .all(),
         events: db
           .prepare(
-            'SELECT run_id,chain_id,seq,type,status,summary_missing,truncated FROM analysis_events ORDER BY run_id,seq LIMIT 100'
+            `SELECT run_id,chain_id,seq,type,status,summary_missing,truncated FROM ${eventTable} WHERE seq IS NOT NULL ORDER BY run_id,seq LIMIT 100`
           )
           .all(),
         reports: db

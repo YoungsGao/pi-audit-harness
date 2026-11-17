@@ -56,6 +56,7 @@ void app.whenReady().then(async () => {
     ipcMain.handle('storage:get-overview', () => service.getStorageOverview())
     ipcMain.handle('metadata:get', () => service.metadata('list'))
     ipcMain.handle('models:get-catalog', () => service.modelSettings())
+    ipcMain.handle('evaluations:action', (_e, a, input) => service.evaluations(a, input))
     ipcMain.handle('sources:list', () => service.source('list'))
     ipcMain.handle('sources:tools', () => service.source('tools'))
     ipcMain.handle('audit:action', (e, a, input) => {
@@ -110,9 +111,11 @@ void app.whenReady().then(async () => {
       }
     })
     await window.loadFile(join(__dirname, '../renderer/index.html'))
-    await until(() => js('document.querySelectorAll("nav button").length===5'), 'navigation')
+    await until(() => js('document.querySelectorAll("nav button").length===7'), 'navigation')
     const scenarios: Record<string, unknown>[] = []
-    for (const fail of [false, true]) {
+    for (const scenario of ['repair', 'failure', 'mcp']) {
+      const fail = scenario === 'failure'
+      model.setMode(scenario === 'mcp' ? 'mcp' : 'finish')
       submissions = 0
       persistent = fail
       const prepared = await service.audit('prepare', { projectId: project.data.projectId })
@@ -174,6 +177,15 @@ void app.whenReady().then(async () => {
         await js('!!document.querySelector("[data-testid=analysis-timeline] [role=alert]")'),
         fail
       )
+      await until(
+        () => js('!!document.querySelector("[data-testid=investigation-panel]")'),
+        'investigation snapshot'
+      )
+      assert.ok(
+        await js(
+          'document.querySelector("[data-testid=investigation-panel]").textContent.includes("证据卡")'
+        )
+      )
       if (!fail)
         assert.ok(
           await js(
@@ -184,11 +196,35 @@ void app.whenReady().then(async () => {
         'document.querySelector("[data-testid=validation-feedback]").scrollIntoView({block:"center"})'
       )
       await js('new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))')
+      if (scenario === 'mcp') {
+        await until(
+          () => js('!!document.querySelector("[data-testid=mcp-feedback]")'),
+          'MCP feedback'
+        )
+        for (const name of ['audit_find_related', 'audit_read_related', 'audit_static_scan'])
+          assert.ok(
+            await js(
+              `document.querySelector('[data-testid=analysis-timeline]').textContent.includes(${JSON.stringify(name)})`
+            )
+          )
+        await js(
+          'document.querySelector("[data-testid=mcp-feedback]").scrollIntoView({block:"center"})'
+        )
+        await js('new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))')
+      }
       writeFileSync(
-        join(root, fail ? 'validation-failed.png' : 'validation-repaired.png'),
+        join(
+          root,
+          scenario === 'mcp'
+            ? 'mcp-feedback.png'
+            : fail
+              ? 'validation-failed.png'
+              : 'validation-repaired.png'
+        ),
         (await window.webContents.capturePage()).toPNG()
       )
       scenarios.push({
+        scenario,
         failed: fail,
         ...scope,
         pathId,
@@ -197,6 +233,47 @@ void app.whenReady().then(async () => {
         status: (detail.data as PathDetail).status
       })
     }
+    await js(
+      'document.querySelector("[data-testid=investigation-panel]").scrollIntoView({block:"start"})'
+    )
+    await js('new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))')
+    writeFileSync(
+      join(root, 'investigation-panel.png'),
+      (await window.webContents.capturePage()).toPNG()
+    )
+    await js(
+      'Array.from(document.querySelectorAll("nav button")).find(b=>b.textContent==="对照评测").click()'
+    )
+    await until(
+      () => js('document.querySelectorAll(".evaluation-cases input").length===9'),
+      'evaluation catalog'
+    )
+    await js(
+      'Array.from(document.querySelectorAll(".evaluation-cases input")).slice(1).filter(e=>e.checked).forEach(e=>e.click())'
+    )
+    await js(
+      'Array.from(document.querySelectorAll("button")).find(b=>b.textContent==="开始三组对照").click()'
+    )
+    await until(
+      () =>
+        js(
+          'document.querySelector("[data-testid=evaluation-status]")?.textContent.includes("completed")'
+        ),
+      'comparison complete'
+    )
+    assert.ok(
+      await js(
+        'document.querySelector("[data-testid=evaluation-comparison]").textContent.includes("不评质量")'
+      )
+    )
+    await js(
+      'document.querySelector("[data-testid=evaluation-comparison]").scrollIntoView({block:"center"})'
+    )
+    await js('new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))')
+    writeFileSync(
+      join(root, 'evaluation-comparison.png'),
+      (await window.webContents.capturePage()).toPNG()
+    )
     assert.equal(await js('typeof require'), 'undefined')
     writeFileSync(
       join(root, 'verification.json'),

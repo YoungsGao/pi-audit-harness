@@ -77,7 +77,12 @@ export class SnapshotRepository {
           )
         }
       }
-      tx.run('INSERT INTO run_snapshots VALUES (?,?,?)', runId, projectId, id)
+      tx.run(
+        'UPDATE audit_runs SET snapshot_id=? WHERE id=? AND project_id=?',
+        id,
+        runId,
+        projectId
+      )
     })
     const info = this.info(projectId, runId)
     // 校验复用的快照，不能用新磁盘内容覆盖已损坏记录。
@@ -87,8 +92,8 @@ export class SnapshotRepository {
 
   info(projectId: string, runId: string): SnapshotInfo {
     const row = this.db.get(
-      `SELECT s.* FROM run_snapshots r JOIN source_snapshots s
-      ON s.snapshot_id=r.snapshot_id AND s.project_id=r.project_id WHERE r.project_id=? AND r.run_id=?`,
+      `SELECT s.* FROM audit_runs r JOIN source_snapshots s
+      ON s.snapshot_id=r.snapshot_id AND s.project_id=r.project_id WHERE r.project_id=? AND r.id=?`,
       projectId,
       runId
     )

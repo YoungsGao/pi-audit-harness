@@ -97,7 +97,7 @@ test('real Pi tool loop serially claims SQLite pending paths, persists decisions
   const state = await chains.action('runState', scope)
   assert.equal(state.stage, 'completed')
   assert.equal(isAuditData('runState', state), true)
-  const events = await chains.action('events', scope)
+  const events = await chains.action('events', { ...scope, limit: 100 })
   assert.equal(isAuditData('events', events), true)
   assert.ok(
     events.events.some(
@@ -123,12 +123,19 @@ test('real Pi tool loop serially claims SQLite pending paths, persists decisions
     model.requests.every(
       (r) =>
         r.model === 'fixture' &&
-        r.tools?.length === 1 &&
-        r.tools[0].function.name === 'audit_read_step'
+        r.tools?.length === 4 &&
+        r.tools.every((t) =>
+          [
+            'audit_read_step',
+            'audit_find_related',
+            'audit_read_related',
+            'audit_static_scan'
+          ].includes(t.function.name)
+        )
     )
   )
   assert.equal(
-    db.get("SELECT count(DISTINCT run_id||':'||seq) AS n FROM analysis_events").n,
+    db.get("SELECT count(DISTINCT run_id||':'||seq) AS n FROM audit_events").n,
     events.events.length
   )
   await assert.rejects(
@@ -181,7 +188,7 @@ test('event payload is redacted/bounded, cursor scoped; result/event write rolls
   const pathId = prepared.pathIds[0],
     attempt = repo.scans.claim(scope.projectId, scope.runId, pathId, 'model')
   db.exec(
-    "CREATE TRIGGER reject_final BEFORE INSERT ON analysis_events WHEN NEW.type='result' BEGIN SELECT RAISE(ABORT,'fail'); END"
+    "CREATE TRIGGER reject_final BEFORE INSERT ON audit_events WHEN NEW.type='result' BEGIN SELECT RAISE(ABORT,'fail'); END"
   )
   assert.throws(() =>
     repo.scans.complete(
@@ -239,7 +246,7 @@ test('v6 upgrade preserves checksums and historical graph; failed v11 migration 
       { version: 13, name: 'broken', sql: 'CREATE TABLE rollback_me(id); SELECT * FROM absent;' }
     ])
   )
-  assert.equal(db.get('PRAGMA user_version').user_version, 13)
+  assert.equal(db.get('PRAGMA user_version').user_version, 15)
   assert.equal(db.get("SELECT name FROM sqlite_schema WHERE name='rollback_me'"), undefined)
 })
 
@@ -307,7 +314,10 @@ test('two SQLite connections claim different pending rows, explicit retry increm
       { code: 'ANALYSIS_STALE' }
     )
     assert.equal(
-      db.get('SELECT attempt FROM path_attempts WHERE path_id=?', first.pathId).attempt,
+      db.get(
+        'SELECT max(attempt_id) AS attempt FROM analysis_sessions WHERE chain_id=?',
+        first.pathId
+      ).attempt,
       retry
     )
   } finally {

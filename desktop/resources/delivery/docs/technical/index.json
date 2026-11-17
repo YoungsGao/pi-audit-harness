@@ -69,6 +69,26 @@
       "title": "16 真实模型输出可靠性与工程纠错"
     },
     {
+      "path": "17.CodeGraph补证与静态扫描MCP.md",
+      "title": "17 CodeGraph补证与静态扫描MCP"
+    },
+    {
+      "path": "18.数据库表设计与ER图汇报.md",
+      "title": "18 数据库表设计与 ER 图汇报"
+    },
+    {
+      "path": "19.数据库表合并与工程简化.md",
+      "title": "19 数据库表合并与工程简化"
+    },
+    {
+      "path": "20.Python本地MCP服务与客户端管理.md",
+      "title": "20 Python 本地 MCP 服务与客户端管理"
+    },
+    {
+      "path": "21.证据调查面板对照评测与Java检测增强.md",
+      "title": "21 证据调查面板、对照评测与 Java 检测增强"
+    },
+    {
       "path": "_template.md",
       "title": "文档模板"
     }

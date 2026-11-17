@@ -50,17 +50,6 @@ function record(row: Row): TemplateRecord {
     verification: 'unverified'
   }
 }
-function projectReview(row: Row): ProjectReview {
-  return {
-    projectId: String(row.project_id),
-    revision: Number(row.revision),
-    businessWrappers: String(row.business_wrappers),
-    inputSources: String(row.input_sources),
-    defenseConventions: String(row.defense_conventions),
-    focus: String(row.focus),
-    updatedAt: String(row.updated_at)
-  }
-}
 export function reviewContextHash(templates: TemplateRecord[], review: ProjectReview): string {
   return createHash('sha256')
     .update(JSON.stringify({ templates, projectReview: review }))
@@ -127,10 +116,11 @@ export class TemplateRepository {
   }
   project(projectId: string, tx: SqlSession = this.db): ProjectReview {
     templateId(projectId)
-    if (!tx.get('SELECT id FROM projects WHERE id=?', projectId))
-      throw new ApiError('PROJECT_NOT_FOUND', '未找到项目', 404)
-    const row = tx.get('SELECT * FROM project_review_settings WHERE project_id=?', projectId)
-    return row ? projectReview(row) : emptyProjectReview(projectId)
+    const row = tx.get('SELECT review_json FROM projects WHERE id=?', projectId)
+    if (!row) throw new ApiError('PROJECT_NOT_FOUND', '未找到项目', 404)
+    return row.review_json
+      ? (JSON.parse(String(row.review_json)) as ProjectReview)
+      : emptyProjectReview(projectId)
   }
   saveProject(value: unknown): ProjectReview {
     const input = validateProjectReview(value)
@@ -138,17 +128,19 @@ export class TemplateRepository {
       const old = this.project(input.projectId, tx)
       if (old.revision !== input.expectedRevision)
         throw new ApiError('PROJECT_REVIEW_CONFLICT', '项目补充要求已被更新，请刷新后再保存', 409)
+      const review: ProjectReview = {
+        projectId: input.projectId,
+        revision: old.revision + 1,
+        businessWrappers: input.businessWrappers,
+        inputSources: input.inputSources,
+        defenseConventions: input.defenseConventions,
+        focus: input.focus,
+        updatedAt: new Date().toISOString()
+      }
       tx.run(
-        `INSERT INTO project_review_settings VALUES (?,?,?,?,?,?,?) ON CONFLICT(project_id) DO UPDATE SET
-        revision=excluded.revision,business_wrappers=excluded.business_wrappers,input_sources=excluded.input_sources,
-        defense_conventions=excluded.defense_conventions,focus=excluded.focus,updated_at=excluded.updated_at`,
-        input.projectId,
-        old.revision + 1,
-        input.businessWrappers,
-        input.inputSources,
-        input.defenseConventions,
-        input.focus,
-        new Date().toISOString()
+        'UPDATE projects SET review_json=? WHERE id=?',
+        JSON.stringify(review),
+        input.projectId
       )
       return this.project(input.projectId, tx)
     })
@@ -204,26 +196,24 @@ export class TemplateRepository {
       createdAt: new Date().toISOString()
     }
     tx.run(
-      'INSERT INTO run_review_configs VALUES (?,?,?,?,?)',
-      runId,
-      projectId,
+      'UPDATE audit_runs SET review_json=?,review_hash=? WHERE id=? AND project_id=?',
       JSON.stringify(config),
       config.contextHash,
-      config.createdAt
+      runId,
+      projectId
     )
     return config
   }
   run(projectId: string, runId: string): RunReviewConfig {
     templateId(projectId)
     templateId(runId)
-    if (!this.db.get('SELECT id FROM audit_runs WHERE id=? AND project_id=?', runId, projectId))
-      throw new ApiError('CHAIN_NOT_FOUND', '任务不属于指定项目', 404)
     const row = this.db.get(
-      'SELECT * FROM run_review_configs WHERE project_id=? AND run_id=?',
+      'SELECT review_json AS context_json,review_hash AS context_hash FROM audit_runs WHERE project_id=? AND id=?',
       projectId,
       runId
     )
-    if (!row) {
+    if (!row) throw new ApiError('CHAIN_NOT_FOUND', '任务不属于指定项目', 404)
+    if (!row.context_json) {
       const review = emptyProjectReview(projectId)
       return {
         projectId,

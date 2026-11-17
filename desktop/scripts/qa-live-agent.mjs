@@ -230,9 +230,12 @@ try {
         await h.chains.action('analyze', { ...current.scope, pathId, modelConfigId: config.id })
         await h.chains.analysis.waitForIdle()
         const detail = h.repo.detail({ ...current.scope, pathId }),
-          attempt = h.db.get('SELECT phase,error_code FROM path_attempts WHERE path_id=?', pathId)
+          attempt = h.db.get(
+            "SELECT CASE WHEN state IN ('queue','analyze') THEN 'analyzing' WHEN state='completed' THEN 'completed' ELSE 'failed' END AS phase,error_code FROM analysis_sessions WHERE chain_id=? ORDER BY attempt_id DESC LIMIT 1",
+            pathId
+          )
         const events = h.db.all(
-          'SELECT type,status,summary,payload_json FROM analysis_events WHERE chain_id=? ORDER BY seq',
+          "SELECT type,status,summary,CASE WHEN stream_event IS NOT NULL THEN json_extract(body_json,'$.details.payload') ELSE json_extract(body_json,'$.payload') END AS payload_json FROM audit_events WHERE chain_id=? AND seq IS NOT NULL ORDER BY seq",
           pathId
         )
         const json = JSON.parse(

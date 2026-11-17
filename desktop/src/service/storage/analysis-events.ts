@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 import type { AnalysisEvents, EventInput } from '../../shared/agent-contracts'
 import type { LocalDatabase, SqlSession } from './database.ts'
 import { ApiError } from '../../shared/api-error.ts'
-import { mirrorStreamEvent } from './stream-events.ts'
+import { projectStreamEvent } from './stream-events.ts'
 import { redactText } from '../../shared/redaction.ts'
 
 // Only bounded, redacted operational data. Never store prompts or hidden reasoning.
@@ -66,10 +66,21 @@ export function appendEvent(
   const safe = boundedLog({ summary: event.summary ?? null, payload: event.payload ?? null })
   const body = safe.value as { summary: string | null; payload: unknown }
   const seq = Number(
-    tx.get('SELECT COALESCE(MAX(seq),0)+1 AS n FROM analysis_events WHERE run_id=?', runId)!.n
+    tx.get('SELECT COALESCE(MAX(seq),0)+1 AS n FROM audit_events WHERE run_id=?', runId)!.n
+  )
+  const truncated = safe.truncated || event.truncated === true
+  const stream = projectStreamEvent(
+    tx,
+    projectId,
+    runId,
+    chainId,
+    event,
+    body.summary ?? null,
+    body.payload ?? null,
+    truncated
   )
   tx.run(
-    `INSERT INTO analysis_events VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+    `INSERT INTO audit_events VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
     randomUUID(),
     runId,
     projectId,
@@ -83,18 +94,11 @@ export function appendEvent(
     event.toolName?.slice(0, 100) ?? null,
     event.status.slice(0, 100),
     event.durationMs === undefined ? null : Math.max(0, Math.round(event.durationMs)),
-    JSON.stringify(body.payload ?? null),
-    Number(safe.truncated || event.truncated === true)
-  )
-  mirrorStreamEvent(
-    tx,
-    projectId,
-    runId,
-    chainId,
-    event,
-    body.summary ?? null,
-    body.payload ?? null,
-    safe.truncated || event.truncated === true
+    Number(truncated),
+    JSON.stringify(stream?.data ?? { payload: body.payload ?? null }),
+    stream?.sessionId ?? null,
+    stream?.id ?? null,
+    stream?.event ?? null
   )
 }
 export class AnalysisEventRepository {
@@ -106,12 +110,16 @@ export class AnalysisEventRepository {
     this.db.transaction((tx) => {
       if (event.attemptId !== undefined) {
         const current = tx.get(
-          'SELECT attempt,phase FROM path_attempts WHERE path_id=? AND run_id=? AND project_id=?',
+          'SELECT attempt_id AS attempt,state FROM analysis_sessions WHERE chain_id=? AND run_id=? AND project_id=? ORDER BY attempt_id DESC LIMIT 1',
           chainId,
           runId,
           projectId
         )
-        if (!current || current.attempt !== event.attemptId || current.phase !== 'analyzing')
+        if (
+          !current ||
+          current.attempt !== event.attemptId ||
+          !['queue', 'analyze'].includes(String(current.state))
+        )
           throw new ApiError('ANALYSIS_STALE', '旧尝试事件不能覆盖当前状态', 409)
       }
       appendEvent(tx, projectId, runId, chainId, event)
@@ -145,7 +153,7 @@ export class AnalysisEventRepository {
     )
       throw new ApiError('CHAIN_NOT_FOUND', '路径不属于本任务', 404)
     const rows = this.db.all(
-      `SELECT * FROM analysis_events WHERE project_id=? AND run_id=? AND seq>?
+      `SELECT * FROM audit_events WHERE project_id=? AND run_id=? AND seq>?
       ${pathId ? 'AND chain_id=?' : ''} ORDER BY seq LIMIT ?`,
       ...[projectId, runId, afterSeq, ...(pathId ? [pathId] : []), limit]
     )
@@ -163,7 +171,9 @@ export class AnalysisEventRepository {
       toolName: r.tool_name === null ? null : String(r.tool_name),
       status: String(r.status),
       durationMs: r.duration_ms === null ? null : Number(r.duration_ms),
-      payload: JSON.parse(String(r.payload_json)),
+      payload: r.stream_event
+        ? (JSON.parse(String(r.body_json)).details?.payload ?? null)
+        : JSON.parse(String(r.body_json)).payload,
       truncated: r.truncated === 1
     }))
     return { projectId, runId, pathId, events, nextSeq: events.at(-1)?.seq ?? afterSeq }

@@ -1,4 +1,6 @@
 import { sourceRequest } from './source-client'
+import { mcpRequest } from './mcp-client'
+import { evaluationRequest } from './evaluation-client'
 import { connectAnalyze } from './analyze-stream-client'
 import type { AnalyzeRequest, StreamHandle, StreamNotice } from '../shared/sse-contracts'
 import { auditRequest } from './audit-client'
@@ -82,6 +84,32 @@ export class ServiceManager {
 
   getStatus(): ServiceStatus {
     return { ...this.status }
+  }
+  async evaluations(
+    action: import('../shared/evaluation').EvaluationAction,
+    input: unknown
+  ): Promise<ApiResult<unknown>> {
+    const c = this.connection
+    if (!c || this.status.status !== 'ready')
+      return {
+        ok: false,
+        requestId: randomUUID(),
+        error: { code: 'SERVICE_NOT_READY', message: '本地服务尚未就绪', retryable: true }
+      }
+    return evaluationRequest(c.port, c.token, action, input)
+  }
+  async mcp(
+    action: import('../shared/mcp-settings').McpAction,
+    input: unknown
+  ): Promise<ApiResult<import('../shared/mcp-settings').McpData>> {
+    const c = this.connection
+    if (!c || this.status.status !== 'ready')
+      return {
+        ok: false,
+        requestId: randomUUID(),
+        error: { code: 'SERVICE_NOT_READY', message: '本地服务尚未就绪', retryable: true }
+      }
+    return mcpRequest(c.port, c.token, action, input)
   }
 
   private update(status: ServiceStatus): void {

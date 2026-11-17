@@ -97,9 +97,9 @@ export class DisclosureRepository {
       )
     const id = randomUUID()
     this.db.run(
-      `INSERT INTO source_transmissions
-      (transmission_id,project_id,run_id,path_id,attempt,scope_key,config_id,revision,base_url,model_id,started_at)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
+      `INSERT INTO model_requests
+      (request_id,project_id,run_id,path_id,attempt,scope_key,config_id,revision,base_url,model_id,started_at,state)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,'authorized')`,
       id,
       scope.projectId,
       scope.runId,
@@ -116,10 +116,6 @@ export class DisclosureRepository {
   }
   observed(id: string, modelId: string): void {
     if (modelId.length > 0 && modelId.length <= 200)
-      this.db.run(
-        'UPDATE source_transmissions SET observed_model_id=? WHERE transmission_id=?',
-        modelId,
-        id
-      )
+      this.db.run('UPDATE model_requests SET observed_model_id=? WHERE request_id=?', modelId, id)
   }
 }

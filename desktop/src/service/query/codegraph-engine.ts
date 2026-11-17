@@ -1,5 +1,5 @@
 import type { DatabaseSync } from 'node:sqlite'
-import type { QueryEngine, GraphNode, GraphBinding } from './graph-contracts.ts'
+import type { QueryEngine, GraphNode, GraphBinding, McpGraphProjection } from './graph-contracts.ts'
 import type { QuerySnapshot, RuntimeOptions } from './query-runtime.ts'
 import type {
   QueryRequest,
@@ -49,6 +49,7 @@ export class CodeGraphEngine implements QueryEngine {
   private projection?: {
     key: string
     view: { nodes: ViewNode[]; calls: JavaCall[]; gaps: string[] }
+    mcp?: McpGraphProjection
   }
   constructor(options: RuntimeOptions, root: string, bindings: GraphRepository) {
     this.pool = new CodeGraphPool(options, root)
@@ -275,6 +276,36 @@ export class CodeGraphEngine implements QueryEngine {
         fixed.engine !== binding.engine)
     )
       throw new ApiError('RUN_GRAPH_CHANGED', '任务固定图身份不匹配', 409)
+  }
+  async mcpProjection(snapshot: QuerySnapshot, signal: AbortSignal): Promise<McpGraphProjection> {
+    return this.pool.read(snapshot, signal, (db, binding) => {
+      this.checkBinding(snapshot, binding)
+      const key = this.pool.key(snapshot)
+      if (this.projection?.key === key && this.projection.mcp) return this.projection.mcp
+      const view = this.view(snapshot, db)
+      const projection: McpGraphProjection = {
+        engine: this.backend,
+        gaps: [...new Set([...binding.gaps, ...view.gaps])],
+        methods: view.nodes
+          .filter((n) => n.method)
+          .map((n) => ({ key: n.method!.key, item: n.item })),
+        calls: view.calls.map((call) => {
+          const caller = view.nodes.find((n) => n.method?.key === call.caller.key)
+          const targets = this.targets(call, caller, view.nodes, db)
+          return {
+            filePath: call.filePath,
+            line: call.line,
+            column: call.column,
+            name: call.name,
+            caller: call.caller.key,
+            targets: targets.nodes.map((n) => n.method!.key),
+            gaps: targets.gaps
+          }
+        })
+      }
+      if (this.projection?.key === key) this.projection.mcp = projection
+      return projection
+    })
   }
   async resolveCalls(
     snapshot: QuerySnapshot,

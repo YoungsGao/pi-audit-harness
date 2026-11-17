@@ -27,6 +27,22 @@ export interface GraphNode {
   signature: string | null
   generated: boolean
 }
+
+// Validated CodeGraph/CST projection for the Python MCP adapter, not a second indexer.
+export interface McpGraphProjection {
+  engine: string
+  gaps: string[]
+  methods: { key: string; item: import('../../shared/query-contracts.ts').QueryItem }[]
+  calls: {
+    filePath: string
+    line: number
+    column: number
+    name: string
+    caller: string
+    targets: string[]
+    gaps: string[]
+  }[]
+}
 export interface GraphEdge {
   source: string
   target: string

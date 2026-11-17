@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-11-10T11:33:11.572Z",
-  "lockSha256": "0f88503064a296d5cccda1362952670dc87a06af2f7eab8f2efe7b0a13a97e60",
+  "generatedAt": "2026-11-11T09:20:12.369Z",
+  "lockSha256": "f0b81ed0c3d82db60c24555227be39d2b92edab1c7a69c981518dbba1feee71a",
   "scope": "installed desktop runtime lock + actual nested CodeGraph package metadata; Electron/Chromium and embedded Node have separate notices",
   "packages": [
     {
@@ -408,6 +408,16 @@
       ]
     },
     {
+      "name": "@hono/node-server",
+      "version": "2.1.6",
+      "license": "MIT",
+      "repository": "git+https://github.com/honojs/node-server.git",
+      "origin": "desktop runtime lock",
+      "licenseTexts": [
+        "licenses/f4d594b4535f0fa4-LICENSE"
+      ]
+    },
+    {
       "name": "@isaacs/nonrecursive-glob-match",
       "version": "1.1.0",
       "license": "BlueOak-1.0.0",
@@ -415,6 +425,16 @@
       "origin": "desktop runtime lock",
       "licenseTexts": [
         "licenses/148b23d9b678e141-LICENSE.md"
+      ]
+    },
+    {
+      "name": "@modelcontextprotocol/sdk",
+      "version": "1.32.2",
+      "license": "MIT",
+      "repository": "git+https://github.com/modelcontextprotocol/typescript-sdk.git",
+      "origin": "desktop runtime lock",
+      "licenseTexts": [
+        "licenses/91651d4fb8d094c2-LICENSE"
       ]
     },
     {
@@ -608,6 +628,16 @@
       ]
     },
     {
+      "name": "accepts",
+      "version": "2.0.0",
+      "license": "MIT",
+      "repository": "jshttp/accepts",
+      "origin": "desktop runtime lock",
+      "licenseTexts": [
+        "licenses/f95b7a83c78ce214-LICENSE"
+      ]
+    },
+    {
       "name": "agent-base",
       "version": "7.1.4",
       "license": "MIT",
@@ -625,6 +655,26 @@
       "origin": "desktop runtime lock",
       "licenseTexts": [
         "licenses/439af92eda9782c8-LICENSE"
+      ]
+    },
+    {
+      "name": "ajv",
+      "version": "8.20.0",
+      "license": "MIT",
+      "repository": "ajv-validator/ajv",
+      "origin": "desktop runtime lock",
+      "licenseTexts": [
+        "licenses/9c728cf87aba8556-LICENSE"
+      ]
+    },
+    {
+      "name": "ajv-formats",
+      "version": "3.0.1",
+      "license": "MIT",
+      "repository": "git+https://github.com/ajv-validator/ajv-formats.git",
+      "origin": "desktop runtime lock",
+      "licenseTexts": [
+        "licenses/3081140538322aaf-LICENSE"
       ]
     },
     {
@@ -668,6 +718,16 @@
       ]
     },
     {
+      "name": "body-parser",
+      "version": "2.4.0",
+      "license": "MIT",
+      "repository": "expressjs/body-parser",
+      "origin": "desktop runtime lock",
+      "licenseTexts": [
+        "licenses/7a0002a2b6f3e70a-LICENSE"
+      ]
+    },
+    {
       "name": "bowser",
       "version": "2.14.1",
       "license": "MIT",
@@ -705,6 +765,36 @@
       "origin": "desktop runtime lock",
       "licenseTexts": [
         "licenses/e66b909d3583fa2a-LICENSE"
+      ]
+    },
+    {
+      "name": "bytes",
+      "version": "3.1.2",
+      "license": "MIT",
+      "repository": "visionmedia/bytes.js",
+      "origin": "desktop runtime lock",
+      "licenseTexts": [
+        "licenses/bc4d24341f85f604-LICENSE"
+      ]
+    },
+    {
+      "name": "call-bind-apply-helpers",
+      "version": "1.0.2",
+      "license": "MIT",
+      "repository": "git+https://github.com/ljharb/call-bind-apply-helpers.git",
+      "origin": "desktop runtime lock",
+      "licenseTexts": [
+        "licenses/4609144d3832c8d2-LICENSE"
+      ]
+    },
+    {
+      "name": "call-bound",
+      "version": "1.0.4",
+      "license": "MIT",
+      "repository": "git+https://github.com/ljharb/call-bound.git",
+      "origin": "desktop runtime lock",
+      "licenseTexts": [
+        "licenses/8f41f42b6408a451-LICENSE"
       ]
     },
     {
@@ -748,6 +838,66 @@
       ]
     },
     {
+      "name": "content-disposition",
+      "version": "2.0.1",
+      "license": "MIT",
+      "repository": "jshttp/content-disposition",
+      "origin": "desktop runtime lock",
+      "licenseTexts": [
+        "licenses/73e2f8b1bf7f7f2f-LICENSE"
+      ]
+    },
+    {
+      "name": "content-type",
+      "version": "1.0.5",
+      "license": "MIT",
+      "repository": "jshttp/content-type",
+      "origin": "desktop runtime lock",
+      "licenseTexts": [
+        "licenses/65e9de41d2cef0ed-LICENSE"
+      ]
+    },
+    {
+      "name": "content-type",
+      "version": "2.1.0",
+      "license": "MIT",
+      "repository": "jshttp/content-type",
+      "origin": "desktop runtime lock",
+      "licenseTexts": [
+        "licenses/a40258d9a4b0ac96-LICENSE"
+      ]
+    },
+    {
+      "name": "cookie",
+      "version": "0.7.2",
+      "license": "MIT",
+      "repository": "jshttp/cookie",
+      "origin": "desktop runtime lock",
+      "licenseTexts": [
+        "licenses/bde361a738adb8c6-LICENSE"
+      ]
+    },
+    {
+      "name": "cookie-signature",
+      "version": "1.2.2",
+      "license": "MIT",
+      "repository": "https://github.com/visionmedia/node-cookie-signature.git",
+      "origin": "desktop runtime lock",
+      "licenseTexts": [
+        "licenses/c34745e22d9cb778-LICENSE"
+      ]
+    },
+    {
+      "name": "cors",
+      "version": "2.8.6",
+      "license": "MIT",
+      "repository": "expressjs/cors",
+      "origin": "desktop runtime lock",
+      "licenseTexts": [
+        "licenses/c7435d8f709189a6-LICENSE"
+      ]
+    },
+    {
       "name": "cross-spawn",
       "version": "7.0.6",
       "license": "MIT",
@@ -776,6 +926,16 @@
       ]
     },
     {
+      "name": "depd",
+      "version": "2.0.0",
+      "license": "MIT",
+      "repository": "dougwilson/nodejs-depd",
+      "origin": "desktop runtime lock",
+      "licenseTexts": [
+        "licenses/7028878ddf0fd7d9-LICENSE"
+      ]
+    },
+    {
       "name": "diff",
       "version": "8.0.4",
       "license": "BSD-3-Clause",
@@ -786,6 +946,16 @@
       ]
     },
     {
+      "name": "dunder-proto",
+      "version": "1.0.1",
+      "license": "MIT",
+      "repository": "git+https://github.com/es-shims/dunder-proto.git",
+      "origin": "desktop runtime lock",
+      "licenseTexts": [
+        "licenses/390fd69f2035b583-LICENSE"
+      ]
+    },
+    {
       "name": "ecdsa-sig-formatter",
       "version": "1.0.11",
       "license": "Apache-2.0",
@@ -793,6 +963,16 @@
       "origin": "desktop runtime lock",
       "licenseTexts": [
         "licenses/7ff5398c8ababb02-LICENSE"
+      ]
+    },
+    {
+      "name": "ee-first",
+      "version": "1.1.1",
+      "license": "MIT",
+      "repository": "jonathanong/ee-first",
+      "origin": "desktop runtime lock",
+      "licenseTexts": [
+        "licenses/e2746902c758ae8a-LICENSE"
       ]
     },
     {
@@ -816,6 +996,16 @@
       ]
     },
     {
+      "name": "encodeurl",
+      "version": "2.0.1",
+      "license": "MIT",
+      "repository": "pillarjs/encodeurl",
+      "origin": "desktop runtime lock",
+      "licenseTexts": [
+        "licenses/56d3ede112ac49c9-LICENSE"
+      ]
+    },
+    {
       "name": "env-paths",
       "version": "3.0.0",
       "license": "MIT",
@@ -826,6 +1016,96 @@
       ]
     },
     {
+      "name": "es-define-property",
+      "version": "1.0.1",
+      "license": "MIT",
+      "repository": "git+https://github.com/ljharb/es-define-property.git",
+      "origin": "desktop runtime lock",
+      "licenseTexts": [
+        "licenses/6a37646cc624feb0-LICENSE"
+      ]
+    },
+    {
+      "name": "es-errors",
+      "version": "1.3.0",
+      "license": "MIT",
+      "repository": "git+https://github.com/ljharb/es-errors.git",
+      "origin": "desktop runtime lock",
+      "licenseTexts": [
+        "licenses/645b141d3027520f-LICENSE"
+      ]
+    },
+    {
+      "name": "es-object-atoms",
+      "version": "1.1.2",
+      "license": "MIT",
+      "repository": "git+https://github.com/ljharb/es-object-atoms.git",
+      "origin": "desktop runtime lock",
+      "licenseTexts": [
+        "licenses/6c43e9e16513bd04-LICENSE"
+      ]
+    },
+    {
+      "name": "escape-html",
+      "version": "1.0.3",
+      "license": "MIT",
+      "repository": "component/escape-html",
+      "origin": "desktop runtime lock",
+      "licenseTexts": [
+        "licenses/5463e0a52abb42be-LICENSE"
+      ]
+    },
+    {
+      "name": "etag",
+      "version": "1.8.1",
+      "license": "MIT",
+      "repository": "jshttp/etag",
+      "origin": "desktop runtime lock",
+      "licenseTexts": [
+        "licenses/dfcb09916bd8554b-LICENSE"
+      ]
+    },
+    {
+      "name": "eventsource",
+      "version": "3.0.7",
+      "license": "MIT",
+      "repository": "git://git@github.com/EventSource/eventsource.git",
+      "origin": "desktop runtime lock",
+      "licenseTexts": [
+        "licenses/09407100555afb65-LICENSE"
+      ]
+    },
+    {
+      "name": "eventsource-parser",
+      "version": "3.1.1",
+      "license": "MIT",
+      "repository": "git+ssh://git@github.com/rexxars/eventsource-parser.git",
+      "origin": "desktop runtime lock",
+      "licenseTexts": [
+        "licenses/20af37513d93868b-LICENSE"
+      ]
+    },
+    {
+      "name": "express",
+      "version": "5.3.0",
+      "license": "MIT",
+      "repository": "expressjs/express",
+      "origin": "desktop runtime lock",
+      "licenseTexts": [
+        "licenses/2c56d0b04eabc383-LICENSE"
+      ]
+    },
+    {
+      "name": "express-rate-limit",
+      "version": "8.7.4",
+      "license": "MIT",
+      "repository": "git+https://github.com/express-rate-limit/express-rate-limit.git",
+      "origin": "desktop runtime lock",
+      "licenseTexts": [
+        "licenses/753a20b83e7ff1d0-license"
+      ]
+    },
+    {
       "name": "extend",
       "version": "3.0.2",
       "license": "MIT",
@@ -833,6 +1113,16 @@
       "origin": "desktop runtime lock",
       "licenseTexts": [
         "licenses/ae97d7c14998a815-LICENSE"
+      ]
+    },
+    {
+      "name": "fast-deep-equal",
+      "version": "3.1.3",
+      "license": "MIT",
+      "repository": "git+https://github.com/epoberezkin/fast-deep-equal.git",
+      "origin": "desktop runtime lock",
+      "licenseTexts": [
+        "licenses/60db03f2d9496a0b-LICENSE"
       ]
     },
     {
@@ -866,6 +1156,16 @@
       ]
     },
     {
+      "name": "fast-uri",
+      "version": "3.1.9",
+      "license": "BSD-3-Clause",
+      "repository": "git+https://github.com/fastify/fast-uri.git",
+      "origin": "desktop runtime lock",
+      "licenseTexts": [
+        "licenses/ebad77a3620fa91d-LICENSE"
+      ]
+    },
+    {
       "name": "fast-wrap-ansi",
       "version": "0.2.0",
       "license": "MIT",
@@ -886,6 +1186,16 @@
       ]
     },
     {
+      "name": "finalhandler",
+      "version": "2.1.1",
+      "license": "MIT",
+      "repository": "pillarjs/finalhandler",
+      "origin": "desktop runtime lock",
+      "licenseTexts": [
+        "licenses/630473d4a6adfa41-LICENSE"
+      ]
+    },
+    {
       "name": "formdata-polyfill",
       "version": "4.0.10",
       "license": "MIT",
@@ -896,6 +1206,26 @@
       ]
     },
     {
+      "name": "forwarded",
+      "version": "0.2.0",
+      "license": "MIT",
+      "repository": "jshttp/forwarded",
+      "origin": "desktop runtime lock",
+      "licenseTexts": [
+        "licenses/2d7f4275b09b041f-LICENSE"
+      ]
+    },
+    {
+      "name": "fresh",
+      "version": "2.0.0",
+      "license": "MIT",
+      "repository": "jshttp/fresh",
+      "origin": "desktop runtime lock",
+      "licenseTexts": [
+        "licenses/f40feff15332333f-LICENSE"
+      ]
+    },
+    {
       "name": "fs-extra",
       "version": "10.1.0",
       "license": "MIT",
@@ -903,6 +1233,16 @@
       "origin": "desktop runtime lock",
       "licenseTexts": [
         "licenses/5a1e746757c4a958-LICENSE"
+      ]
+    },
+    {
+      "name": "function-bind",
+      "version": "1.1.2",
+      "license": "MIT",
+      "repository": "https://github.com/Raynos/function-bind.git",
+      "origin": "desktop runtime lock",
+      "licenseTexts": [
+        "licenses/83de3b394293d96f-LICENSE"
       ]
     },
     {
@@ -936,6 +1276,26 @@
       ]
     },
     {
+      "name": "get-intrinsic",
+      "version": "1.3.0",
+      "license": "MIT",
+      "repository": "git+https://github.com/ljharb/get-intrinsic.git",
+      "origin": "desktop runtime lock",
+      "licenseTexts": [
+        "licenses/ed58a6c65bdcf204-LICENSE"
+      ]
+    },
+    {
+      "name": "get-proto",
+      "version": "1.0.1",
+      "license": "MIT",
+      "repository": "git+https://github.com/ljharb/get-proto.git",
+      "origin": "desktop runtime lock",
+      "licenseTexts": [
+        "licenses/abfbcfda1d91167a-LICENSE"
+      ]
+    },
+    {
       "name": "google-auth-library",
       "version": "10.9.1",
       "license": "Apache-2.0",
@@ -953,6 +1313,16 @@
       "origin": "desktop runtime lock",
       "licenseTexts": [
         "licenses/0f403441e9df9734-LICENSE"
+      ]
+    },
+    {
+      "name": "gopd",
+      "version": "1.2.0",
+      "license": "MIT",
+      "repository": "git+https://github.com/ljharb/gopd.git",
+      "origin": "desktop runtime lock",
+      "licenseTexts": [
+        "licenses/f757cb02c87ace65-LICENSE"
       ]
     },
     {
@@ -976,6 +1346,26 @@
       ]
     },
     {
+      "name": "has-symbols",
+      "version": "1.1.0",
+      "license": "MIT",
+      "repository": "git://github.com/inspect-js/has-symbols.git",
+      "origin": "desktop runtime lock",
+      "licenseTexts": [
+        "licenses/c0d7b7b02fe7161b-LICENSE"
+      ]
+    },
+    {
+      "name": "hasown",
+      "version": "2.0.4",
+      "license": "MIT",
+      "repository": "git+https://github.com/inspect-js/hasOwn.git",
+      "origin": "desktop runtime lock",
+      "licenseTexts": [
+        "licenses/ba2e3a5fbd1028da-LICENSE"
+      ]
+    },
+    {
       "name": "highlight.js",
       "version": "10.7.3",
       "license": "BSD-3-Clause",
@@ -986,6 +1376,16 @@
       ]
     },
     {
+      "name": "hono",
+      "version": "4.13.17",
+      "license": "MIT",
+      "repository": "git+https://github.com/honojs/hono.git",
+      "origin": "desktop runtime lock",
+      "licenseTexts": [
+        "licenses/3dff12b3f7bacc2a-LICENSE"
+      ]
+    },
+    {
       "name": "hosted-git-info",
       "version": "9.0.3",
       "license": "ISC",
@@ -993,6 +1393,16 @@
       "origin": "desktop runtime lock",
       "licenseTexts": [
         "licenses/5a8c8949d21b7495-LICENSE"
+      ]
+    },
+    {
+      "name": "http-errors",
+      "version": "2.0.1",
+      "license": "MIT",
+      "repository": "jshttp/http-errors",
+      "origin": "desktop runtime lock",
+      "licenseTexts": [
+        "licenses/707a89567e9b013e-LICENSE"
       ]
     },
     {
@@ -1026,6 +1436,16 @@
       ]
     },
     {
+      "name": "iconv-lite",
+      "version": "0.7.3",
+      "license": "MIT",
+      "repository": "https://github.com/pillarjs/iconv-lite.git",
+      "origin": "desktop runtime lock",
+      "licenseTexts": [
+        "licenses/76dc46c7125d2401-LICENSE"
+      ]
+    },
+    {
       "name": "ignore",
       "version": "7.0.5",
       "license": "MIT",
@@ -1043,6 +1463,46 @@
       "origin": "desktop runtime lock",
       "licenseTexts": [
         "licenses/f3cb0de1f0c28ac1-LICENSE-MIT"
+      ]
+    },
+    {
+      "name": "inherits",
+      "version": "2.0.4",
+      "license": "ISC",
+      "repository": "git://github.com/isaacs/inherits",
+      "origin": "desktop runtime lock",
+      "licenseTexts": [
+        "licenses/3eafa9bfb872baf1-LICENSE"
+      ]
+    },
+    {
+      "name": "ip-address",
+      "version": "10.7.6",
+      "license": "MIT",
+      "repository": "https://github.com/beaugunderson/ip-address.git",
+      "origin": "desktop runtime lock",
+      "licenseTexts": [
+        "licenses/103008c23cce8e6f-LICENSE"
+      ]
+    },
+    {
+      "name": "ipaddr.js",
+      "version": "1.9.1",
+      "license": "MIT",
+      "repository": "git://github.com/whitequark/ipaddr.js",
+      "origin": "desktop runtime lock",
+      "licenseTexts": [
+        "licenses/38a5a1606dbc89a9-LICENSE"
+      ]
+    },
+    {
+      "name": "is-promise",
+      "version": "4.0.0",
+      "license": "MIT",
+      "repository": "https://github.com/then/is-promise.git",
+      "origin": "desktop runtime lock",
+      "licenseTexts": [
+        "licenses/8c7017281bacafa8-LICENSE"
       ]
     },
     {
@@ -1076,6 +1536,16 @@
       ]
     },
     {
+      "name": "jose",
+      "version": "6.2.17",
+      "license": "MIT",
+      "repository": "panva/jose",
+      "origin": "desktop runtime lock",
+      "licenseTexts": [
+        "licenses/1c38817e99a5d571-LICENSE.md"
+      ]
+    },
+    {
       "name": "js-yaml",
       "version": "4.3.2",
       "license": "MIT",
@@ -1103,6 +1573,26 @@
       "origin": "desktop runtime lock",
       "licenseTexts": [
         "licenses/55f85fb2549d12a5-LICENSE"
+      ]
+    },
+    {
+      "name": "json-schema-traverse",
+      "version": "1.0.0",
+      "license": "MIT",
+      "repository": "git+https://github.com/epoberezkin/json-schema-traverse.git",
+      "origin": "desktop runtime lock",
+      "licenseTexts": [
+        "licenses/e830fd7d93f6ebaa-LICENSE"
+      ]
+    },
+    {
+      "name": "json-schema-typed",
+      "version": "8.0.2",
+      "license": "BSD-2-Clause",
+      "repository": "https://github.com/RemyRylan/json-schema-typed.git",
+      "origin": "desktop runtime lock",
+      "licenseTexts": [
+        "licenses/eea3575afa9a179d-LICENSE.md"
       ]
     },
     {
@@ -1224,6 +1714,56 @@
       ]
     },
     {
+      "name": "math-intrinsics",
+      "version": "1.1.0",
+      "license": "MIT",
+      "repository": "git+https://github.com/es-shims/math-intrinsics.git",
+      "origin": "desktop runtime lock",
+      "licenseTexts": [
+        "licenses/f585fed67bcee1cc-LICENSE"
+      ]
+    },
+    {
+      "name": "media-typer",
+      "version": "1.1.1",
+      "license": "MIT",
+      "repository": "jshttp/media-typer",
+      "origin": "desktop runtime lock",
+      "licenseTexts": [
+        "licenses/2ceece1b03fbfbb0-LICENSE"
+      ]
+    },
+    {
+      "name": "merge-descriptors",
+      "version": "2.0.0",
+      "license": "MIT",
+      "repository": "sindresorhus/merge-descriptors",
+      "origin": "desktop runtime lock",
+      "licenseTexts": [
+        "licenses/a3c9d6cd0c00fc16-license"
+      ]
+    },
+    {
+      "name": "mime-db",
+      "version": "1.54.0",
+      "license": "MIT",
+      "repository": "jshttp/mime-db",
+      "origin": "desktop runtime lock",
+      "licenseTexts": [
+        "licenses/4f88fcddeb8de9fd-LICENSE"
+      ]
+    },
+    {
+      "name": "mime-types",
+      "version": "3.0.2",
+      "license": "MIT",
+      "repository": "jshttp/mime-types",
+      "origin": "desktop runtime lock",
+      "licenseTexts": [
+        "licenses/d3f6b61aada9a3c3-LICENSE"
+      ]
+    },
+    {
       "name": "minimatch",
       "version": "11.0.1",
       "license": "BlueOak-1.0.0",
@@ -1241,6 +1781,16 @@
       "origin": "desktop runtime lock",
       "licenseTexts": [
         "licenses/2083576c5af80549-license.md"
+      ]
+    },
+    {
+      "name": "negotiator",
+      "version": "1.1.0",
+      "license": "MIT",
+      "repository": "jshttp/negotiator",
+      "origin": "desktop runtime lock",
+      "licenseTexts": [
+        "licenses/860ecfa7ab0ce48c-LICENSE"
       ]
     },
     {
@@ -1264,6 +1814,46 @@
       ]
     },
     {
+      "name": "object-assign",
+      "version": "4.1.1",
+      "license": "MIT",
+      "repository": "sindresorhus/object-assign",
+      "origin": "desktop runtime lock",
+      "licenseTexts": [
+        "licenses/598e372231bb5bef-license"
+      ]
+    },
+    {
+      "name": "object-inspect",
+      "version": "1.13.4",
+      "license": "MIT",
+      "repository": "git://github.com/inspect-js/object-inspect.git",
+      "origin": "desktop runtime lock",
+      "licenseTexts": [
+        "licenses/ecbef7226b7af9b6-LICENSE"
+      ]
+    },
+    {
+      "name": "on-finished",
+      "version": "2.4.2",
+      "license": "MIT",
+      "repository": "jshttp/on-finished",
+      "origin": "desktop runtime lock",
+      "licenseTexts": [
+        "licenses/ab76330096f05351-LICENSE"
+      ]
+    },
+    {
+      "name": "once",
+      "version": "1.4.0",
+      "license": "ISC",
+      "repository": "git://github.com/isaacs/once",
+      "origin": "desktop runtime lock",
+      "licenseTexts": [
+        "licenses/d0d1303998dfae04-LICENSE"
+      ]
+    },
+    {
       "name": "openai",
       "version": "7.19.0",
       "license": "Apache-2.0",
@@ -1281,6 +1871,16 @@
       "origin": "desktop runtime lock",
       "licenseTexts": [
         "licenses/725caf13d8b81b24-license"
+      ]
+    },
+    {
+      "name": "parseurl",
+      "version": "1.3.3",
+      "license": "MIT",
+      "repository": "pillarjs/parseurl",
+      "origin": "desktop runtime lock",
+      "licenseTexts": [
+        "licenses/c3fdd1b6fb725cb3-LICENSE"
       ]
     },
     {
@@ -1304,6 +1904,16 @@
       ]
     },
     {
+      "name": "path-to-regexp",
+      "version": "8.4.2",
+      "license": "MIT",
+      "repository": "https://github.com/pillarjs/path-to-regexp.git",
+      "origin": "desktop runtime lock",
+      "licenseTexts": [
+        "licenses/815c8b96310baa51-LICENSE"
+      ]
+    },
+    {
       "name": "picomatch",
       "version": "4.0.7",
       "license": "MIT",
@@ -1311,6 +1921,16 @@
       "origin": "CodeGraph self-contained bundle",
       "licenseTexts": [
         "licenses/0eb48e249822c101-LICENSE"
+      ]
+    },
+    {
+      "name": "pkce-challenge",
+      "version": "5.0.1",
+      "license": "MIT",
+      "repository": "git+https://github.com/crouchcd/pkce-challenge.git",
+      "origin": "desktop runtime lock",
+      "licenseTexts": [
+        "licenses/560377ce6df233b2-LICENSE"
       ]
     },
     {
@@ -1344,12 +1964,32 @@
       ]
     },
     {
+      "name": "proxy-addr",
+      "version": "2.0.8",
+      "license": "MIT",
+      "repository": "jshttp/proxy-addr",
+      "origin": "desktop runtime lock",
+      "licenseTexts": [
+        "licenses/b94cf93d9a9b565b-LICENSE"
+      ]
+    },
+    {
       "name": "proxy-agent-negotiate",
       "version": "1.1.0",
       "license": "MIT",
       "repository": "https://github.com/TooTallNate/proxy-agents.git",
       "origin": "desktop runtime lock",
       "licenseTexts": []
+    },
+    {
+      "name": "qs",
+      "version": "6.17.1",
+      "license": "BSD-3-Clause",
+      "repository": "https://github.com/ljharb/qs.git",
+      "origin": "desktop runtime lock",
+      "licenseTexts": [
+        "licenses/394380b97e53013d-LICENSE.md"
+      ]
     },
     {
       "name": "quickjs-wasi",
@@ -1359,6 +1999,36 @@
       "origin": "desktop runtime lock",
       "licenseTexts": [
         "licenses/addd71433d370803-LICENSE"
+      ]
+    },
+    {
+      "name": "range-parser",
+      "version": "1.3.0",
+      "license": "MIT",
+      "repository": "jshttp/range-parser",
+      "origin": "desktop runtime lock",
+      "licenseTexts": [
+        "licenses/d8d03a877289186b-LICENSE"
+      ]
+    },
+    {
+      "name": "raw-body",
+      "version": "3.0.2",
+      "license": "MIT",
+      "repository": "stream-utils/raw-body",
+      "origin": "desktop runtime lock",
+      "licenseTexts": [
+        "licenses/6c791d6d9ec7a011-LICENSE"
+      ]
+    },
+    {
+      "name": "require-from-string",
+      "version": "2.0.2",
+      "license": "MIT",
+      "repository": "floatdrop/require-from-string",
+      "origin": "desktop runtime lock",
+      "licenseTexts": [
+        "licenses/bc20339cbc91aaa3-license"
       ]
     },
     {
@@ -1382,6 +2052,16 @@
       ]
     },
     {
+      "name": "router",
+      "version": "2.2.0",
+      "license": "MIT",
+      "repository": "pillarjs/router",
+      "origin": "desktop runtime lock",
+      "licenseTexts": [
+        "licenses/1b270661457a8f73-LICENSE"
+      ]
+    },
+    {
       "name": "safe-buffer",
       "version": "5.1.2",
       "license": "MIT",
@@ -1389,6 +2069,16 @@
       "origin": "desktop runtime lock",
       "licenseTexts": [
         "licenses/115052870841b125-LICENSE"
+      ]
+    },
+    {
+      "name": "safer-buffer",
+      "version": "2.1.2",
+      "license": "MIT",
+      "repository": "git+https://github.com/ChALkeR/safer-buffer.git",
+      "origin": "desktop runtime lock",
+      "licenseTexts": [
+        "licenses/2fb14d3728e4ebf3-LICENSE"
       ]
     },
     {
@@ -1422,6 +2112,36 @@
       ]
     },
     {
+      "name": "send",
+      "version": "1.2.1",
+      "license": "MIT",
+      "repository": "pillarjs/send",
+      "origin": "desktop runtime lock",
+      "licenseTexts": [
+        "licenses/2519670ce9ac452c-LICENSE"
+      ]
+    },
+    {
+      "name": "serve-static",
+      "version": "2.2.1",
+      "license": "MIT",
+      "repository": "expressjs/serve-static",
+      "origin": "desktop runtime lock",
+      "licenseTexts": [
+        "licenses/aa686afa5272f44c-LICENSE"
+      ]
+    },
+    {
+      "name": "setprototypeof",
+      "version": "1.2.0",
+      "license": "ISC",
+      "repository": "https://github.com/wesleytodd/setprototypeof.git",
+      "origin": "desktop runtime lock",
+      "licenseTexts": [
+        "licenses/7787a1d3bc2f39b6-LICENSE"
+      ]
+    },
+    {
       "name": "shebang-command",
       "version": "2.0.0",
       "license": "MIT",
@@ -1439,6 +2159,46 @@
       "origin": "desktop runtime lock",
       "licenseTexts": [
         "licenses/849fb37298f1c4dc-license"
+      ]
+    },
+    {
+      "name": "side-channel",
+      "version": "1.1.1",
+      "license": "MIT",
+      "repository": "git+https://github.com/ljharb/side-channel.git",
+      "origin": "desktop runtime lock",
+      "licenseTexts": [
+        "licenses/c78ef7160e212e79-LICENSE"
+      ]
+    },
+    {
+      "name": "side-channel-list",
+      "version": "1.0.1",
+      "license": "MIT",
+      "repository": "git+https://github.com/ljharb/side-channel-list.git",
+      "origin": "desktop runtime lock",
+      "licenseTexts": [
+        "licenses/2e2f4a17d827779e-LICENSE"
+      ]
+    },
+    {
+      "name": "side-channel-map",
+      "version": "1.0.1",
+      "license": "MIT",
+      "repository": "git+https://github.com/ljharb/side-channel-map.git",
+      "origin": "desktop runtime lock",
+      "licenseTexts": [
+        "licenses/fbcd0551973fc2c6-LICENSE"
+      ]
+    },
+    {
+      "name": "side-channel-weakmap",
+      "version": "1.0.2",
+      "license": "MIT",
+      "repository": "git+https://github.com/ljharb/side-channel-weakmap.git",
+      "origin": "desktop runtime lock",
+      "licenseTexts": [
+        "licenses/9d9dd0c0dbaa9921-LICENSE"
       ]
     },
     {
@@ -1470,6 +2230,16 @@
       "licenseTexts": []
     },
     {
+      "name": "statuses",
+      "version": "2.0.2",
+      "license": "MIT",
+      "repository": "jshttp/statuses",
+      "origin": "desktop runtime lock",
+      "licenseTexts": [
+        "licenses/d39841e95558c32c-LICENSE"
+      ]
+    },
+    {
       "name": "sumchecker",
       "version": "3.0.1",
       "license": "Apache-2.0",
@@ -1487,6 +2257,16 @@
       "origin": "desktop runtime lock",
       "licenseTexts": [
         "licenses/dc08d4241a00d98d-LICENSE"
+      ]
+    },
+    {
+      "name": "toidentifier",
+      "version": "1.0.1",
+      "license": "MIT",
+      "repository": "component/toidentifier",
+      "origin": "desktop runtime lock",
+      "licenseTexts": [
+        "licenses/2067d1f99d35f28c-LICENSE"
       ]
     },
     {
@@ -1517,6 +2297,16 @@
       "origin": "desktop runtime lock",
       "licenseTexts": [
         "licenses/b15471035cb0e3fd-LICENSE.txt"
+      ]
+    },
+    {
+      "name": "type-is",
+      "version": "2.1.0",
+      "license": "MIT",
+      "repository": "jshttp/type-is",
+      "origin": "desktop runtime lock",
+      "licenseTexts": [
+        "licenses/1fd87d3dab5d902c-LICENSE"
       ]
     },
     {
@@ -1570,6 +2360,26 @@
       ]
     },
     {
+      "name": "unpipe",
+      "version": "1.0.0",
+      "license": "MIT",
+      "repository": "stream-utils/unpipe",
+      "origin": "desktop runtime lock",
+      "licenseTexts": [
+        "licenses/3a555405bd00c7e7-LICENSE"
+      ]
+    },
+    {
+      "name": "vary",
+      "version": "1.1.2",
+      "license": "MIT",
+      "repository": "jshttp/vary",
+      "origin": "desktop runtime lock",
+      "licenseTexts": [
+        "licenses/d308bd3935a6f293-LICENSE"
+      ]
+    },
+    {
       "name": "web-streams-polyfill",
       "version": "3.3.3",
       "license": "MIT",
@@ -1600,6 +2410,16 @@
       ]
     },
     {
+      "name": "wrappy",
+      "version": "1.0.2",
+      "license": "ISC",
+      "repository": "https://github.com/npm/wrappy",
+      "origin": "desktop runtime lock",
+      "licenseTexts": [
+        "licenses/13cebf193d7ada5e-LICENSE"
+      ]
+    },
+    {
       "name": "ws",
       "version": "8.22.0",
       "license": "MIT",
@@ -1617,6 +2437,26 @@
       "origin": "desktop runtime lock",
       "licenseTexts": [
         "licenses/be80181ebffd939c-LICENSE"
+      ]
+    },
+    {
+      "name": "zod",
+      "version": "4.6.7",
+      "license": "MIT",
+      "repository": "git+https://github.com/colinhacks/zod.git",
+      "origin": "desktop runtime lock",
+      "licenseTexts": [
+        "licenses/31d0566281954af7-LICENSE"
+      ]
+    },
+    {
+      "name": "zod-to-json-schema",
+      "version": "3.25.2",
+      "license": "ISC",
+      "repository": "https://github.com/StefanTerdell/zod-to-json-schema",
+      "origin": "desktop runtime lock",
+      "licenseTexts": [
+        "licenses/4009fd307a1c4ee1-LICENSE"
       ]
     }
   ]

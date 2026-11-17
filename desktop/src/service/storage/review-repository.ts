@@ -23,7 +23,7 @@ export class ReviewRepository {
     )
     if (!path) throw new ApiError('REVIEW_SCOPE_NOT_FOUND', '未找到当前项目和任务的路径', 404)
     const attempt = this.db.get(
-      'SELECT attempt,phase FROM path_attempts WHERE project_id=? AND run_id=? AND path_id=?',
+      `SELECT attempt_id AS attempt,CASE WHEN state IN ('queue','analyze') THEN 'analyzing' WHEN state='completed' THEN 'completed' ELSE 'failed' END AS phase FROM analysis_sessions WHERE project_id=? AND run_id=? AND chain_id=? ORDER BY attempt_id DESC LIMIT 1`,
       scope.projectId,
       scope.runId,
       scope.pathId

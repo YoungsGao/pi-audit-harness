@@ -11,11 +11,11 @@ export class GraphRepository {
   }
   get(projectId: string, runId: string): GraphBinding | null {
     const row = this.db.get(
-      'SELECT * FROM run_graph_bindings WHERE project_id=? AND run_id=?',
+      'SELECT graph_json AS binding_json,graph_hash AS binding_hash FROM audit_runs WHERE project_id=? AND id=?',
       projectId,
       runId
     )
-    if (!row) return null
+    if (!row?.binding_json) return null
     const binding = JSON.parse(String(row.binding_json)) as GraphBinding
     if (graphHash(binding) !== row.binding_hash)
       throw new ApiError('RUN_GRAPH_CORRUPT', '固定图身份损坏', 409)
@@ -29,12 +29,12 @@ export class GraphRepository {
       return
     }
     this.db.run(
-      'INSERT INTO run_graph_bindings VALUES(?,?,?,?,?)',
-      runId,
-      projectId,
+      'UPDATE audit_runs SET graph_json=?,graph_hash=?,graph_created_at=? WHERE id=? AND project_id=?',
       JSON.stringify(binding),
       graphHash(binding),
-      new Date().toISOString()
+      new Date().toISOString(),
+      runId,
+      projectId
     )
   }
 }

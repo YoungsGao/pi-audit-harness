@@ -4,10 +4,78 @@ import type {
   RuleCatalog,
   SourceRange
 } from '../../shared/code-query-contracts.ts'
+import { indexJavaFile } from '../scanning/java-index.ts'
+import type { JavaFileIndex } from '../scanning/java-index.ts'
 
 const limitations =
   'Java 文本候选；不解析类型绑定、别名、重载、跨文件调用或运行时派发，必须结合源码核实。'
 const rules: RiskRule[] = [
+  {
+    id: 'JAVA-SQL-SPRING-JDBC',
+    category: 'sql-injection',
+    cwe: 'CWE-89',
+    apis: [
+      'JdbcTemplate.query',
+      'JdbcTemplate.queryForObject',
+      'JdbcTemplate.queryForList',
+      'JdbcTemplate.queryForMap',
+      'JdbcTemplate.queryForRowSet',
+      'JdbcTemplate.update',
+      'JdbcTemplate.batchUpdate',
+      'JdbcTemplate.execute',
+      'NamedParameterJdbcTemplate.query',
+      'NamedParameterJdbcTemplate.queryForObject',
+      'NamedParameterJdbcTemplate.queryForList',
+      'NamedParameterJdbcTemplate.update',
+      'NamedParameterJdbcTemplate.batchUpdate',
+      'JdbcClient.sql',
+      ...[
+        'query',
+        'queryForObject',
+        'queryForList',
+        'queryForMap',
+        'queryForRowSet',
+        'update',
+        'batchUpdate',
+        'execute'
+      ].map((name) => 'JdbcOperations.' + name),
+      ...['query', 'queryForObject', 'queryForList', 'update', 'batchUpdate'].map(
+        (name) => 'NamedParameterJdbcOperations.' + name
+      )
+    ],
+    argumentIndexes: [0],
+    review: {
+      source: 'HTTP 参数、请求体、Servlet 请求中的外部输入。',
+      propagation: '核查第0个SQL文本如何构造；跟踪辅助方法、StringBuilder和动态表名/排序字段。',
+      defenses: [
+        '占位符及对应参数绑定能保护值，不能保护拼接进SQL结构的表名或列名。',
+        '区分SQL字符串重载和PreparedStatementCreator回调；框架类型本身不是安全证明。'
+      ],
+      limitations
+    }
+  },
+  {
+    id: 'JAVA-SQL-ORM',
+    category: 'sql-injection',
+    cwe: 'CWE-89',
+    apis: [
+      'EntityManager.createQuery',
+      'EntityManager.createNativeQuery',
+      'Session.createQuery',
+      'Session.createNativeQuery',
+      'Session.createSQLQuery'
+    ],
+    argumentIndexes: [0],
+    review: {
+      source: '外部可控查询值、排序、表名和条件片段。',
+      propagation: '核查JPQL/HQL/原生SQL文本构造；创建查询只是候选，须检查终端执行及可达性。',
+      defenses: [
+        '核实setParameter绑定与实际占位符对应；不能为此前拼接内容补救。',
+        'CriteriaQuery对象重载不是字符串SQL；缺少类型或执行证据时保留未知。'
+      ],
+      limitations
+    }
+  },
   {
     id: 'JAVA-SQL-STATEMENT',
     category: 'sql-injection',
@@ -25,6 +93,23 @@ const rules: RiskRule[] = [
       defenses: [
         '核实 PreparedStatement / MyBatis 参数绑定是否覆盖当前危险参数。',
         '区分 SQL 结构白名单与普通字符串转义。'
+      ],
+      limitations
+    }
+  },
+  {
+    id: 'JAVA-SQL-PREPARE',
+    category: 'sql-injection',
+    cwe: 'CWE-89',
+    apis: ['Connection.prepareStatement', 'Connection.prepareCall'],
+    argumentIndexes: [0],
+    review: {
+      source: '外部可控SQL文本或结构片段。',
+      propagation:
+        '核查准备语句时第0个SQL表达式及后续execute调用；已拼接的SQL不会因PreparedStatement类名而安全。',
+      defenses: [
+        'SQL结构固定、危险值只通过占位符绑定，且绑定与实际执行匹配。',
+        '区分存储过程构造和过程内部动态SQL；缺少实现时保留未知。'
       ],
       limitations
     }
@@ -105,7 +190,7 @@ function freeze<T>(value: T): T {
   return value
 }
 export const builtinRules: RuleCatalog = freeze({
-  version: 'java-basic-2026.10.23.1',
+  version: 'java-framework-2026.11.15.2',
   language: 'java',
   rules
 })
@@ -155,21 +240,74 @@ function argumentsAt(
 export function findRiskCandidates(
   filePath: string,
   source: string,
-  maxCandidates = 101
+  maxCandidates = 101,
+  syntax?: JavaFileIndex
 ): RiskCandidate[] {
   const masked = maskJava(source),
     candidates: RiskCandidate[] = []
+  if (!syntax) {
+    try {
+      syntax = indexJavaFile(filePath, source)
+    } catch {
+      /* Incomplete Java retains the existing bounded text fallback. */
+    }
+  }
   const calls =
-    /\bnew\s+(?:[\w$]+\.)*(ProcessBuilder|FileInputStream|FileOutputStream|FileReader|FileWriter)\s*\(|\.\s*(executeQuery|executeUpdate|execute|addBatch|exec|command)\s*\(|\b(?:java\.nio\.file\.)?Files\s*\.\s*(readAllBytes|readString|newInputStream|newOutputStream|writeString|write|delete)\s*\(/g
+    /\bnew\s+(?:[\w$]+\.)*(ProcessBuilder|FileInputStream|FileOutputStream|FileReader|FileWriter)\s*\(|\.\s*(executeQuery|executeUpdate|execute|addBatch|exec|command|prepareStatement|prepareCall|query|queryForObject|queryForList|queryForMap|queryForRowSet|update|batchUpdate|sql|createQuery|createNativeQuery|createSQLQuery)\s*\(|\b(?:java\.nio\.file\.)?Files\s*\.\s*(readAllBytes|readString|newInputStream|newOutputStream|writeString|write|delete)\s*\(/g
   for (const match of masked.matchAll(calls)) {
     const method = match[2] ?? match[3]
-    const rule = rules.find((item) =>
-      match[1]
-        ? item.apis.includes(match[1] + '.<init>')
-        : item.apis.some((api) => api.endsWith('.' + method))
+    const open = match.index + match[0].lastIndexOf('(')
+    const call = syntax?.calls.find((c) => c.open === open)
+    const receiver =
+      call?.receiver.replace(/^this\./, '') ??
+      masked.slice(0, match.index).match(/[\w$]+$/)?.[0] ??
+      ''
+    const binding = call?.caller.bindings
+      .filter((b) => b.name === receiver && b.start <= call.start && b.end >= call.end)
+      .at(-1)
+    const receiverType =
+      (binding?.type ?? receiver)
+        .replace(/<.*>|\[\]|\s/g, '')
+        .split('.')
+        .at(-1) ?? ''
+    const framework = rules.find((r) => r.apis.includes(receiverType + '.' + method))
+    // Generic names such as query/update/execute also occur in ordinary application APIs.
+    const legacy = [
+      'executeQuery',
+      'executeUpdate',
+      'execute',
+      'addBatch',
+      'exec',
+      'command',
+      'prepareStatement',
+      'prepareCall'
+    ].includes(method)
+    if (!match[1] && !match[3] && !framework && !legacy) continue
+    if (
+      binding &&
+      !framework &&
+      legacy &&
+      ![
+        'Statement',
+        'PreparedStatement',
+        'CallableStatement',
+        'Runtime',
+        'ProcessBuilder',
+        'Connection'
+      ].includes(receiverType)
     )
+      continue
+    const rule =
+      framework ??
+      rules
+        .filter((r) => !['JAVA-SQL-SPRING-JDBC', 'JAVA-SQL-ORM'].includes(r.id))
+        .find((item) =>
+          match[1]
+            ? item.apis.includes(match[1] + '.<init>')
+            : item.apis.some((api) => api.endsWith('.' + method))
+        )
     if (!rule) continue
-    const parsed = argumentsAt(masked, match.index + match[0].lastIndexOf('('))
+    const parsed = argumentsAt(masked, open)
     if (!parsed) continue
     const args = parsed.spans
       .map(([left, right], index) => {
@@ -182,11 +320,25 @@ export function findRiskCandidates(
       })
       .filter((arg) => maskJava(arg.text, true).trim())
     if (!args.length) continue // executeQuery() 并没有第 0 个 SQL 参数。
+    if (framework && call && /^[\w$]+$/.test(args[0].text)) {
+      const type =
+        call.caller.bindings
+          .filter((b) => b.name === args[0].text && b.start <= call.start && b.end >= call.end)
+          .at(-1)?.type ?? ''
+      if (
+        /(?:CriteriaQuery|PreparedStatementCreator|CallableStatementCreator|ConnectionCallback|StatementCallback)(?:<|$)/.test(
+          type
+        )
+      )
+        continue
+    }
     const indexes = rule.argumentIndexes
     const dangerous = indexes === 'all' ? args : args.filter((arg) => indexes.includes(arg.index))
     const api = match[1]
       ? match[1] + '.<init>'
-      : rule.apis.find((item) => item.endsWith('.' + method))!
+      : framework
+        ? receiverType + '.' + method
+        : rule.apis.find((item) => item.endsWith('.' + method))!
     candidates.push({
       ...range(filePath, source, match.index, parsed.end),
       ruleId: rule.id,

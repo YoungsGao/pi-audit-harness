@@ -1,0 +1,26 @@
+digraph ER {
+graph [rankdir=LR, bgcolor="transparent", pad="0.35", nodesep="0.35", ranksep="0.85", splines=polyline, fontname="Microsoft YaHei", label="核心物理 ER · 项目 / 任务 / 路径 / 结果", labelloc=t, fontsize=20];
+node [shape=plain,fontname="Microsoft YaHei",fontsize=11]; edge [fontname="Microsoft YaHei",fontsize=9,color="#94a3b8",fontcolor="#475569",arrowsize=0.7];
+"projects" [label=<<TABLE BORDER="1" COLOR="#1d4ed8" CELLBORDER="0" CELLSPACING="0" CELLPADDING="10" WIDTH="180"><TR><TD BGCOLOR="#1d4ed8"><FONT COLOR="white"><B>projects</B><BR/>项目、来源与<BR/>审查要求</FONT></TD></TR><TR><TD ALIGN="LEFT" BGCOLOR="white">id [PK]</TD></TR></TABLE>>];
+"model_configs" [label=<<TABLE BORDER="1" COLOR="#0e7490" CELLBORDER="0" CELLSPACING="0" CELLPADDING="10" WIDTH="180"><TR><TD BGCOLOR="#0e7490"><FONT COLOR="white"><B>model_configs</B><BR/>模型配置</FONT></TD></TR><TR><TD ALIGN="LEFT" BGCOLOR="white">id [PK]</TD></TR></TABLE>>];
+"audit_runs" [label=<<TABLE BORDER="1" COLOR="#1d4ed8" CELLBORDER="0" CELLSPACING="0" CELLPADDING="10" WIDTH="180"><TR><TD BGCOLOR="#1d4ed8"><FONT COLOR="white"><B>audit_runs</B><BR/>任务与固定分<BR/>析材料</FONT></TD></TR><TR><TD ALIGN="LEFT" BGCOLOR="white">id [PK]<BR ALIGN="LEFT"/>project_id<BR ALIGN="LEFT"/>status<BR ALIGN="LEFT"/>snapshot_id</TD></TR></TABLE>>];
+"call_edges" [label=<<TABLE BORDER="1" COLOR="#7c3aed" CELLBORDER="0" CELLSPACING="0" CELLPADDING="10" WIDTH="180"><TR><TD BGCOLOR="#7c3aed"><FONT COLOR="white"><B>call_edges</B><BR/>调用边</FONT></TD></TR><TR><TD ALIGN="LEFT" BGCOLOR="white">uid [PK]<BR ALIGN="LEFT"/>run_id<BR ALIGN="LEFT"/>project_id</TD></TR></TABLE>>];
+"call_paths" [label=<<TABLE BORDER="1" COLOR="#7c3aed" CELLBORDER="0" CELLSPACING="0" CELLPADDING="10" WIDTH="180"><TR><TD BGCOLOR="#7c3aed"><FONT COLOR="white"><B>call_paths</B><BR/>候选路径与机<BR/>器结论</FONT></TD></TR><TR><TD ALIGN="LEFT" BGCOLOR="white">path_id [PK]<BR ALIGN="LEFT"/>run_id<BR ALIGN="LEFT"/>project_id<BR ALIGN="LEFT"/>verdict<BR ALIGN="LEFT"/>status</TD></TR></TABLE>>];
+"path_steps" [label=<<TABLE BORDER="1" COLOR="#7c3aed" CELLBORDER="0" CELLSPACING="0" CELLPADDING="10" WIDTH="180"><TR><TD BGCOLOR="#7c3aed"><FONT COLOR="white"><B>path_steps</B><BR/>路径有序步骤</FONT></TD></TR><TR><TD ALIGN="LEFT" BGCOLOR="white">path_id [PK]<BR ALIGN="LEFT"/>step_index [PK]<BR ALIGN="LEFT"/>edge_uid<BR ALIGN="LEFT"/>run_id<BR ALIGN="LEFT"/>project_id</TD></TR></TABLE>>];
+"reports" [label=<<TABLE BORDER="1" COLOR="#be185d" CELLBORDER="0" CELLSPACING="0" CELLPADDING="10" WIDTH="180"><TR><TD BGCOLOR="#be185d"><FONT COLOR="white"><B>reports</B><BR/>报告登记</FONT></TD></TR><TR><TD ALIGN="LEFT" BGCOLOR="white">id [PK]<BR ALIGN="LEFT"/>run_id<BR ALIGN="LEFT"/>project_id<BR ALIGN="LEFT"/>status</TD></TR></TABLE>>];
+"analysis_sessions" [label=<<TABLE BORDER="1" COLOR="#b45309" CELLBORDER="0" CELLSPACING="0" CELLPADDING="10" WIDTH="180"><TR><TD BGCOLOR="#b45309"><FONT COLOR="white"><B>analysis_sessions</B><BR/>分析尝试与历<BR/>史会话</FONT></TD></TR><TR><TD ALIGN="LEFT" BGCOLOR="white">session_id [PK]<BR ALIGN="LEFT"/>run_id<BR ALIGN="LEFT"/>project_id<BR ALIGN="LEFT"/>chain_id</TD></TR></TABLE>>];
+"audit_events" [label=<<TABLE BORDER="1" COLOR="#b45309" CELLBORDER="0" CELLSPACING="0" CELLPADDING="10" WIDTH="180"><TR><TD BGCOLOR="#b45309"><FONT COLOR="white"><B>audit_events</B><BR/>唯一审计事件<BR/>账本</FONT></TD></TR><TR><TD ALIGN="LEFT" BGCOLOR="white">event_id [PK]<BR ALIGN="LEFT"/>run_id<BR ALIGN="LEFT"/>project_id<BR ALIGN="LEFT"/>chain_id<BR ALIGN="LEFT"/>status<BR ALIGN="LEFT"/>session_id</TD></TR></TABLE>>];
+"model_configs" -> "audit_runs" [dir=both,arrowtail="teeodot",arrowhead="crowodot",label="model_config_id"];
+"projects" -> "audit_runs" [dir=both,arrowtail="teetee",arrowhead="crowodot",label="project_id"];
+"audit_runs" -> "call_edges" [dir=both,arrowtail="teetee",arrowhead="crowodot",label="复合FK"];
+"call_edges" -> "call_paths" [dir=both,arrowtail="teeodot",arrowhead="crowodot",label="复合FK"];
+"audit_runs" -> "call_paths" [dir=both,arrowtail="teetee",arrowhead="crowodot",label="复合FK"];
+"call_edges" -> "path_steps" [dir=both,arrowtail="teetee",arrowhead="crowodot",label="复合FK"];
+"call_paths" -> "path_steps" [dir=both,arrowtail="teetee",arrowhead="crowodot",label="复合FK"];
+"audit_runs" -> "reports" [dir=both,arrowtail="teetee",arrowhead="crowodot",label="复合FK"];
+"call_paths" -> "analysis_sessions" [dir=both,arrowtail="teetee",arrowhead="crowodot",label="复合FK"];
+"model_configs" -> "analysis_sessions" [dir=both,arrowtail="teetee",arrowhead="crowodot",label="model_config_id"];
+"call_paths" -> "audit_events" [dir=both,arrowtail="teeodot",arrowhead="crowodot",label="复合FK"];
+"audit_runs" -> "audit_events" [dir=both,arrowtail="teetee",arrowhead="crowodot",label="复合FK"];
+"analysis_sessions" -> "audit_events" [dir=both,arrowtail="teeodot",arrowhead="crowodot",label="session_id"];
+}

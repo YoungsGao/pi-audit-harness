@@ -54,7 +54,18 @@ const identifier = (node: CstNode | undefined): string =>
 
 // CST 用于真实语法范围；目标匹配只是有边界的候选解析，不冒充编译器类型绑定。
 export function indexJavaFile(filePath: string, source: string): JavaFileIndex {
-  const { cst, tokens } = lexAndParse(source)
+  // Windows editors/PowerShell can write UTF-8 BOM. Preserve offsets for frozen-source evidence.
+  const { cst, tokens } = lexAndParse(source.startsWith('\uFEFF') ? ' ' + source.slice(1) : source)
+  const httpAnnotations = tokens.flatMap((token, i) => {
+    if (token.image !== '@') return []
+    let j = i + 1
+    while (tokens[j + 1]?.image === '.' && tokens[j + 2]?.tokenType.name === 'Identifier') j += 2
+    return /^(?:RequestMapping|GetMapping|PostMapping|PutMapping|PatchMapping|DeleteMapping)$/.test(
+      tokens[j]?.image ?? ''
+    )
+      ? [token.startOffset]
+      : []
+  })
   const methods: JavaMethod[] = [],
     warnings: ScanWarning[] = [],
     fields = new Map<string, JavaMethod['bindings']>()
@@ -129,9 +140,11 @@ export function indexJavaFile(filePath: string, source: string): JavaFileIndex {
         bodyStart: body.location.startOffset,
         line: node.location.startLine,
         entry:
-          /@(?:[\w$.]+\.)?(?:RequestMapping|GetMapping|PostMapping|PutMapping|PatchMapping|DeleteMapping)\b/.test(
-            source.slice(node.location.startOffset, body.location.startOffset)
-          ),
+          httpAnnotations.some(
+            (offset) => offset >= node.location.startOffset && offset < body.location.startOffset
+          ) ||
+          (/^do(?:Get|Post|Put|Delete|Patch|Head|Options)$/.test(name) &&
+            bindings.some((b) => /(?:^|\.)HttpServletRequest$/.test(b.type))),
         bindings
       }
       const collectLocals = (current: CstNode, scopeEnd: number): void => {

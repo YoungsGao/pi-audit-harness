@@ -147,7 +147,7 @@ void app.whenReady().then(async () => {
       }
     })
     await window.loadFile(join(__dirname, '../renderer/index.html'))
-    await until(() => js('document.querySelectorAll("nav button").length===5'))
+    await until(() => js('document.querySelectorAll("nav button").length===7'))
     await js(
       `localStorage.setItem('audit.detail.selection.v1',JSON.stringify(${JSON.stringify({ ...scope, pathId, tab: 'path' })}));Array.from(document.querySelectorAll('nav button')).find(b=>b.textContent==='审计分析').click()`
     )
@@ -193,7 +193,7 @@ void app.whenReady().then(async () => {
     const loaded = new Promise<void>((r) => window!.webContents.once('did-finish-load', () => r()))
     window.webContents.reload()
     await loaded
-    await until(() => js('document.querySelectorAll("nav button").length===5'))
+    await until(() => js('document.querySelectorAll("nav button").length===7'))
     await js(
       'Array.from(document.querySelectorAll("nav button")).find(b=>b.textContent==="审计分析").click()'
     )
@@ -217,7 +217,9 @@ void app.whenReady().then(async () => {
     assert.equal(detail.ok, true)
     assert.ok((detail.data as PathDetail).steps.every((s) => s.evidence.length > 0))
     assert.equal(
-      db.prepare('SELECT attempt FROM path_attempts WHERE path_id=?').get(pathId)!.attempt,
+      db
+        .prepare('SELECT max(attempt_id) AS attempt FROM analysis_sessions WHERE chain_id=?')
+        .get(pathId)!.attempt,
       2
     )
     assert.equal(

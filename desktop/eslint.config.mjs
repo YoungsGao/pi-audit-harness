@@ -41,6 +41,8 @@ export default defineConfig(
       '**/.qa-test-data',
       '**/.reliability-test-data',
       '**/out-reliability-test',
+      '**/out-mcp-test',
+      '**/.mcp-test-data',
       '**/resources/delivery/**'
     ]
   },
@@ -57,6 +59,8 @@ export default defineConfig(
       'scripts/security-lab.mjs',
       'scripts/qa-*.mjs',
       'scripts/reliability-lab.mjs',
+      'scripts/mcp-lab.mjs',
+      'scripts/eval-lab.mjs',
       'qa/**/*.mjs'
     ],
     rules: { '@typescript-eslint/explicit-function-return-type': 'off' }

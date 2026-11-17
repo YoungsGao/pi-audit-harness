@@ -88,22 +88,21 @@ export class CallChainRepository {
 
   manualPoint(projectId: string, runId: string, pathId: string): ManualRiskPoint | null {
     const row = this.db.get(
-      `SELECT snapshot_id AS snapshotId,file_path AS filePath,line,
-      column_number AS column,function_key AS functionKey,rule_id AS ruleId,note
-      FROM manual_risk_points WHERE project_id=? AND run_id=? AND path_id=?`,
+      'SELECT manual_points_json FROM call_paths WHERE project_id=? AND run_id=? AND path_id=?',
       projectId,
       runId,
       pathId
     )
-    return row
+    const point = row ? JSON.parse(String(row.manual_points_json))[0] : null
+    return point
       ? {
-          snapshotId: String(row.snapshotId),
-          filePath: String(row.filePath),
-          line: Number(row.line),
-          column: Number(row.column),
-          functionKey: row.functionKey === null ? null : String(row.functionKey),
-          ruleId: String(row.ruleId),
-          note: String(row.note)
+          snapshotId: String(point.snapshotId),
+          filePath: String(point.filePath),
+          line: Number(point.line),
+          column: Number(point.column),
+          functionKey: point.functionKey === null ? null : String(point.functionKey),
+          ruleId: String(point.ruleId),
+          note: String(point.note)
         }
       : null
   }
@@ -203,12 +202,15 @@ export class CallChainRepository {
     const now = new Date().toISOString()
     return this.db.transaction((tx) => {
       const registered = tx.get(
-        'SELECT source_stamp FROM source_imports WHERE project_id=?',
+        'SELECT source_stamp FROM projects WHERE id=? AND source_key IS NOT NULL',
         input.projectId
       )
       if (registered && registered.source_stamp !== input.sourceStamp)
         throw new ApiError('CHAIN_RUN_CONFLICT', '任务源码指纹与已登记源码不一致', 409)
-      const existing = tx.get('SELECT * FROM audit_runs WHERE id=?', input.runId)
+      const existing = tx.get(
+        'SELECT id,project_id,source_stamp,rules_version,status FROM audit_runs WHERE id=?',
+        input.runId
+      )
       if (
         existing &&
         (existing.project_id !== input.projectId ||
@@ -321,16 +323,18 @@ export class CallChainRepository {
       if (summary) this.scans.finish(tx, input.runId, summary)
       if (manual) {
         for (const path of paths) {
-          const old = tx.get(
-            `SELECT * FROM manual_risk_points WHERE run_id=? AND file_path=? AND line=? AND column_number=? AND path_id=?`,
-            input.runId,
-            manual.filePath,
-            manual.line,
-            manual.column,
-            path.pathId
+          const points = JSON.parse(
+            String(
+              tx.get('SELECT manual_points_json FROM call_paths WHERE path_id=?', path.pathId)!
+                .manual_points_json
+            )
+          ) as (ManualRiskPoint & { pointId: string; createdAt: string })[]
+          const old = points.find(
+            (p) =>
+              p.filePath === manual.filePath && p.line === manual.line && p.column === manual.column
           )
           if (old) {
-            if (old.note !== manual.note || old.rule_id !== manual.ruleId)
+            if (old.note !== manual.note || old.ruleId !== manual.ruleId)
               throw new ApiError(
                 'MANUAL_POINT_CONFLICT',
                 '该位置已登记其他调查内容，请查看已有记录或创建新任务',
@@ -338,20 +342,11 @@ export class CallChainRepository {
               )
             continue
           }
+          points.push({ ...manual, pointId: randomUUID(), createdAt: now })
           tx.run(
-            'INSERT INTO manual_risk_points VALUES (?,?,?,?,?,?,?,?,?,?,?,?)',
-            randomUUID(),
-            input.projectId,
-            input.runId,
-            manual.snapshotId,
-            path.pathId,
-            manual.filePath,
-            manual.line,
-            manual.column,
-            manual.functionKey,
-            manual.ruleId,
-            manual.note,
-            now
+            'UPDATE call_paths SET manual_points_json=? WHERE path_id=?',
+            JSON.stringify(points),
+            path.pathId
           )
         }
         if (addedPaths)
@@ -361,9 +356,9 @@ export class CallChainRepository {
             input.runId
           )
         tx.run(
-          `UPDATE scan_runs SET state=CASE WHEN state='empty' OR EXISTS(SELECT 1 FROM call_paths WHERE run_id=? AND truncated=1) THEN 'partial' ELSE state END,
-          truncated=EXISTS(SELECT 1 FROM call_paths WHERE run_id=? AND truncated=1),
-          candidate_count=(SELECT count(*) FROM call_edges WHERE run_id=? AND is_sink=1) WHERE run_id=?`,
+          `UPDATE audit_runs SET scan_state=CASE WHEN scan_state='empty' OR EXISTS(SELECT 1 FROM call_paths WHERE run_id=? AND truncated=1) THEN 'partial' ELSE scan_state END,
+          scan_truncated=EXISTS(SELECT 1 FROM call_paths WHERE run_id=? AND truncated=1),
+          candidate_count=(SELECT count(*) FROM call_edges WHERE run_id=? AND is_sink=1) WHERE id=?`,
           input.runId,
           input.runId,
           input.runId,

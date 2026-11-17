@@ -7,6 +7,7 @@ import { loadPiSdk } from './pi-sdk.ts'
 import type { ResolvedModel } from './model-config-resolver.ts'
 import { PiRuntime, throwIfCancelled, waitWithSignal } from './pi-runtime.ts'
 import { nonThinkingPayload } from './provider-compat.ts'
+import { MCP_TOOLS } from './mcp/contracts.ts'
 
 export function assertManagedTools(
   session: CreateAgentSessionResult['session'],
@@ -32,7 +33,7 @@ export async function createManagedSession(
 ): Promise<CreateAgentSessionResult['session']> {
   if (
     new Set(tools).size !== tools.length ||
-    tools.some((name) => !['audit_read_step', 'audit_read_evidence'].includes(name))
+    tools.some((name) => !['audit_read_step', 'audit_read_evidence', ...MCP_TOOLS].includes(name))
   )
     throw new ApiError('INVALID_TOOL_SET', '不允许注册通用执行或文件写入工具', 400)
   const sdk = await waitWithSignal(loadPiSdk(), signal)

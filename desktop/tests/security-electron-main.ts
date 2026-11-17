@@ -135,7 +135,7 @@ void app.whenReady().then(async () => {
     assert.equal(await js('typeof require'), 'undefined')
     assert.equal(await js('typeof window.audit'), 'object')
     assert.equal(await js('typeof window.audit.invoke'), 'undefined')
-    await until(() => js('document.querySelectorAll("nav button").length===5'))
+    await until(() => js('document.querySelectorAll("nav button").length===7'))
     await js(
       `localStorage.setItem('audit.detail.selection.v1',JSON.stringify(${JSON.stringify({ ...scope, tab: 'path' })})); Array.from(document.querySelectorAll('nav button')).find(b=>b.textContent==='审计分析').click()`
     )

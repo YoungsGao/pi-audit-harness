@@ -15,8 +15,26 @@ import { createHash } from 'node:crypto'
 import { publicAnalysisValue } from '../../shared/path-detail-view.ts'
 import { SnapshotRepository } from '../storage/snapshot-repository.ts'
 import { GraphRepository } from '../storage/graph-repository.ts'
+import { mcpHash } from '../mcp/contracts.ts'
+import type { McpReceipt } from '../mcp/contracts.ts'
 
 export interface ReportSnapshot {
+  mcp?: {
+    truncated: boolean
+    receipts: {
+      pathId: string
+      attempt: number
+      stepIndex: number
+      tool: string
+      status: string
+      engine: string
+      rulesDigest: string | null
+      gaps: string[]
+      truncated: boolean
+      sourceRanges: { filePath: string; startLine: number; endLine: number }[]
+      findings: Record<string, unknown>[]
+    }[]
+  }
   queryGraph: import('../query/graph-contracts.ts').GraphBinding | null
   recovery: {
     controlState: string
@@ -81,7 +99,11 @@ export function savedReportSnapshot(
       'SELECT id,name,source_type,git_url,git_commit FROM projects WHERE id=?',
       projectId
     )
-    const run = db.get('SELECT * FROM audit_runs WHERE id=? AND project_id=?', runId, projectId)
+    const run = db.get(
+      'SELECT id,status,stage,error_code,rules_version,source_stamp,created_at,started_at,finished_at,model_config_id,control_state,snapshot_id FROM audit_runs WHERE id=? AND project_id=?',
+      runId,
+      projectId
+    )
     if (!project || !run) throw new ApiError('REPORT_SCOPE_NOT_FOUND', '报告项目或任务不存在', 404)
     const ids = db.all(
       'SELECT path_id FROM call_paths WHERE project_id=? AND run_id=? ORDER BY created_at,path_id',
@@ -139,11 +161,11 @@ export function savedReportSnapshot(
       if (review.stale) reviewCounts.stale++
     }
     const scanRow = db.get(
-      'SELECT state,truncated,warnings_json FROM scan_runs WHERE project_id=? AND run_id=?',
+      'SELECT scan_state AS state,scan_truncated AS truncated,warnings_json FROM audit_runs WHERE project_id=? AND id=? AND scan_state IS NOT NULL',
       projectId,
       runId
     )
-    const warnings = scanRow ? JSON.parse(String(scanRow.warnings_json)) : []
+    const warnings = scanRow ? JSON.parse(String(scanRow.warnings_json ?? '[]')) : []
     const scan = {
       state: scanRow ? String(scanRow.state) : '未保存',
       truncated: !scanRow || scanRow.truncated === 1,
@@ -161,26 +183,25 @@ export function savedReportSnapshot(
       Object.values(filter).some((value) => value !== 'all') ||
       reviewCounts.stale > 0
     const hasSnapshot = db.get(
-      'SELECT snapshot_id FROM run_snapshots WHERE project_id=? AND run_id=?',
+      'SELECT snapshot_id FROM audit_runs WHERE project_id=? AND id=? AND snapshot_id IS NOT NULL',
       projectId,
       runId
     )
     const snapshot: ReportSnapshot = {
+      mcp: { truncated: false, receipts: [] },
       queryGraph: new GraphRepository(db).get(projectId, runId),
       recovery: {
-        controlState: String(
-          db.get('SELECT state FROM run_controls WHERE run_id=?', runId)?.state ?? 'legacy'
-        ),
+        controlState: String(run.control_state),
         recordedRequests: db
           .all(
-            'SELECT path_id FROM recovery_requests WHERE project_id=? AND run_id=?',
+            'SELECT path_id FROM model_requests WHERE project_id=? AND run_id=? AND journey_id IS NOT NULL',
             projectId,
             runId
           )
           .filter((r) => paths.some((p) => p.pathId === r.path_id)).length,
         uncertainRequests: db
           .all(
-            "SELECT path_id FROM recovery_requests WHERE project_id=? AND run_id=? AND state IN ('started','uncertain')",
+            "SELECT path_id FROM model_requests WHERE project_id=? AND run_id=? AND journey_id IS NOT NULL AND state IN ('started','uncertain')",
             projectId,
             runId
           )
@@ -230,7 +251,7 @@ export function savedReportSnapshot(
       sourceSnapshot: hasSnapshot ? new SnapshotRepository(db).info(projectId, runId) : null,
       transmissions: db
         .all(
-          'SELECT * FROM source_transmissions WHERE project_id=? AND run_id=? ORDER BY started_at,transmission_id',
+          'SELECT * FROM model_requests WHERE project_id=? AND run_id=? AND config_id IS NOT NULL ORDER BY started_at,request_id',
           projectId,
           runId
         )
@@ -267,6 +288,39 @@ export function savedReportSnapshot(
       scan,
       statistics,
       paths
+    }
+    for (const row of db.all(
+      `SELECT t.*,r.attempt FROM tool_receipts t JOIN path_recovery r
+      ON r.journey_id=t.journey_id AND r.path_id=t.path_id WHERE t.tool_name!='audit_read_step' AND t.project_id=? AND t.run_id=? ORDER BY t.rowid`,
+      projectId,
+      runId
+    )) {
+      if (!paths.some((p) => p.pathId === row.path_id)) continue
+      if (snapshot.mcp!.receipts.length >= 500) {
+        snapshot.mcp!.truncated = true
+        break
+      }
+      const receipt = JSON.parse(String(row.receipt_json)) as McpReceipt
+      if (mcpHash(receipt) !== row.sha256)
+        throw new ApiError('REPORT_MCP_CORRUPT', 'MCP回执损坏，未导出为可信报告材料', 409)
+      const output = receipt.output
+      snapshot.mcp!.receipts.push({
+        pathId: String(row.path_id),
+        attempt: Number(row.attempt),
+        stepIndex: output.stepIndex,
+        tool: receipt.name,
+        status: output.status,
+        engine: output.engine,
+        rulesDigest: output.rulesDigest,
+        gaps: output.gaps,
+        truncated: output.truncated,
+        sourceRanges: output.ranges.map(({ filePath, startLine, endLine }) => ({
+          filePath,
+          startLine,
+          endLine
+        })),
+        findings: receipt.name === 'audit_static_scan' ? output.items : []
+      })
     }
     if (Buffer.byteLength(JSON.stringify(snapshot)) > 15 * 1024 * 1024)
       throw new ApiError('REPORT_LIMIT', '报告数据超过 15MiB，未静默截断', 413)

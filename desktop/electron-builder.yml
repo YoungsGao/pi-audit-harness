@@ -18,6 +18,13 @@ files:
 asarUnpack:
   - node_modules/@colbymchenry/codegraph*/**
 extraResources:
+  - from: ../python/src
+    to: audit-python/src
+    filter:
+      - '**/*.py'
+      - '**/audit_mcp/contract.json'
+  - from: ../python/requirements-runtime.txt
+    to: audit-python/requirements-runtime.txt
   - from: resources/delivery
     to: delivery
   - from: resources/compliance

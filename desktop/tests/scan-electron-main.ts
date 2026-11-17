@@ -184,7 +184,7 @@ async function captureWorkspace(name: string): Promise<void> {
       `${name} horizontal overflow at ${width}`
     )
     assert.equal(await js('document.querySelector("main").scrollTop'), 0)
-    assert.equal(await js('document.querySelectorAll("nav button[title]").length'), 5)
+    assert.equal(await js('document.querySelectorAll("nav button[title]").length'), 7)
     writeFileSync(
       join(root, `${name}-${width}.png`),
       (

@@ -89,7 +89,7 @@ test('transient transport failure retries once in the same request/round budgets
     assert.equal(history.frames.filter((f) => f.event === 'request_info').length, 1)
     assert.ok(
       h.db.get(
-        "SELECT count(*) n FROM recovery_requests WHERE path_id=? AND state='uncertain'",
+        "SELECT count(*) n FROM model_requests WHERE path_id=? AND state='uncertain'",
         scope.pathId
       ).n >= 1
     )
@@ -104,7 +104,7 @@ test('user stop during transient retry backoff dispatches no new request and lea
   const deadline = Date.now() + 5000
   while (
     !h.db.get(
-      "SELECT count(*) n FROM analysis_events WHERE chain_id=? AND status='request_retry'",
+      "SELECT count(*) n FROM audit_events WHERE chain_id=? AND status='request_retry'",
       scope.pathId
     ).n
   ) {
@@ -296,7 +296,10 @@ test('real Pi retries a bad citation once using the existing source/tools, persi
   const feedback = history.frames.filter((f) => f.event === 'validation_info')
   assert.ok(feedback.some((f) => f.data.details.payload.validation?.rule === 'registered-citation'))
   assert.equal(history.frames.at(-1).event, 'completed')
-  assert.equal(h.db.get('SELECT count(*) n FROM path_attempts WHERE path_id=?', scope.pathId).n, 1)
+  assert.equal(
+    h.db.get('SELECT count(*) n FROM analysis_sessions WHERE chain_id=?', scope.pathId).n,
+    1
+  )
 })
 
 test('invalid JSON gets one bounded repair; persistent invented source fails unknown with explicit field and no extra retries', async (t) => {

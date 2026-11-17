@@ -337,7 +337,7 @@ test('stream terminal frame rolls back with business result and crash recovery p
   const attempt = h.repo.scans.claim(h.scope.projectId, h.scope.runId, chainId, 'model')
   const session = h.repo.scans.streams.current(h.scope.projectId, h.scope.runId, chainId)
   h.db.exec(
-    "CREATE TRIGGER reject_stream_terminal BEFORE INSERT ON stream_events WHEN NEW.event='completed' BEGIN SELECT RAISE(ABORT,'fixture'); END"
+    "CREATE TRIGGER reject_stream_terminal BEFORE INSERT ON audit_events WHEN NEW.stream_event='completed' BEGIN SELECT RAISE(ABORT,'fixture'); END"
   )
   assert.throws(() =>
     h.repo.scans.complete(

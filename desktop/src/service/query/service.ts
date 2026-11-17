@@ -15,6 +15,7 @@ import { builtinRules, findRiskCandidates } from '../rules/builtin.ts'
 import { indexJavaFile } from '../scanning/java-index.ts'
 import { UnifiedQueryService } from './unified-service.ts'
 import type { RuntimeOptions } from './query-runtime.ts'
+import { PythonMcpManager } from '../mcp/manager.ts'
 type QueryScan = SourceScan & { snapshotScope?: { projectId: string; runId: string } }
 
 export function queryInput(value: unknown, keys: string[]): Record<string, unknown> {
@@ -48,6 +49,7 @@ function check(signal: AbortSignal): void {
 }
 
 export class CodeQueryService {
+  readonly mcp: PythonMcpManager
   readonly unified: UnifiedQueryService
   readonly graphPathsEnabled: boolean
   get snapshots(): SourceRepository['snapshots'] {
@@ -58,6 +60,7 @@ export class CodeQueryService {
   private readonly tasks = new Set<Promise<unknown>>()
   constructor(repo: SourceRepository, options: RuntimeOptions = {}) {
     this.repo = repo
+    this.mcp = new PythonMcpManager(repo.dataRoot)
     this.unified = new UnifiedQueryService(repo, options)
     this.graphPathsEnabled = !!options.dataRoot
   }
@@ -121,6 +124,7 @@ export class CodeQueryService {
     this.closing.abort()
     await Promise.allSettled(this.tasks)
     await this.unified.close()
+    await this.mcp.close()
   }
 
   async sourceSnapshot(

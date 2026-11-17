@@ -119,8 +119,8 @@ test('SEC-03 credential-echo analysis fails closed before result/checkpoint publ
   assert.match(detail.summary, /MODEL_SECRET_EXPOSED/)
   const records = [
     detail,
-    h.db.all('SELECT * FROM analysis_events'),
-    h.db.all('SELECT * FROM stream_events'),
+    h.db.all('SELECT * FROM audit_events'),
+    h.db.all('SELECT * FROM audit_events'),
     h.db.all('SELECT * FROM recovery_checkpoints')
   ]
   assert.equal(JSON.stringify(records).includes('local-fixture-key'), false)
@@ -147,7 +147,7 @@ test('SEC-01/02 malicious model calls cannot activate read/bash/write/edit/execu
     assert.deepEqual(await readFile(join(h.source, 'Demo.java')), before)
     assert.deepEqual(
       h.model.requests[0].tools.map((x) => x.function.name),
-      ['audit_read_step']
+      ['audit_read_step', 'audit_find_related', 'audit_read_related', 'audit_static_scan']
     )
     assert.equal(h.model.requests.length, 1)
   }
@@ -167,7 +167,10 @@ test('SEC-02 scoped read rejects extra paths, commands and invalid step indices'
     await h.chains.analysis.waitForIdle()
     assert.equal(h.repo.detail(scope).status, 'failed')
     assert.match(h.repo.detail(scope).summary, /AGENT_TOOL_SCOPE/)
-    assert.equal(h.db.get('SELECT count(*) AS n FROM recovery_tools').n, 0)
+    assert.equal(
+      h.db.get(`SELECT count(*) AS n FROM tool_receipts WHERE tool_name='audit_read_step'`).n,
+      0
+    )
   }
 })
 

@@ -69,7 +69,10 @@ test('RUN-02 real Pi opens a native safe checkpoint, restores host evidence and 
     'completed'
   )
   assert.equal(
-    h.db.get('SELECT attempt FROM path_attempts WHERE path_id=?', h.input.pathId).attempt,
+    h.db.get(
+      'SELECT max(attempt_id) AS attempt FROM analysis_sessions WHERE chain_id=?',
+      h.input.pathId
+    ).attempt,
     2
   )
   assert.equal(await readFile(join(h.root, 'runtime', 'recovery', cp.file_name), 'utf8'), oldBytes)
@@ -290,11 +293,17 @@ test('RUN-02 different-PID forced termination after safe Pi checkpoint resumes a
   assert.equal(plan.requestsUsed, before)
   assert.equal(h.db.get("SELECT count(*) AS n FROM path_recovery WHERE state='completed'").n, 2)
   assert.equal(
-    h.db.get('SELECT attempt FROM path_attempts WHERE path_id=?', h.prepared.pathIds[0]).attempt,
+    h.db.get(
+      'SELECT max(attempt_id) AS attempt FROM analysis_sessions WHERE chain_id=?',
+      h.prepared.pathIds[0]
+    ).attempt,
     2
   )
   assert.equal(
-    h.db.get('SELECT attempt FROM path_attempts WHERE path_id=?', h.prepared.pathIds[1]).attempt,
+    h.db.get(
+      'SELECT max(attempt_id) AS attempt FROM analysis_sessions WHERE chain_id=?',
+      h.prepared.pathIds[1]
+    ).attempt,
     1
   )
   assert.equal(h.model.requests[before].messages.filter((m) => m.role === 'tool').length, 2)
@@ -313,7 +322,10 @@ test('RUN-02 crash after committed path but before delivery resumes the next pen
   assert.equal(resumed.messages.find((m) => m.type === 'plan').plan.committedPaths, 1)
   assert.deepEqual(h.repo.detail({ ...h.scope, pathId: h.prepared.pathIds[0] }), first)
   assert.equal(
-    h.db.get('SELECT attempt FROM path_attempts WHERE path_id=?', h.prepared.pathIds[0]).attempt,
+    h.db.get(
+      'SELECT max(attempt_id) AS attempt FROM analysis_sessions WHERE chain_id=?',
+      h.prepared.pathIds[0]
+    ).attempt,
     1
   )
   assert.equal(h.db.get("SELECT count(*) AS n FROM path_recovery WHERE state='completed'").n, 2)
@@ -356,7 +368,7 @@ test('RUN-02 actual in-flight model request crash preserves uncertain usage and 
   assert.equal(plan.mode, 'restart')
   assert.equal(plan.uncertainRequests, 1)
   assert.equal(plan.requestsUsed, 1)
-  assert.equal(h.db.get("SELECT count(*) AS n FROM recovery_requests WHERE state='uncertain'").n, 1)
+  assert.equal(h.db.get("SELECT count(*) AS n FROM model_requests WHERE state='uncertain'").n, 1)
 })
 
 test('RUN-02 claim and recovery association commit atomically so a crash before the first model request remains recoverable', async (t) => {
@@ -428,7 +440,7 @@ test('RUN-02 v11 migration history remains unchanged and new checkpoint/tool rec
   migrate(db, migrations.slice(0, 11))
   const history = db.all('SELECT * FROM schema_migrations ORDER BY version')
   migrate(db)
-  assert.equal(db.get('PRAGMA user_version').user_version, 13)
+  assert.equal(db.get('PRAGMA user_version').user_version, 15)
   assert.deepEqual(
     db.all('SELECT * FROM schema_migrations WHERE version<=11 ORDER BY version'),
     history
@@ -437,5 +449,7 @@ test('RUN-02 v11 migration history remains unchanged and new checkpoint/tool rec
   assert.throws(() => h.db.exec("UPDATE recovery_checkpoints SET host_json='{}'"), {
     code: 'DB_QUERY_FAILED'
   })
-  assert.throws(() => h.db.exec('DELETE FROM recovery_tools'), { code: 'DB_QUERY_FAILED' })
+  assert.throws(() => h.db.exec(`DELETE FROM tool_receipts WHERE tool_name='audit_read_step'`), {
+    code: 'DB_QUERY_FAILED'
+  })
 })

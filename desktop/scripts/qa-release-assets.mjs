@@ -10,6 +10,11 @@ for (const name of ['README.md', 'LICENSE', 'THIRD_PARTY_NOTICES.md'])
 await mkdir(join(out, 'docs'), { recursive: true })
 await cp(join(root, 'docs/technical'), join(out, 'docs/technical'), { recursive: true })
 await mkdir(join(out, 'desktop'), { recursive: true })
+await mkdir(join(out, 'python'), { recursive: true })
+await copyFile(
+  join(root, 'python/requirements-runtime.txt'),
+  join(out, 'python/requirements-runtime.txt')
+)
 await copyFile(join(desktop, 'README.md'), join(out, 'desktop/README.md'))
 for (const name of ['package.json', 'package-lock.json'])
   await copyFile(join(desktop, name), join(out, 'desktop', name))

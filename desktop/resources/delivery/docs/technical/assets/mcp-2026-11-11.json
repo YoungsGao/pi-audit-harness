@@ -1,0 +1,55 @@
+{
+  "date": "2026-11-11",
+  "scope": "controlled MCP/CodeGraph/Semgrep engineering validation; local protocol model, not a paid-model accuracy evaluation",
+  "versions": {
+    "mcpSdk": "1.32.2",
+    "mcpProtocol": "2025-11-25",
+    "semgrep": "1.185.0",
+    "codegraph": "1.6.2",
+    "schema": 14
+  },
+  "tests": {
+    "node": 221,
+    "passed": 221,
+    "failed": 0,
+    "skipped": 0,
+    "semgrepRealPositiveNegative": true,
+    "stdioInteroperability": true,
+    "electronScenarios": [
+      {
+        "name": "repair",
+        "status": "unresolved",
+        "verdict": "unknown",
+        "submissions": 2
+      },
+      {
+        "name": "failure",
+        "status": "failed",
+        "verdict": "unknown",
+        "submissions": 2
+      },
+      {
+        "name": "mcp",
+        "status": "unresolved",
+        "verdict": "unknown",
+        "submissions": 2
+      }
+    ]
+  },
+  "paidModelRequests": 0,
+  "limitations": [
+    "Only one-hop Java relations rooted in original path steps",
+    "Graph relationships and scan findings are candidates, not confirmed vulnerabilities",
+    "Optional user-installed scanner, not bundled",
+    "In-memory MCP transport is not an OS sandbox",
+    "Paid-model tool selection and vulnerability accuracy were not measured"
+  ],
+  "runtimeAudit": {
+    "info": 0,
+    "low": 0,
+    "moderate": 0,
+    "high": 0,
+    "critical": 0,
+    "total": 0
+  }
+}

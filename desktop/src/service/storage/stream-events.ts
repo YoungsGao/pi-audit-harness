@@ -9,9 +9,14 @@ import type {
 } from '../../shared/sse-contracts'
 import type { EventInput } from '../../shared/agent-contracts'
 import { ApiError } from '../../shared/api-error.ts'
-import { streamEventSpec } from '../../shared/sse-contracts.ts'
 
-function insert(
+interface StreamProjection {
+  sessionId: string
+  id: number
+  event: StreamEventName
+  data: StreamFrame['data']
+}
+function project(
   tx: SqlSession,
   session: Row,
   event: StreamEventName,
@@ -19,35 +24,12 @@ function insert(
   type: StreamFrame['data']['type'],
   summary: string | null,
   details: unknown
-): void {
-  const spec = streamEventSpec[event]
-  if (!spec.from.includes(String(session.state)) || spec.status !== status || spec.type !== type)
-    throw new ApiError('SSE_INVALID_TRANSITION', '事件与会话状态迁移不一致', 409)
+): StreamProjection {
   const id = Number(
     tx.get(
-      'SELECT COALESCE(MAX(id),0)+1 AS n FROM stream_events WHERE session_id=?',
+      'SELECT COALESCE(MAX(session_seq),0)+1 AS n FROM audit_events WHERE session_id=?',
       session.session_id
     )!.n
-  )
-  const data: StreamFrame['data'] = {
-    projectId: String(session.project_id),
-    runId: String(session.run_id),
-    chainId: String(session.chain_id),
-    sessionId: String(session.session_id),
-    attemptId: Number(session.attempt_id),
-    type,
-    status,
-    message: summary,
-    summaryMissing: !summary,
-    details
-  }
-  tx.run(
-    'INSERT INTO stream_events VALUES (?,?,?,?,?)',
-    session.session_id,
-    id,
-    event,
-    JSON.stringify(data),
-    new Date().toISOString()
   )
   tx.run(
     'UPDATE analysis_sessions SET state=?,finished_at=? WHERE session_id=?',
@@ -55,6 +37,23 @@ function insert(
     ['queue', 'analyze'].includes(status) ? null : new Date().toISOString(),
     session.session_id
   )
+  return {
+    sessionId: String(session.session_id),
+    id,
+    event,
+    data: {
+      projectId: String(session.project_id),
+      runId: String(session.run_id),
+      chainId: String(session.chain_id),
+      sessionId: String(session.session_id),
+      attemptId: Number(session.attempt_id),
+      type,
+      status,
+      message: summary,
+      summaryMissing: !summary,
+      details
+    }
+  }
 }
 export function createStreamSession(
   tx: SqlSession,
@@ -64,18 +63,19 @@ export function createStreamSession(
   attempt: number,
   modelId: string
 ): string {
-  const id = randomUUID()
+  const id = randomUUID(),
+    time = new Date().toISOString()
   tx.run(
-    "INSERT INTO analysis_sessions (session_id,project_id,run_id,chain_id,attempt_id,model_config_id,state,created_at) VALUES (?,?,?,?,?,?,'queue',?)",
+    "INSERT INTO analysis_sessions(session_id,project_id,run_id,chain_id,attempt_id,model_config_id,state,created_at) VALUES(?,?,?,?,?,?,'queue',?)",
     id,
     projectId,
     runId,
     chainId,
     attempt,
     modelId,
-    new Date().toISOString()
+    time
   )
-  insert(
+  const frame = project(
     tx,
     tx.get('SELECT * FROM analysis_sessions WHERE session_id=?', id)!,
     'queued',
@@ -84,9 +84,24 @@ export function createStreamSession(
     '调用链进入队列',
     null
   )
+  tx.run(
+    `INSERT INTO audit_events(event_id,run_id,project_id,chain_id,time,type,summary,summary_missing,status,truncated,body_json,session_id,session_seq,stream_event)
+    VALUES(?,?,?,?,?,'process',?,0,'queued',0,?,?,?,?)`,
+    randomUUID(),
+    runId,
+    projectId,
+    chainId,
+    time,
+    frame.data.message,
+    JSON.stringify(frame.data),
+    id,
+    frame.id,
+    frame.event
+  )
   return id
 }
-export function mirrorStreamEvent(
+// Project the same saved event into SSE, without a second event row or payload.
+export function projectStreamEvent(
   tx: SqlSession,
   projectId: string,
   runId: string,
@@ -95,22 +110,16 @@ export function mirrorStreamEvent(
   summary: string | null,
   payload: unknown,
   truncated: boolean
-): void {
-  if (!chainId) return
+): StreamProjection | null {
+  if (!chainId) return null
   const session = tx.get(
     "SELECT * FROM analysis_sessions WHERE project_id=? AND run_id=? AND chain_id=? AND state IN ('queue','analyze') ORDER BY attempt_id DESC LIMIT 1",
     projectId,
     runId,
     chainId
   )
-  if (!session) return
-  const current = tx.get('SELECT attempt FROM path_attempts WHERE path_id=?', chainId)
-  if (
-    !current ||
-    current.attempt !== session.attempt_id ||
-    (event.attemptId !== undefined && event.attemptId !== current.attempt)
-  )
-    return
+  if (!session || (event.attemptId !== undefined && event.attemptId !== session.attempt_id))
+    return null
   const details = {
     payload,
     toolCallId: event.toolCallId ?? null,
@@ -119,35 +128,35 @@ export function mirrorStreamEvent(
     truncated
   }
   if (event.status === 'analyzing' && session.state === 'queue')
-    insert(tx, session, 'analyzing', 'analyze', 'process', summary, details)
-  else if (session.state === 'analyze') {
-    if (event.type === 'process' && event.status === 'request_retry')
-      insert(tx, session, 'request_info', 'analyze', 'process', summary, details)
-    else if (event.type === 'process' && event.status.startsWith('validation_'))
-      insert(tx, session, 'validation_info', 'analyze', 'process', summary, details)
-    else if (event.type === 'tool')
-      insert(tx, session, 'tool_call_info', 'analyze', 'process', summary, details)
-    else if (event.type === 'model')
-      insert(tx, session, 'thoughts_execute', 'analyze', 'thinking', summary, details)
-    else if (event.type === 'result') {
-      const code = String((payload as Record<string, unknown> | null)?.errorCode ?? '')
-      const failed = event.status === 'failed' || event.status === 'interrupted'
-      const timed = failed && /TIMEOUT|TIMED_OUT/.test(code)
-      const stopped =
-        code === 'RUN_USER_STOP' ||
-        event.status === 'stopped' ||
-        /AGENT_(?:NO_PROGRESS|ROUND_LIMIT|TOOL_LIMIT|REQUEST_LIMIT|EVIDENCE_LIMIT)/.test(code)
-      insert(
-        tx,
-        session,
-        timed ? 'timed_out' : stopped ? 'stopped' : failed ? 'failed' : 'completed',
-        timed ? 'timeout' : stopped ? 'stop' : failed ? 'error' : 'completed',
-        'result',
-        summary,
-        details
-      )
-    }
-  }
+    return project(tx, session, 'analyzing', 'analyze', 'process', summary, details)
+  if (session.state !== 'analyze') return null
+  if (event.type === 'process' && event.status === 'investigation_state')
+    return project(tx, session, 'investigation_info', 'analyze', 'process', summary, details)
+  if (event.type === 'process' && event.status === 'request_retry')
+    return project(tx, session, 'request_info', 'analyze', 'process', summary, details)
+  if (event.type === 'process' && event.status.startsWith('validation_'))
+    return project(tx, session, 'validation_info', 'analyze', 'process', summary, details)
+  if (event.type === 'tool')
+    return project(tx, session, 'tool_call_info', 'analyze', 'process', summary, details)
+  if (event.type === 'model')
+    return project(tx, session, 'thoughts_execute', 'analyze', 'thinking', summary, details)
+  if (event.type !== 'result') return null
+  const code = String((payload as Record<string, unknown> | null)?.errorCode ?? '')
+  const failed = event.status === 'failed' || event.status === 'interrupted'
+  const timed = failed && /TIMEOUT|TIMED_OUT/.test(code)
+  const stopped =
+    code === 'RUN_USER_STOP' ||
+    event.status === 'stopped' ||
+    /AGENT_(?:NO_PROGRESS|ROUND_LIMIT|TOOL_LIMIT|REQUEST_LIMIT|EVIDENCE_LIMIT)/.test(code)
+  return project(
+    tx,
+    session,
+    timed ? 'timed_out' : stopped ? 'stopped' : failed ? 'failed' : 'completed',
+    timed ? 'timeout' : stopped ? 'stop' : failed ? 'error' : 'completed',
+    'result',
+    summary,
+    details
+  )
 }
 export class StreamRepository {
   private readonly db: LocalDatabase
@@ -178,7 +187,7 @@ export class StreamRepository {
     const after = input.afterId ?? 0
     const last = Number(
       this.db.get(
-        'SELECT COALESCE(MAX(id),0) AS n FROM stream_events WHERE session_id=?',
+        'SELECT COALESCE(MAX(session_seq),0) AS n FROM audit_events WHERE session_id=?',
         row.session_id
       )!.n
     )
@@ -191,18 +200,18 @@ export class StreamRepository {
     const session = this.session(input)
     const frames = this.db
       .all(
-        'SELECT * FROM stream_events WHERE session_id=? AND id>? ORDER BY id LIMIT 50',
+        'SELECT * FROM audit_events WHERE session_id=? AND session_seq>? ORDER BY session_seq LIMIT 50',
         session.session_id,
         input.afterId ?? 0
       )
       .map((r) => ({
-        event: r.event as StreamEventName,
-        id: Number(r.id),
-        data: JSON.parse(String(r.data_json)) as StreamFrame['data']
+        event: r.stream_event as StreamEventName,
+        id: Number(r.session_seq),
+        data: JSON.parse(String(r.body_json)) as StreamFrame['data']
       }))
     const lastEventId = Number(
       this.db.get(
-        'SELECT COALESCE(MAX(id),0) AS n FROM stream_events WHERE session_id=?',
+        'SELECT COALESCE(MAX(session_seq),0) AS n FROM audit_events WHERE session_id=?',
         session.session_id
       )!.n
     )
@@ -284,11 +293,13 @@ export class StreamRepository {
       if (!row || ['queue', 'analyze'].includes(String(row.state)))
         throw new ApiError('SSE_ACTIVE_SESSION', '只能清理已结束会话', 409)
       const last = Number(
-        tx.get('SELECT COALESCE(MAX(id),0) AS n FROM stream_events WHERE session_id=?', sessionId)!
-          .n
+        tx.get(
+          'SELECT COALESCE(MAX(session_seq),0) AS n FROM audit_events WHERE session_id=?',
+          sessionId
+        )!.n
       )
       if (throughId >= last) throw new ApiError('SSE_INVALID_CURSOR', '保留终态事件供状态确认', 400)
-      tx.run('DELETE FROM stream_events WHERE session_id=? AND id<=?', sessionId, throughId)
+      // Expire the SSE projection; keep the shared audit record for reports/diagnostics.
       tx.run(
         'UPDATE analysis_sessions SET min_event_id=max(min_event_id,?) WHERE session_id=?',
         throughId + 1,

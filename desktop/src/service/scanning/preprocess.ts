@@ -35,6 +35,7 @@ export async function preprocessJava(
     if (signal.aborted) throw new ApiError('QUERY_CANCELLED', '预处理已取消', 499)
     await setImmediate()
     let failed = false
+    let syntax: ReturnType<typeof indexJavaFile> | undefined
     try {
       if (
         Buffer.byteLength(file.source, 'utf8') > 256 * 1024 ||
@@ -43,6 +44,7 @@ export async function preprocessJava(
       )
         throw new Error('JAVA_INDEX_LIMIT')
       const index = indexJavaFile(file.filePath, file.source)
+      syntax = index
       methods.push(...index.methods)
       calls.push(...index.calls)
       for (const warning of index.warnings) warn(warning.code, warning.filePath, warning.message)
@@ -56,7 +58,7 @@ export async function preprocessJava(
     }
     const candidates = manual
       ? []
-      : findRiskCandidates(file.filePath, file.source, maxResults + 1 - risks.length)
+      : findRiskCandidates(file.filePath, file.source, maxResults + 1 - risks.length, syntax)
     for (const candidate of candidates) {
       if (risks.length >= maxResults) {
         candidateOverflow = true

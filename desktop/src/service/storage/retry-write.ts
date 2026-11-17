@@ -7,7 +7,12 @@ export async function retryWrite<T>(work: () => T): Promise<T> {
     try {
       return work()
     } catch (error) {
-      if (!(error instanceof ApiError) || error.code !== 'DB_QUERY_FAILED' || attempt >= 2)
+      if (
+        !(error instanceof ApiError) ||
+        error.code !== 'DB_QUERY_FAILED' ||
+        !error.retryable ||
+        attempt >= 2
+      )
         throw error
       await delay(50 * (attempt + 1))
     }

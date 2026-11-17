@@ -338,6 +338,32 @@ export class UnifiedQueryService {
     else if (!items.length && request.operation !== 'prepare') result.status = 'no-match'
     return result
   }
+  async mcpProjection(
+    projectId: string,
+    runId: string,
+    signal: AbortSignal
+  ): Promise<import('./graph-contracts.ts').McpGraphProjection> {
+    const info = this.repo.snapshots.info(projectId, runId)
+    const engine = this.engine
+    if (
+      !(engine instanceof CodeGraphEngine) ||
+      this.repo.graphs.get(projectId, runId)?.backend === 'basic'
+    )
+      return { engine: 'basic', gaps: ['CODEGRAPH_NOT_AVAILABLE'], methods: [], calls: [] }
+    return engine.mcpProjection(
+      {
+        projectId,
+        runId,
+        snapshotId: info.snapshotId,
+        sourceStamp: info.sourceStamp,
+        files: info.files.map((f) => ({
+          filePath: f.filePath,
+          source: this.repo.snapshots.read(projectId, runId, f.filePath)
+        }))
+      },
+      signal
+    )
+  }
   restoreCalls(projectId: string, runId: string, methods: JavaMethod[], calls: JavaCall[]): void {
     const binding = this.repo.graphs.get(projectId, runId)
     if (!binding || binding.backend === 'basic') return

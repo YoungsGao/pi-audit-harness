@@ -162,7 +162,7 @@ test('transient result writes retry at most three times without another Pi reque
   let writes = 0
   const complete = h.repo.scans.complete.bind(h.repo.scans)
   h.repo.scans.complete = (...args) => {
-    if (++writes <= 2) throw new ApiError('DB_QUERY_FAILED', 'fixture transient lock')
+    if (++writes <= 2) throw new ApiError('DB_QUERY_FAILED', 'fixture transient lock', 500, true)
     return complete(...args)
   }
   h.chains.analysis.start(h.scope.projectId, h.scope.runId, pathId, 'model')
@@ -203,7 +203,7 @@ test('transient result writes retry at most three times without another Pi reque
 test('persistent result transaction failure rolls back success, persists failed unknown and stops the queue', async (t) => {
   const h = await createAgentHarness(t)
   h.db.exec(
-    "CREATE TRIGGER reject_success BEFORE INSERT ON stream_events WHEN NEW.event='completed' BEGIN SELECT RAISE(ABORT,'fixture'); END"
+    "CREATE TRIGGER reject_success BEFORE INSERT ON audit_events WHEN NEW.stream_event='completed' BEGIN SELECT RAISE(ABORT,'fixture'); END"
   )
   h.chains.analysis.startPending(h.scope.projectId, h.scope.runId, 'model', 10)
   await h.chains.analysis.waitForIdle()
@@ -212,7 +212,10 @@ test('persistent result transaction failure rolls back success, persists failed 
   assert.equal(stats.pending, 1)
   assert.equal(stats.analyzing, 0)
   assert.equal(stats.safe, 0)
-  assert.equal(h.db.get("SELECT count(*) AS n FROM stream_events WHERE event='completed'").n, 0)
+  assert.equal(
+    h.db.get("SELECT count(*) AS n FROM audit_events WHERE stream_event='completed'").n,
+    0
+  )
   const failedPath = h.repo.list(h.scope).paths.find((p) => p.status === 'failed').pathId
   const history = await h.chains.action('history', { ...h.scope, pathId: failedPath })
   assert.equal(history.frames.at(-1).event, 'failed')
@@ -230,7 +233,7 @@ test('unwritable failure state yields explicit runtime persistence fault, no unh
   }
   h.chains.analysis = new PathAnalysisService(h.repo, h.query, async (input) => {
     h.db.exec(
-      "CREATE TRIGGER reject_events BEFORE INSERT ON stream_events BEGIN SELECT RAISE(ABORT,'fixture disk unavailable'); END"
+      "CREATE TRIGGER reject_events BEFORE INSERT ON audit_events BEGIN SELECT RAISE(ABORT,'fixture disk unavailable'); END"
     )
     return {
       verdict: 'unknown',
@@ -269,7 +272,8 @@ test('unwritable failure state yields explicit runtime persistence fault, no unh
   })
   assert.equal(h.repo.detail({ ...h.scope, pathId }).status, 'analyzing') // Honest DB state, explicitly marked unconfirmed by the service.
   assert.equal(
-    h.db.get("SELECT count(*) AS n FROM stream_events WHERE event IN ('completed','failed')").n,
+    h.db.get("SELECT count(*) AS n FROM audit_events WHERE stream_event IN ('completed','failed')")
+      .n,
     0
   )
   h.db.exec('DROP TRIGGER reject_events')
@@ -309,7 +313,7 @@ test('scan failure records a distinct run and correlated scope; unavailable fail
   assert.notEqual(failed.runId, h.scope.runId)
   assert.equal(h.repo.scans.state(h.scope.projectId, failed.runId).stage, 'failed')
   h.db.exec(
-    "CREATE TRIGGER reject_scan_failure BEFORE UPDATE ON scan_runs WHEN NEW.state='failed' BEGIN SELECT RAISE(ABORT,'fixture'); END"
+    "CREATE TRIGGER reject_scan_failure BEFORE UPDATE OF scan_state ON audit_runs WHEN NEW.scan_state='failed' BEGIN SELECT RAISE(ABORT,'fixture'); END"
   )
   await assert.rejects(h.chains.action('prepare', { projectId: h.scope.projectId }), {
     code: 'SCAN_PERSISTENCE_FAILED'

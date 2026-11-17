@@ -22,7 +22,7 @@ test('MOD-04 actual Pi transport sends zero requests when resolved configuration
       h.ports.getConfig = async (id) => ({ ...(await original(id)), revision: 2 })
     } else
       h.db.exec(
-        "CREATE TRIGGER reject_transmission BEFORE INSERT ON source_transmissions BEGIN SELECT RAISE(ABORT,'fixture'); END"
+        "CREATE TRIGGER reject_transmission BEFORE INSERT ON model_requests BEGIN SELECT RAISE(ABORT,'fixture'); END"
       )
     await h.chains.action('analyze', {
       ...h.scope,
@@ -59,7 +59,7 @@ test('SRC-03 detects damaged saved bytes without falling back to mutable source;
 test('MOD-04 observed-model write failure settles failed unknown without an unhandled subscriber exception', async (t) => {
   const h = await createAgentHarness(t)
   h.db.exec(
-    "CREATE TRIGGER reject_observed_model BEFORE UPDATE ON source_transmissions BEGIN SELECT RAISE(ABORT,'fixture'); END"
+    "CREATE TRIGGER reject_observed_model BEFORE UPDATE OF observed_model_id ON model_requests BEGIN SELECT RAISE(ABORT,'fixture'); END"
   )
   await h.chains.action('analyze', {
     ...h.scope,
@@ -125,7 +125,9 @@ test('SRC-03 persists exact bytes, manifest/ignore scope and read-only task bind
   assert.throws(() => h.db.run('UPDATE snapshot_files SET content=?', Buffer.from('changed')), {
     code: 'DB_QUERY_FAILED'
   })
-  assert.throws(() => h.db.run('DELETE FROM run_snapshots'), { code: 'DB_QUERY_FAILED' })
+  assert.throws(() => h.db.run('UPDATE audit_runs SET snapshot_id=NULL'), {
+    code: 'DB_QUERY_FAILED'
+  })
   const reopened = openStorage(join(h.root, 'runtime'))
   try {
     assert.equal(
@@ -186,7 +188,7 @@ test('MOD-04 denies all fresh starts before consent, reuses same snapshot, rejec
   await h.chains.action('analyze', start)
   await h.chains.analysis.waitForIdle()
   assert.equal(reviews, 1)
-  assert.equal(h.db.get('SELECT * FROM source_transmissions').observed_model_id, 'fixture-observed')
+  assert.equal(h.db.get('SELECT * FROM model_requests').observed_model_id, 'fixture-observed')
   const next = await h.chains.action('prepare', { projectId: h.scope.projectId })
   assert.equal(
     (await h.chains.action('disclosure', { ...h.scope, runId: next.runId, modelConfigId: 'model' }))
@@ -246,7 +248,7 @@ test('SCAN-02 authenticates fixed routes, validates snapshot positions and idemp
   await writeFile(join(h.path, 'Demo.java'), 'changed')
   const saved = await send('manualRisk', h.manual)
   assert.equal(saved.ok, true)
-  assert.equal(h.db.get('SELECT count(*) AS n FROM run_graph_bindings').n, 0)
+  assert.equal(h.db.get('SELECT count(*) AS n FROM audit_runs WHERE graph_json IS NOT NULL').n, 0)
   assert.equal(saved.data.pathIds.length, 1)
   assert.deepEqual((await send('manualRisk', h.manual)).data, saved.data)
   const detail = await send('detail', { ...h.scope, pathId: saved.data.pathIds[0] })

@@ -20,6 +20,8 @@ export function mergeAnalysisFrames(
   return [...unique.values()].sort((a, b) => a.id - b.id).slice(-200)
 }
 export function analysisErrorHelp(code: string): string {
+  if (/MCP_/.test(code))
+    return 'MCP工具返回、回执或固定配置未通过检查，风险保持未知。查看工具输入输出；本地扫描器缺失会显示unavailable，不能据此认定安全。'
   if (/MODEL_SECRET_EXPOSED/.test(code))
     return '模型回复包含当前配置的凭据，应用已拒绝保存回复，风险保持未知。请检查所用服务；不要把密钥粘贴进审计材料。'
   if (code === 'AGENT_DECISION_INVALID')

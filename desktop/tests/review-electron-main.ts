@@ -225,7 +225,7 @@ void app.whenReady().then(async () => {
       }
     })
     await window.loadFile(join(__dirname, '../renderer/index.html'))
-    await until(() => js('document.querySelectorAll("nav button").length===5'), 'navigation ready')
+    await until(() => js('document.querySelectorAll("nav button").length===7'), 'navigation ready')
     await click('模型配置', true)
     await until(() => js('!!document.querySelector(".model-config-layout")'))
     assert.equal(
@@ -443,7 +443,7 @@ void app.whenReady().then(async () => {
     window.webContents.reload()
     await reloaded
     await until(
-      () => js('document.querySelectorAll("nav button").length===5'),
+      () => js('document.querySelectorAll("nav button").length===7'),
       'navigation after reload'
     )
     await click('模型配置', true)

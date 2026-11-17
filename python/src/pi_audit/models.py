@@ -80,3 +80,5 @@ class ToolReply(StrictModel):
             if self.status != expected:
                 raise ValueError("status 与截断状态不一致")
         return self
+
+

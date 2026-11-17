@@ -24,6 +24,7 @@ import { WindowsCredentialStore } from './storage/credential-store'
 import { ReportRepository } from './storage/report-repository'
 import { ReportService } from './reports/service'
 import { ReviewService } from './reviews/service'
+import { EvaluationService } from './evaluation/service'
 
 const parent = process.parentPort
 if (!parent) throw new Error('请通过 Electron 启动正式服务入口')
@@ -36,6 +37,7 @@ let sources: SourceService | undefined
 let queries: CodeQueryService | undefined
 let chains: CallChainService | undefined
 let reports: ReportService | undefined
+let evaluations: EvaluationService | undefined
 let initialized = false
 let closing = false
 let lastHeartbeat = Date.now()
@@ -53,6 +55,7 @@ function shutdown(exitCode = 0): void {
     const results = await Promise.allSettled([chains?.close(), runtime?.close(), running?.close()])
     // 先停止接收请求并等待 HTTP/Pi 清理，再关闭本服务唯一的数据库连接。
     await sources?.close()
+    await evaluations?.close()
     await chains?.close()
     await queries?.close()
     await reports?.close()
@@ -124,6 +127,7 @@ parent.on('message', (event: { data: unknown }) => {
   const currentMetadata = metadata!
   const operations = new PiOperations(currentRuntime, currentMetadata.modelPorts())
   reports = new ReportService(database!, message.dataRoot)
+  evaluations = new EvaluationService(message.dataRoot, metadata!.modelPorts())
   chains!.analysis = new PathAnalysisService(
     chainRepository!,
     queries!,
@@ -131,6 +135,8 @@ parent.on('message', (event: { data: unknown }) => {
     true
   )
   startingServer = startHttpServer(message.token, {
+    evaluationAction: (action, value) => evaluations!.action(action, value),
+    mcpAction: (action, value, signal) => queries!.mcp.action(action, value, signal),
     reviewAction: (action, value, signal) =>
       new ReviewService(database!, queries!).action(action, value, signal),
     templateAction: (action, value, signal) =>

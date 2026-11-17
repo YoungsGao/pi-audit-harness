@@ -64,8 +64,7 @@ export class MetadataRepository {
       // 已导入源码带有来源键和登记指纹；旧元数据表单不能绕过导入流程改写路径/来源。
       if (
         input.projectId &&
-        tx.get("SELECT name FROM sqlite_schema WHERE name='source_imports'") &&
-        tx.get('SELECT project_id FROM source_imports WHERE project_id=?', input.projectId)
+        tx.get('SELECT id FROM projects WHERE id=? AND source_key IS NOT NULL', input.projectId)
       )
         throw new ApiError(
           'SOURCE_PROJECT_LOCKED',
